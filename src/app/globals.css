@@ -1,0 +1,158 @@
+@import "tw-animate-css";
+@import "shadcn/tailwind.css";
+@import url('https://fonts.googleapis.com/css2?family=DM+Sans:ital,opsz,wght@0,9..40,100..1000;1,9..40,100..1000&family=DM+Serif+Display:ital@0;1&display=swap');
+
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+:root {
+  /* Warm off-white background and Sage Green color palette */
+  --background: 120 20% 98%;
+  --foreground: 120 15% 15%;
+  --page-bg: #dde6e2;
+
+  --card: 0 0% 100%;
+  --card-foreground: 120 15% 15%;
+
+  --popover: 0 0% 100%;
+  --popover-foreground: 120 15% 15%;
+
+  /* Sage Green Palette */
+  --primary: 120 20% 35%;
+  --primary-foreground: 120 10% 98%;
+
+  --secondary: 120 15% 90%;
+  --secondary-foreground: 120 20% 30%;
+
+  --muted: 120 10% 93%;
+  --muted-foreground: 120 10% 50%;
+
+  --accent: 120 15% 88%;
+  --accent-foreground: 120 20% 25%;
+
+  --destructive: 0 84.2% 60.2%;
+  --destructive-foreground: 0 0% 98%;
+
+  --border: 120 10% 85%;
+  --input: 120 10% 85%;
+  --ring: 120 20% 35%;
+
+  --radius: 1rem;
+
+  /* Glass tokens */
+  --glass-bg: rgba(255, 255, 255, 0.85);
+  --glass-border: rgba(74, 124, 111, 0.15);
+  --glass-strong: rgba(255, 255, 255, 0.95);
+  --ink: #1a2e28;
+  --ink-muted: rgba(26, 46, 40, 0.55);
+  --ink-faint: rgba(26, 46, 40, 0.2);
+  --glass-shadow: 0 1px 3px rgba(74, 124, 111, 0.08), 0 4px 12px rgba(74, 124, 111, 0.06);
+  --sage: #4a7c6f;
+  --sage-light: rgba(74, 124, 111, 0.1);
+  --sage-mid: #6ba395;
+  --accent: #c8602a;
+  --accent-bg: rgba(200, 96, 42, 0.12);
+}
+
+.dark {
+  --background: 120 10% 10%;
+  --foreground: 120 10% 95%;
+  --page-bg: #14211d;
+
+  --card: 120 10% 13%;
+  --card-foreground: 120 10% 95%;
+
+  --popover: 120 10% 13%;
+  --popover-foreground: 120 10% 95%;
+
+  --primary: 120 15% 45%;
+  --primary-foreground: 120 10% 10%;
+
+  --secondary: 120 10% 20%;
+  --secondary-foreground: 120 10% 90%;
+
+  --muted: 120 10% 18%;
+  --muted-foreground: 120 10% 65%;
+
+  --accent: 120 10% 22%;
+  --accent-foreground: 120 10% 90%;
+
+  --destructive: 0 62.8% 30.6%;
+  --destructive-foreground: 120 10% 95%;
+
+  --border: 120 10% 20%;
+  --input: 120 10% 20%;
+  --ring: 120 15% 45%;
+
+  /* Dark mode glass */
+  --glass-bg: rgba(26, 40, 36, 0.85);
+  --glass-border: rgba(255, 255, 255, 0.08);
+  --glass-strong: rgba(18, 28, 25, 0.92);
+  --ink: #ffffff;
+  --ink-muted: rgba(255, 255, 255, 0.5);
+  --ink-faint: rgba(255, 255, 255, 0.18);
+  --glass-shadow: 0 4px 20px rgba(0, 0, 0, 0.3);
+}
+
+* {
+  @apply border-border;
+}
+
+body {
+  @apply antialiased;
+  font-family: 'DM Sans', sans-serif;
+  background: var(--page-bg);
+  color: hsl(var(--foreground));
+}
+
+h1, h2, h3, h4, h5, h6 {
+  font-family: 'DM Serif Display', serif;
+}
+
+/* Custom Scrollbars to be subtle */
+::-webkit-scrollbar {
+  width: 6px;
+  height: 6px;
+}
+::-webkit-scrollbar-track {
+  background: transparent;
+}
+::-webkit-scrollbar-thumb {
+  background: rgba(120, 150, 120, 0.3);
+  border-radius: 9999px;
+}
+::-webkit-scrollbar-thumb:hover {
+  background: rgba(120, 150, 120, 0.5);
+}
+
+/* Select dropdown z-index fix */
+[data-radix-popper-content-wrapper] {
+  z-index: 9999 !important;
+}
+
+/* Session Room Animations */
+@keyframes pulse {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.35; }
+}
+
+@keyframes floatUp {
+  0% { opacity: 1; transform: translateY(0) scale(1); }
+  100% { opacity: 0; transform: translateY(-120px) scale(1.4); }
+}
+
+.animate-pulse-slow {
+  animation: pulse 1.4s ease infinite;
+}
+
+.animate-float-up {
+  animation: floatUp 1.8s ease forwards;
+}
+
+@keyframes toastInOut {
+  0% { opacity: 0; }
+  15% { opacity: 1; }
+  75% { opacity: 1; }
+  100% { opacity: 0; }
+}

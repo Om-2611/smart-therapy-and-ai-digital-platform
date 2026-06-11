@@ -1,0 +1,121 @@
+generator client {
+  provider        = "prisma-client-js"
+  previewFeatures = ["postgresqlExtensions"]
+}
+
+datasource db {
+  provider   = "postgresql"
+  url        = env("DATABASE_URL")
+  extensions = [vector]
+}
+
+enum Role {
+  THERAPIST
+  CLIENT
+  ADMIN
+}
+
+enum SessionStatus {
+  SCHEDULED
+  ACTIVE
+  COMPLETED
+  CANCELLED
+}
+
+model User {
+  id        String   @id // Firebase Auth UID
+  email     String   @unique
+  role      Role     @default(CLIENT)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  therapist ProfileTherapist?
+  client    ProfileClient?
+}
+
+model ProfileTherapist {
+  id        String   @id @default(uuid())
+  userId    String   @unique
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  firstName String
+  lastName  String
+  specialty String[] // SLD, ADHD, Anxiety, Depression, ID, Dyslexia, Autism etc.
+  bio       String?
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  sessions Session[]
+  notes    TherapistNote[]
+  bookings Booking[]
+}
+
+model ProfileClient {
+  id          String    @id @default(uuid())
+  userId      String    @unique
+  user        User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  firstName   String
+  lastName    String
+  dateOfBirth DateTime
+  diagnosis   String[]
+  parentEmail String?
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+  bookings    Booking[]
+  sessions    Session[]
+}
+
+model DocumentChunk {
+  id          String                       @id @default(uuid())
+  therapistId String                       @map("therapist_id")
+  sessionId   String?                      @map("session_id")
+  fileName    String                       @map("file_name")
+  chunkIndex  Int                          @map("chunk_index")
+  chunkText   String                       @map("chunk_text")
+  embedding   Unsupported("vector(1024)")?
+  createdAt   DateTime                     @default(now()) @map("created_at")
+  metadata    Json                         @default("{}")
+
+  @@index([therapistId])
+  @@map("document_chunks")
+}
+
+model Booking {
+  id          String           @id @default(uuid())
+  therapistId String
+  therapist   ProfileTherapist @relation(fields: [therapistId], references: [id])
+  clientId    String
+  client      ProfileClient    @relation(fields: [clientId], references: [id])
+  dateTime    DateTime
+  duration    Int              @default(50) // duration in minutes
+  status      String           @default("pending") // pending, confirmed, cancelled
+  createdAt   DateTime         @default(now())
+  updatedAt   DateTime         @updatedAt
+}
+
+model Session {
+  id          String           @id @default(uuid())
+  therapistId String
+  therapist   ProfileTherapist @relation(fields: [therapistId], references: [id])
+  clientId    String
+  client      ProfileClient    @relation(fields: [clientId], references: [id])
+  status      SessionStatus    @default(SCHEDULED)
+  scheduledAt DateTime
+  startedAt   DateTime?
+  endedAt     DateTime?
+  createdAt   DateTime         @default(now())
+  updatedAt   DateTime         @updatedAt
+
+  notes TherapistNote[]
+}
+
+model TherapistNote {
+  id          String           @id @default(uuid())
+  sessionId   String
+  session     Session          @relation(fields: [sessionId], references: [id], onDelete: Cascade)
+  therapistId String
+  therapist   ProfileTherapist @relation(fields: [therapistId], references: [id], onDelete: Cascade)
+  content     String // Calming notes, clinical progress logs
+  isPrivate   Boolean          @default(true)
+  createdAt   DateTime         @default(now())
+  updatedAt   DateTime         @updatedAt
+}
