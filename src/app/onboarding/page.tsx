@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, Suspense } from 'react';
 import { useAuthStore } from '@/store/useAuthStore';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { Card, CardHeader, CardTitle, CardDescription, CardContent } from '@/components/ui/card';
@@ -8,11 +8,24 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 
-export default function OnboardingPage() {
+function OnboardingForm() {
   const { uid, email, setRoleAndProfile } = useAuthStore();
   const searchParams = useSearchParams();
+  const inviteToken = searchParams.get('invite');
   const router = useRouter();
   const [role, setRole] = useState<'THERAPIST' | 'CLIENT'>('THERAPIST');
+
+  // Therapist profile fields
+  const [firstName, setFirstName] = useState('');
+  const [lastName, setLastName] = useState('');
+  const [specialtyInput, setSpecialtyInput] = useState('');
+
+  // Client profile fields
+  const [dob, setDob] = useState('');
+  const [diagnosisInput, setDiagnosisInput] = useState('');
+
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
     const param = searchParams.get('role') as 'THERAPIST' | 'CLIENT' | null;
@@ -20,18 +33,22 @@ export default function OnboardingPage() {
       setRole(param);
     }
   }, [searchParams]);
-  
-  // Therapist profile fields
-  const [firstName, setFirstName] = useState('');
-  const [lastName, setLastName] = useState('');
-  const [specialtyInput, setSpecialtyInput] = useState('');
-  
-  // Client profile fields
-  const [dob, setDob] = useState('');
-  const [diagnosisInput, setDiagnosisInput] = useState('');
-  
-  const [loading, setLoading] = useState(false);
-  const [error, setError] = useState<string | null>(null);
+
+  // Invite flow: lock role to CLIENT and prefill name + diagnosis from the invite.
+  useEffect(() => {
+    if (!inviteToken) return;
+    setRole('CLIENT');
+    fetch(`/api/invites/${inviteToken}`)
+      .then((res) => (res.ok ? res.json() : null))
+      .then((data) => {
+        if (data?.invite) {
+          setFirstName(data.invite.firstName || '');
+          setLastName(data.invite.lastName || '');
+          setDiagnosisInput((data.invite.diagnosis || []).join(', '));
+        }
+      })
+      .catch(() => {});
+  }, [inviteToken]);
 
   useEffect(() => {
     if (!uid) {
@@ -62,6 +79,7 @@ export default function OnboardingPage() {
           specialty,
           dateOfBirth: dob || undefined,
           diagnosis,
+          inviteToken: inviteToken || undefined,
         }),
       });
 
@@ -71,8 +89,7 @@ export default function OnboardingPage() {
       }
 
       const data = await response.json();
-      const profile = role === 'THERAPIST' ? data.user.therapist : data.user.client;
-      setRoleAndProfile(role, profile);
+      setRoleAndProfile(role, data.profile);
       router.push('/');
     } catch (err: any) {
       setError(err.message || 'Onboarding registration failed');
@@ -92,59 +109,66 @@ export default function OnboardingPage() {
         </CardHeader>
         <CardContent>
           <form onSubmit={handleSubmit} className="space-y-6">
-            <div className="space-y-2">
-              <Label className="font-medium" style={{ color: 'var(--ink-muted)' }}>Select Your Account Type</Label>
-              <div className="flex gap-2">
-                <button
-                  type="button"
-                  onClick={() => setRole('THERAPIST')}
-                  className={`flex-1 py-2.5 rounded-xl text-sm font-semibold transition-all border ${
-                    role === 'THERAPIST'
-                      ? 'text-white shadow-sm'
-                      : 'text-[var(--ink-muted)] border-[var(--glass-border)] hover:border-[var(--sage)]/40'
-                  }`}
-                  style={role === 'THERAPIST' ? { background: 'var(--sage)', borderColor: 'var(--sage)' } : { background: 'var(--glass-bg)' }}
-                >
-                  Therapist
-                </button>
-                <button
-                  type="button"
-                  onClick={() => setRole('CLIENT')}
-                  className={`flex-1 py-2.5 rounded-xl text-sm font-semibold transition-all border ${
-                    role === 'CLIENT'
-                      ? 'text-white shadow-sm'
-                      : 'text-[var(--ink-muted)] border-[var(--glass-border)] hover:border-[var(--sage)]/40'
-                  }`}
-                  style={role === 'CLIENT' ? { background: 'var(--sage)', borderColor: 'var(--sage)' } : { background: 'var(--glass-bg)' }}
-                >
-                  Client / Student
-                </button>
+            {inviteToken ? (
+              <div className="rounded-xl p-3 text-sm font-medium" style={{ background: 'var(--c-accent-bg)', color: 'var(--c-accent)', border: '1px solid var(--glass-border)' }}>
+                Joining as a patient — your name and diagnosis were set by your therapist. Just add your date of birth below.
               </div>
-            </div>
+            ) : (
+              <div className="space-y-2">
+                <Label className="font-medium" style={{ color: 'var(--ink-muted)' }}>Select Your Account Type</Label>
+                <div className="flex gap-2">
+                  <button
+                    type="button"
+                    onClick={() => setRole('THERAPIST')}
+                    className={`flex-1 py-2.5 rounded-xl text-sm font-semibold transition-all border ${
+                      role === 'THERAPIST'
+                        ? 'text-white shadow-sm'
+                        : 'text-[var(--ink-muted)] border-[var(--glass-border)] hover:border-[var(--sage)]/40'
+                    }`}
+                    style={role === 'THERAPIST' ? { background: 'var(--sage)', borderColor: 'var(--sage)' } : { background: 'var(--glass-bg)' }}
+                  >
+                    Therapist
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setRole('CLIENT')}
+                    className={`flex-1 py-2.5 rounded-xl text-sm font-semibold transition-all border ${
+                      role === 'CLIENT'
+                        ? 'text-white shadow-sm'
+                        : 'text-[var(--ink-muted)] border-[var(--glass-border)] hover:border-[var(--sage)]/40'
+                    }`}
+                    style={role === 'CLIENT' ? { background: 'var(--sage)', borderColor: 'var(--sage)' } : { background: 'var(--glass-bg)' }}
+                  >
+                    Client / Student
+                  </button>
+                </div>
+              </div>
+            )}
 
             <div className="grid grid-cols-2 gap-4">
               <div className="space-y-1">
                 <Label htmlFor="firstName" className="font-medium" style={{ color: 'var(--ink-muted)' }}>First Name</Label>
-                <Input 
-                  id="firstName" 
-                  value={firstName} 
-                  onChange={(e) => setFirstName(e.target.value)} 
+                <Input
+                  id="firstName"
+                  value={firstName}
+                  onChange={(e) => setFirstName(e.target.value)}
                   required
+                  readOnly={!!inviteToken}
                   placeholder="John"
                   className="rounded-xl border"
-                  style={{ background: 'var(--glass-bg)', borderColor: 'var(--glass-border)', color: 'var(--ink)' }}
+                  style={{ background: 'var(--glass-bg)', borderColor: 'var(--glass-border)', color: 'var(--ink)', opacity: inviteToken ? 0.7 : 1 }}
                 />
               </div>
               <div className="space-y-1">
                 <Label htmlFor="lastName" className="font-medium" style={{ color: 'var(--ink-muted)' }}>Last Name</Label>
-                <Input 
-                  id="lastName" 
-                  value={lastName} 
-                  onChange={(e) => setLastName(e.target.value)} 
-                  required
+                <Input
+                  id="lastName"
+                  value={lastName}
+                  onChange={(e) => setLastName(e.target.value)}
+                  readOnly={!!inviteToken}
                   placeholder="Doe"
                   className="rounded-xl border"
-                  style={{ background: 'var(--glass-bg)', borderColor: 'var(--glass-border)', color: 'var(--ink)' }}
+                  style={{ background: 'var(--glass-bg)', borderColor: 'var(--glass-border)', color: 'var(--ink)', opacity: inviteToken ? 0.7 : 1 }}
                 />
               </div>
             </div>
@@ -177,13 +201,14 @@ export default function OnboardingPage() {
                 </div>
                 <div className="space-y-1">
                   <Label htmlFor="diagnosis" className="font-medium" style={{ color: 'var(--ink-muted)' }}>Diagnosis / Learning Needs (comma-separated)</Label>
-                  <Input 
-                    id="diagnosis" 
-                    value={diagnosisInput} 
-                    onChange={(e) => setDiagnosisInput(e.target.value)} 
+                  <Input
+                    id="diagnosis"
+                    value={diagnosisInput}
+                    onChange={(e) => setDiagnosisInput(e.target.value)}
+                    readOnly={!!inviteToken}
                     placeholder="ADHD, Anxiety, Dyslexia"
                     className="rounded-xl border"
-                    style={{ background: 'var(--glass-bg)', borderColor: 'var(--glass-border)', color: 'var(--ink)' }}
+                    style={{ background: 'var(--glass-bg)', borderColor: 'var(--glass-border)', color: 'var(--ink)', opacity: inviteToken ? 0.7 : 1 }}
                   />
                 </div>
               </div>
@@ -205,5 +230,13 @@ export default function OnboardingPage() {
         </CardContent>
       </Card>
     </div>
+  );
+}
+
+export default function OnboardingPage() {
+  return (
+    <Suspense fallback={null}>
+      <OnboardingForm />
+    </Suspense>
   );
 }

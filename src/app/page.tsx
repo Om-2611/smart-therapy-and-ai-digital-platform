@@ -11,7 +11,8 @@ import { Card, CardHeader, CardTitle, CardDescription, CardContent } from '@/com
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from '@/components/ui/dialog';
 import { Select, SelectTrigger, SelectValue, SelectContent, SelectItem } from '@/components/ui/select';
 import { useTheme } from '@/components/ThemeProvider';
-import { Plus, Play, Calendar, ClipboardList, LogOut, ArrowRight, UserCheck, Heart, Moon, Sun } from 'lucide-react';
+import DashboardLayout from '@/components/layout/DashboardLayout';
+import { Plus, Play, Calendar, CalendarClock, ClipboardList, ArrowRight, UserCheck, UserPlus, Users, Heart, Copy, Check } from 'lucide-react';
 
 interface Booking {
   id: string;
@@ -37,9 +38,13 @@ interface ClientProfile {
   diagnosis: string[];
 }
 
-const GLASS_CARD = 'bg-white dark:bg-[#16221e] shadow-[var(--glass-shadow)] rounded-2xl border border-[var(--glass-border)]';
+// Creamy translucent surfaces in light mode; original dark surface in dark mode.
+const CARD_BASE =
+  'rounded-[14px] border-[0.5px] border-[var(--glass-border)] shadow-[var(--glass-shadow)] bg-[var(--glass-bg)] dark:bg-[#16221e] animate-fade-up';
+const GLASS_CARD = `${CARD_BASE} hover-lift`;
+const STAT_CARD = `${CARD_BASE} stat-hover`;
 const GLASS_INNER = 'bg-[var(--sage-light)]';
-const GLASS_STRONG = 'bg-white/90 dark:bg-[rgba(18,28,25,0.92)] backdrop-blur-xl border-b border-[var(--glass-border)]';
+const GLASS_STRONG = 'bg-[var(--nav-bg)] backdrop-blur-[8px] border-b border-[var(--glass-border)]';
 
 export default function Home() {
   const { uid, role, profile } = useAuthStore();
@@ -59,9 +64,21 @@ export default function Home() {
   const [duration, setDuration] = useState(50);
   const [loading, setLoading] = useState(false);
 
+  // Add Patient (invite) State
+  const [isAddPatientModalOpen, setIsAddPatientModalOpen] = useState(false);
+  const [patientFirstName, setPatientFirstName] = useState('');
+  const [patientLastName, setPatientLastName] = useState('');
+  const [patientDiagnosisInput, setPatientDiagnosisInput] = useState('');
+  const [inviteLink, setInviteLink] = useState('');
+  const [copied, setCopied] = useState(false);
+
   useEffect(() => {
     if (!uid) {
       router.push('/auth');
+      return;
+    }
+    if (role === 'ADMIN') {
+      router.push('/admin');
       return;
     }
     fetchDashboardData();
@@ -71,7 +88,7 @@ export default function Home() {
     if (!profile) return;
     try {
       const queryParam = role === 'THERAPIST' ? `therapistId=${profile.id}` : `clientId=${profile.id}`;
-      
+
       const [bookingsRes, sessionsRes] = await Promise.all([
         fetch(`/api/bookings?${queryParam}`),
         fetch(`/api/sessions?${queryParam}`)
@@ -157,6 +174,51 @@ export default function Home() {
     }
   };
 
+  const handleAddPatient = async () => {
+    if (!profile || !patientFirstName.trim()) return;
+    setLoading(true);
+    try {
+      const diagnosis = patientDiagnosisInput.split(',').map((d) => d.trim()).filter((d) => d.length > 0);
+      const response = await fetch('/api/invites', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          therapistId: profile.id,
+          firstName: patientFirstName.trim(),
+          lastName: patientLastName.trim(),
+          diagnosis,
+        }),
+      });
+      if (response.ok) {
+        const data = await response.json();
+        setInviteLink(`${window.location.origin}/auth?invite=${data.token}`);
+      }
+    } catch (err) {
+      console.error('Failed to create invite:', err);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const resetAddPatient = () => {
+    setIsAddPatientModalOpen(false);
+    setPatientFirstName('');
+    setPatientLastName('');
+    setPatientDiagnosisInput('');
+    setInviteLink('');
+    setCopied(false);
+  };
+
+  const handleCopyInvite = async () => {
+    try {
+      await navigator.clipboard.writeText(inviteLink);
+      setCopied(true);
+      setTimeout(() => setCopied(false), 2000);
+    } catch (err) {
+      console.error('Copy failed:', err);
+    }
+  };
+
   const handleLogout = async () => {
     await signOut(auth);
     router.push('/auth');
@@ -170,340 +232,349 @@ export default function Home() {
     );
   }
 
+  const initials = `${profile.firstName?.[0] ?? ''}${profile.lastName?.[0] ?? ''}`.toUpperCase();
+  const nameInitials = (f?: string, l?: string) => `${f?.[0] ?? ''}${l?.[0] ?? ''}`.toUpperCase();
+
+  const therapistStats = [
+    { icon: Play, label: 'Active rooms', value: sessions.filter((s) => s.status === 'ACTIVE').length },
+    { icon: CalendarClock, label: 'Appointments', value: bookings.length },
+    { icon: Users, label: 'Clients', value: clients.length },
+    { icon: ClipboardList, label: 'Total sessions', value: sessions.length },
+  ];
+
   return (
-    <div className="min-h-screen py-10 px-6 md:px-16 lg:px-24" style={{ background: 'var(--page-bg)' }}>
-      {/* Header */}
-      <header className={`flex flex-col md:flex-row md:items-center justify-between gap-4 pb-8 ${GLASS_STRONG} -mx-6 md:-mx-16 lg:-mx-24 px-6 md:px-16 lg:px-24 py-5 sticky top-0 z-40`}>
-        <div>
-          <div className="flex items-center gap-2 font-bold text-sm uppercase tracking-wider mb-1" style={{ color: 'var(--sage)' }}>
-            <Heart className="h-4 w-4" style={{ fill: 'var(--sage)' }} /> Core therapy space
-          </div>
-          <h1 className="text-4xl md:text-5xl font-heading" style={{ color: 'var(--ink)' }}>
-            Welcome back, {profile.firstName}
-          </h1>
-          <p className="mt-2 text-md max-w-lg font-medium" style={{ color: 'var(--ink-muted)' }}>
-            {role === 'THERAPIST' 
-              ? 'Real-time interactive modules, calm interfaces, and session workspace tools.' 
-              : 'Your space to collaborate with your therapist on interactive games and tasks.'
-            }
-          </p>
+    <DashboardLayout role={role} profile={profile}>
+      {theme === 'light' && (
+        <div aria-hidden className="pointer-events-none absolute inset-0 overflow-hidden">
+          <div
+            className="blob animate-blob"
+            style={{ top: '-14%', right: '-8%', width: '38vw', height: '38vw', background: 'radial-gradient(circle at 70% 30%, rgba(200, 96, 42, 0.10), transparent 70%)' }}
+          />
+          <div
+            className="blob animate-blob"
+            style={{ bottom: '-18%', left: '-10%', width: '40vw', height: '40vw', background: 'radial-gradient(circle at 30% 70%, rgba(156, 125, 89, 0.12), transparent 70%)', animationDelay: '-9s' }}
+          />
         </div>
-        <div className="flex items-center gap-3">
-          <button
-            onClick={toggleTheme}
-            className="w-9 h-9 rounded-lg flex items-center justify-center"
-            style={{
-              background: 'var(--glass-bg)',
-              border: '1px solid var(--glass-border)',
-              color: 'var(--ink-muted)',
-              cursor: 'pointer',
-            }}
-          >
-            {theme === 'light' ? <Moon size={15} /> : <Sun size={15} />}
-          </button>
+      )}
+
+      <div className="relative z-10">
+        {/* Inline welcome + actions */}
+        <div className="flex flex-col gap-4 md:flex-row md:items-center md:justify-between mb-8 animate-fade-in">
+          <div className="flex items-center gap-4">
+            <div
+              className="flex h-12 w-12 shrink-0 items-center justify-center rounded-2xl text-lg font-bold text-white shadow-sm"
+              style={{ background: 'linear-gradient(135deg, var(--sage), var(--sage-mid))' }}
+            >
+              {initials || '🙂'}
+            </div>
+            <div>
+              <div className="flex items-center gap-2 text-xs font-bold uppercase tracking-wider" style={{ color: 'var(--sage)' }}>
+                <Heart className="h-3.5 w-3.5" style={{ fill: 'var(--sage)' }} /> Core therapy space
+              </div>
+              <h1 className="font-heading text-2xl md:text-3xl" style={{ color: 'var(--ink)' }}>
+                Welcome back, {profile.firstName}
+              </h1>
+            </div>
+          </div>
           {role === 'THERAPIST' && (
-            <>
-              <Button 
-                onClick={() => setIsBookModalOpen(true)} 
+            <div className="flex flex-wrap items-center gap-2 md:gap-3">
+              <Button
+                onClick={() => setIsAddPatientModalOpen(true)}
                 variant="outline"
-                className="rounded-xl flex items-center gap-2 py-5 px-4 shadow-sm border"
-                style={{
-                  background: 'var(--glass-bg)',
-                  borderColor: 'var(--glass-border)',
-                  color: 'var(--ink)',
-                }}
+                className="btn-press rounded-xl flex items-center gap-2 py-5 px-4 shadow-sm border"
+                style={{ background: 'var(--glass-bg)', borderColor: 'var(--glass-border)', color: 'var(--ink)' }}
               >
-                <Calendar className="h-4 w-4" /> Book Appointment
+                <UserPlus className="h-4 w-4" /> <span className="hidden sm:inline">Add Patient</span>
               </Button>
-              <Button 
+              <Button
+                onClick={() => setIsBookModalOpen(true)}
+                variant="outline"
+                className="btn-press rounded-xl flex items-center gap-2 py-5 px-4 shadow-sm border"
+                style={{ background: 'var(--glass-bg)', borderColor: 'var(--glass-border)', color: 'var(--ink)' }}
+              >
+                <Calendar className="h-4 w-4" /> <span className="hidden sm:inline">Book</span>
+              </Button>
+              <Button
                 onClick={() => setIsSessionModalOpen(true)}
-                className="rounded-xl flex items-center gap-2 py-5 px-4 shadow-sm"
+                className="btn-press rounded-xl flex items-center gap-2 py-5 px-4 shadow-sm"
                 style={{ background: 'var(--sage)', color: '#fff', border: 'none' }}
               >
-                <Plus className="h-4 w-4" /> New Session Room
+                <Plus className="h-4 w-4" /> <span className="hidden sm:inline">New Session</span>
               </Button>
-            </>
+            </div>
           )}
-          <Button 
-            onClick={handleLogout} 
-            variant="ghost" 
-            className="rounded-xl flex items-center gap-2 py-5"
-            style={{ color: 'var(--ink-muted)' }}
-          >
-            <LogOut className="h-4 w-4" /> Logout
-          </Button>
         </div>
-      </header>
 
-      {/* CLIENT DASHBOARD */}
-      {role === 'CLIENT' && (
-        <main className="space-y-8 mt-10">
-          {/* Welcome & Quick Stats */}
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-            <Card className={`col-span-2 ${GLASS_CARD} p-6`}>
-              <div className="flex items-center justify-between">
-                <div>
-                  <p className="text-sm font-medium mb-1" style={{ color: 'var(--ink-muted)' }}>Hello!</p>
-                  <h2 className="text-3xl font-heading" style={{ color: 'var(--ink)' }}>Ready for something fun?</h2>
-                  <p className="mt-2 font-medium" style={{ color: 'var(--ink-muted)' }}>Your therapist is waiting for you</p>
-                </div>
-                <div className="hidden md:flex flex-col items-center gap-2">
-                  <div className="text-5xl">🌟</div>
-                  <span className="text-sm font-bold" style={{ color: 'var(--sage)' }}>Great job!</span>
-                </div>
-              </div>
-            </Card>
-            <Card className={`${GLASS_CARD} p-6`}>
-              <div className="text-center">
-                <div className="text-4xl mb-2">🔥</div>
-                <p className="text-3xl font-bold" style={{ color: 'var(--ink)' }}>{Math.floor(Math.random() * 10) + 3}</p>
-                <p className="text-sm font-medium" style={{ color: 'var(--ink-muted)' }}>Day Streak</p>
-                <p className="text-xs mt-1" style={{ color: 'var(--sage)' }}>Keep it up!</p>
-              </div>
-            </Card>
-          </div>
-
-          {/* Upcoming Session Card */}
-          {sessions.length > 0 && (
-            <Card className={`${GLASS_CARD} p-6`}>
-              <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
-                <div className="flex items-center gap-4">
-                  <div className="w-14 h-14 rounded-2xl flex items-center justify-center text-2xl" style={{ background: 'var(--sage-light)' }}>
-                    👨‍🏫
-                  </div>
+        {/* CLIENT DASHBOARD */}
+        {role === 'CLIENT' && (
+          <main className="mt-8 space-y-6">
+            {/* Welcome & Quick Stats */}
+            <div className="grid grid-cols-1 gap-6 md:grid-cols-3">
+              <Card className={`md:col-span-2 ${GLASS_CARD} p-6`}>
+                <div className="flex items-center justify-between">
                   <div>
-                    <div className="flex items-center gap-2 mb-1">
-                      <span className="text-xs font-bold px-2 py-0.5 rounded-full" style={{ color: 'var(--sage)', background: 'var(--sage-light)' }}>Upcoming</span>
-                      {sessions[0]?.status === 'ACTIVE' && (
-                        <span className="flex items-center gap-1 text-xs font-bold text-green-600">
-                          <span className="w-2 h-2 bg-green-500 rounded-full animate-pulse"></span>
-                          Live Now
-                        </span>
-                      )}
-                    </div>
-                    <p className="font-bold text-lg" style={{ color: 'var(--ink)' }}>Session with {sessions[0]?.therapist?.firstName}</p>
-                    <p className="text-sm font-medium" style={{ color: 'var(--ink-muted)' }}>
-                      {new Date(sessions[0]?.scheduledAt).toLocaleDateString(undefined, { weekday: 'long', month: 'long', day: 'numeric' })}
-                      {' • '}
-                      {new Date(sessions[0]?.scheduledAt).toLocaleTimeString(undefined, { hour: '2-digit', minute: '2-digit' })}
-                    </p>
+                    <p className="mb-1 text-sm font-medium" style={{ color: 'var(--ink-muted)' }}>Hello!</p>
+                    <h2 className="font-heading text-3xl" style={{ color: 'var(--ink)' }}>Ready for something fun?</h2>
+                    <p className="mt-2 font-medium" style={{ color: 'var(--ink-muted)' }}>Your therapist is waiting for you</p>
+                  </div>
+                  <div className="hidden flex-col items-center gap-2 md:flex">
+                    <div className="text-5xl">🌟</div>
+                    <span className="text-sm font-bold" style={{ color: 'var(--sage)' }}>Great job!</span>
                   </div>
                 </div>
-                <Button 
-                  onClick={() => handleStartSession(sessions[0]?.id)}
-                  className="rounded-xl flex items-center gap-2 py-4 px-6 shadow-md"
-                  style={{ background: 'var(--sage)', color: '#fff', border: 'none' }}
-                >
-                  <Play className="h-5 w-5" /> Join Session
-                </Button>
-              </div>
-            </Card>
-          )}
-
-          {/* Activity History & Therapist Message */}
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-            <Card className={`${GLASS_CARD} p-6`}>
-              <CardHeader className="p-0 pb-4">
-                <CardTitle className="text-lg font-heading flex items-center gap-2" style={{ color: 'var(--ink)' }}>
-                  📝 Today's Activity
-                </CardTitle>
-              </CardHeader>
-              <CardContent className="p-0 space-y-3">
-                {sessions.length > 0 ? (
-                  <div className="space-y-2">
-                    <div className={`flex items-center gap-3 p-3 rounded-xl ${GLASS_INNER}`}>
-                      <span className="text-xl">🎯</span>
-                      <div>
-                        <p className="font-medium text-sm" style={{ color: 'var(--ink)' }}>Maze Challenge</p>
-                        <p className="text-xs" style={{ color: 'var(--ink-muted)' }}>Completed in 3:45</p>
-                      </div>
-                    </div>
-                    <div className={`flex items-center gap-3 p-3 rounded-xl ${GLASS_INNER}`}>
-                      <span className="text-xl">🫧</span>
-                      <div>
-                        <p className="font-medium text-sm" style={{ color: 'var(--ink)' }}>Bubble Splash</p>
-                        <p className="text-xs" style={{ color: 'var(--ink-muted)' }}>12 bubbles popped</p>
-                      </div>
-                    </div>
-                  </div>
-                ) : (
-                  <p className="text-center py-4 font-medium" style={{ color: 'var(--ink-muted)' }}>No activities yet today</p>
-                )}
-              </CardContent>
-            </Card>
-
-            <Card className={`${GLASS_CARD} p-6`}>
-              <CardHeader className="p-0 pb-4">
-                <CardTitle className="text-lg font-heading flex items-center gap-2" style={{ color: 'var(--ink)' }}>
-                  💬 Therapist Note
-                </CardTitle>
-              </CardHeader>
-              <CardContent className="p-0">
-                <div className={`rounded-xl p-4 ${GLASS_INNER}`}>
-                  <p className="font-medium italic" style={{ color: 'var(--ink)' }}>"Great progress today! Keep practicing the breathing exercises we learned."</p>
-                  <p className="text-xs mt-2" style={{ color: 'var(--ink-muted)' }}>— {profile?.firstName}'s Therapist</p>
+              </Card>
+              <Card className={`${GLASS_CARD} stagger-1 p-6`}>
+                <div className="text-center">
+                  <div className="mb-2 text-4xl">🔥</div>
+                  <p className="font-heading text-4xl" style={{ color: 'var(--ink)' }}>{Math.floor(Math.random() * 10) + 3}</p>
+                  <p className="text-sm font-medium" style={{ color: 'var(--ink-muted)' }}>Day Streak</p>
+                  <p className="mt-1 text-xs" style={{ color: 'var(--sage)' }}>Keep it up!</p>
                 </div>
-              </CardContent>
-            </Card>
-          </div>
-        </main>
-      )}
+              </Card>
+            </div>
 
-      {/* THERAPIST DASHBOARD */}
-      {role === 'THERAPIST' && (
-        <main className="grid grid-cols-1 lg:grid-cols-3 gap-8 mt-10">
-        
-        {/* Bookings / Sessions Column */}
-        <div className="lg:col-span-2 space-y-8">
-          {/* Active Sessions */}
-          <Card className={`${GLASS_CARD} p-6`}>
-            <CardHeader className="p-0 pb-4 flex flex-row items-center justify-between" style={{ borderBottom: '1px solid var(--glass-border)' }}>
-              <div>
-                <CardTitle className="text-2xl font-heading" style={{ color: 'var(--ink)' }}>Session Rooms</CardTitle>
-                <CardDescription className="font-medium" style={{ color: 'var(--ink-muted)' }}>Join scheduled realtime sessions</CardDescription>
-              </div>
-              <ClipboardList className="h-5 w-5" style={{ color: 'var(--ink-muted)' }} />
-            </CardHeader>
-            <CardContent className="p-0 pt-4 space-y-3">
-              {sessions.length === 0 ? (
-                <div className="text-center py-10 rounded-xl border border-dashed" style={{ borderColor: 'var(--glass-border)', background: 'var(--sage-light)' }}>
-                  <p className="font-medium" style={{ color: 'var(--ink-muted)' }}>No sessions scheduled.</p>
-                </div>
-              ) : (
-                sessions.map((session) => (
-                  <div 
-                    key={session.id} 
-                    className="flex flex-col sm:flex-row sm:items-center justify-between p-4 rounded-xl transition-all gap-4"
-                    style={{ background: 'var(--sage-light)', border: '1px solid var(--glass-border)' }}
-                  >
+            {/* Upcoming Session Card */}
+            {sessions.length > 0 && (
+              <Card className={`${GLASS_CARD} p-6`}>
+                <div className="flex flex-col justify-between gap-4 md:flex-row md:items-center">
+                  <div className="flex items-center gap-4">
+                    <div className="flex h-14 w-14 items-center justify-center rounded-2xl text-2xl" style={{ background: 'var(--sage-light)' }}>
+                      👨‍🏫
+                    </div>
                     <div>
-                      <p className="font-semibold text-md" style={{ color: 'var(--ink)' }}>
-                        {role === 'THERAPIST' 
-                          ? `Session with ${session.client?.firstName} ${session.client?.lastName}`
-                          : `Session with Therapist ${session.therapist?.firstName}`
-                        }
-                      </p>
-                      <p className="text-xs font-medium mt-1" style={{ color: 'var(--ink-muted)' }}>
-                        {new Date(session.scheduledAt).toLocaleDateString(undefined, {
-                          weekday: 'long', month: 'long', day: 'numeric', hour: '2-digit', minute: '2-digit'
-                        })}
-                      </p>
-                    </div>
-                    <Button 
-                      onClick={() => handleStartSession(session.id)}
-                      className="rounded-lg flex items-center gap-1 text-sm font-semibold"
-                      style={{ background: 'var(--sage-light)', color: 'var(--sage)', border: 'none' }}
-                    >
-                      <Play className="h-4 w-4" /> Enter Room <ArrowRight className="h-3 w-3 ml-1" />
-                    </Button>
-                  </div>
-                ))
-              )}
-            </CardContent>
-          </Card>
-
-          {/* Upcoming Schedule */}
-          <Card className={`${GLASS_CARD} p-6`}>
-            <CardHeader className="p-0 pb-4 flex flex-row items-center justify-between" style={{ borderBottom: '1px solid var(--glass-border)' }}>
-              <div>
-                <CardTitle className="text-2xl font-heading" style={{ color: 'var(--ink)' }}>Appointment Schedule</CardTitle>
-                <CardDescription className="font-medium" style={{ color: 'var(--ink-muted)' }}>Bookings overview</CardDescription>
-              </div>
-              <Calendar className="h-5 w-5" style={{ color: 'var(--ink-muted)' }} />
-            </CardHeader>
-            <CardContent className="p-0 pt-4 space-y-3">
-              {bookings.length === 0 ? (
-                <div className="text-center py-10 rounded-xl border border-dashed" style={{ borderColor: 'var(--glass-border)', background: 'var(--sage-light)' }}>
-                  <p className="font-medium" style={{ color: 'var(--ink-muted)' }}>No appointments booked.</p>
-                </div>
-              ) : (
-                bookings.map((booking) => (
-                  <div key={booking.id} className="flex items-center justify-between p-4 rounded-xl" style={{ background: 'var(--sage-light)', border: '1px solid var(--glass-border)' }}>
-                    <div>
-                      <p className="font-semibold" style={{ color: 'var(--ink)' }}>
-                        {role === 'THERAPIST' 
-                          ? `Appointment: ${booking.client?.firstName} ${booking.client?.lastName}`
-                          : `Appointment: ${booking.therapist?.firstName} ${booking.therapist?.lastName}`
-                        }
-                      </p>
-                      <p className="text-xs font-medium mt-1" style={{ color: 'var(--ink-muted)' }}>
-                        {new Date(booking.dateTime).toLocaleDateString(undefined, {
-                          month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit'
-                        })} • {booking.duration} mins
-                      </p>
-                    </div>
-                  </div>
-                ))
-              )}
-            </CardContent>
-          </Card>
-        </div>
-
-        {/* Info/Clients Profile column */}
-        <div>
-          <Card className={`${GLASS_CARD} p-6`}>
-            <CardHeader className="p-0 pb-4 flex flex-row items-center justify-between" style={{ borderBottom: '1px solid var(--glass-border)' }}>
-              <div>
-                <CardTitle className="text-2xl font-heading" style={{ color: 'var(--ink)' }}>
-                  {role === 'THERAPIST' ? 'Client Directory' : 'Learning Plan'}
-                </CardTitle>
-                <CardDescription className="font-medium" style={{ color: 'var(--ink-muted)' }}>
-                  {role === 'THERAPIST' ? 'Manage your cohort' : 'Core learning adjustments'}
-                </CardDescription>
-              </div>
-              <UserCheck className="h-5 w-5" style={{ color: 'var(--ink-muted)' }} />
-            </CardHeader>
-            <CardContent className="p-0 pt-4 space-y-4">
-              {role === 'THERAPIST' ? (
-                clients.length === 0 ? (
-                  <p className="text-center py-4 font-medium text-sm" style={{ color: 'var(--ink-muted)' }}>No clients assigned yet.</p>
-                ) : (
-                  clients.map((client) => (
-                    <div key={client.id} className="p-4 rounded-xl" style={{ background: 'var(--sage-light)', border: '1px solid var(--glass-border)' }}>
-                      <p className="font-bold" style={{ color: 'var(--ink)' }}>{client.firstName} {client.lastName}</p>
-                      <div className="flex flex-wrap gap-1 mt-2">
-                        {client.diagnosis.map((tag) => (
-                          <span key={tag} className="text-[10px] font-semibold px-2 py-0.5 rounded-full" style={{ background: 'var(--sage-light)', color: 'var(--sage)' }}>
-                            {tag}
+                      <div className="mb-1 flex items-center gap-2">
+                        <span className="rounded-full px-2 py-0.5 text-xs font-bold" style={{ color: 'var(--c-accent)', background: 'var(--c-accent-bg)' }}>Upcoming</span>
+                        {sessions[0]?.status === 'ACTIVE' && (
+                          <span className="flex items-center gap-1 text-xs font-bold" style={{ color: 'var(--c-accent)' }}>
+                            <span className="live-dot h-2 w-2 rounded-full" style={{ background: 'var(--c-accent)' }}></span>
+                            Live Now
                           </span>
-                        ))}
+                        )}
                       </div>
-                      <Button
-                        onClick={() => handleStartSession(undefined, client.userId)}
-                        className="mt-3 w-full text-xs font-semibold rounded-lg"
-                        style={{ background: 'var(--sage-light)', color: 'var(--sage)', border: 'none' }}
-                      >
-                        Launch Direct Session
-                      </Button>
-                    </div>
-                  ))
-                )
-              ) : (
-                <div className="space-y-3">
-                  <div className="p-4 rounded-xl" style={{ background: 'var(--sage-light)' }}>
-                    <p className="font-semibold" style={{ color: 'var(--ink)' }}>Diagnoses / Needs</p>
-                    <div className="flex flex-wrap gap-1 mt-2">
-                      {profile.diagnosis?.map((tag: string) => (
-                        <span key={tag} className="text-[11px] font-semibold px-2 py-0.5 rounded-full" style={{ background: 'var(--sage-light)', color: 'var(--sage)', border: '1px solid var(--glass-border)' }}>
-                          {tag}
-                        </span>
-                      ))}
+                      <p className="text-lg font-bold" style={{ color: 'var(--ink)' }}>Session with {sessions[0]?.therapist?.firstName}</p>
+                      <p className="text-sm font-medium" style={{ color: 'var(--ink-muted)' }}>
+                        {new Date(sessions[0]?.scheduledAt).toLocaleDateString(undefined, { weekday: 'long', month: 'long', day: 'numeric' })}
+                        {' • '}
+                        {new Date(sessions[0]?.scheduledAt).toLocaleTimeString(undefined, { hour: '2-digit', minute: '2-digit' })}
+                      </p>
                     </div>
                   </div>
-                  <div className="p-4 rounded-xl" style={{ background: 'var(--sage-light)' }}>
-                    <p className="font-semibold" style={{ color: 'var(--ink)' }}>DOB</p>
-                    <p className="text-sm font-medium mt-1" style={{ color: 'var(--ink-muted)' }}>
-                      {new Date(profile.dateOfBirth).toLocaleDateString()}
-                    </p>
-                  </div>
+                  <Button
+                    onClick={() => handleStartSession(sessions[0]?.id)}
+                    className="btn-press flex items-center gap-2 rounded-xl px-6 py-4 shadow-md"
+                    style={{ background: 'var(--sage)', color: '#fff', border: 'none' }}
+                  >
+                    <Play className="h-5 w-5" /> Join Session
+                  </Button>
                 </div>
-              )}
-            </CardContent>
-          </Card>
-        </div>
+              </Card>
+            )}
 
-      </main>
-      )}
+            {/* Activity History & Therapist Message */}
+            <div className="grid grid-cols-1 gap-6 md:grid-cols-2">
+              <Card className={`${GLASS_CARD} p-6`}>
+                <CardHeader className="p-0 pb-4">
+                  <CardTitle className="flex items-center gap-2 font-heading text-lg" style={{ color: 'var(--ink)' }}>
+                    📝 Today's Activity
+                  </CardTitle>
+                </CardHeader>
+                <CardContent className="space-y-3 p-0">
+                  {sessions.length > 0 ? (
+                    <div className="space-y-2">
+                      <div className={`flex items-center gap-3 rounded-xl p-3 ${GLASS_INNER}`}>
+                        <span className="text-xl">🎯</span>
+                        <div>
+                          <p className="text-sm font-medium" style={{ color: 'var(--ink)' }}>Maze Challenge</p>
+                          <p className="text-xs" style={{ color: 'var(--ink-muted)' }}>Completed in 3:45</p>
+                        </div>
+                      </div>
+                      <div className={`flex items-center gap-3 rounded-xl p-3 ${GLASS_INNER}`}>
+                        <span className="text-xl">🫧</span>
+                        <div>
+                          <p className="text-sm font-medium" style={{ color: 'var(--ink)' }}>Bubble Splash</p>
+                          <p className="text-xs" style={{ color: 'var(--ink-muted)' }}>12 bubbles popped</p>
+                        </div>
+                      </div>
+                    </div>
+                  ) : (
+                    <p className="py-4 text-center font-medium" style={{ color: 'var(--ink-muted)' }}>No activities yet today</p>
+                  )}
+                </CardContent>
+              </Card>
+
+              <Card className={`${GLASS_CARD} stagger-1 p-6`}>
+                <CardHeader className="p-0 pb-4">
+                  <CardTitle className="flex items-center gap-2 font-heading text-lg" style={{ color: 'var(--ink)' }}>
+                    💬 Therapist Note
+                  </CardTitle>
+                </CardHeader>
+                <CardContent className="p-0">
+                  <div className={`rounded-xl p-4 ${GLASS_INNER}`}>
+                    <p className="font-medium italic" style={{ color: 'var(--ink)' }}>"Great progress today! Keep practicing the breathing exercises we learned."</p>
+                    <p className="mt-2 text-xs" style={{ color: 'var(--ink-muted)' }}>— {profile?.firstName}'s Therapist</p>
+                  </div>
+                </CardContent>
+              </Card>
+            </div>
+          </main>
+        )}
+
+        {/* THERAPIST DASHBOARD */}
+        {role === 'THERAPIST' && (
+          <main className="mt-8 space-y-6">
+            {/* Stat row */}
+            <div className="grid grid-cols-2 gap-4 lg:grid-cols-4">
+              {therapistStats.map(({ icon: Icon, label, value }, i) => (
+                <div key={label} className={`${STAT_CARD} stagger-${i + 1} p-5`}>
+                  <div className="flex h-10 w-10 items-center justify-center rounded-xl" style={{ background: 'var(--sage-light)', color: 'var(--sage)' }}>
+                    <Icon className="h-5 w-5" />
+                  </div>
+                  <p className="mt-3 font-heading text-4xl" style={{ color: 'var(--ink)' }}>{value}</p>
+                  <p className="text-sm font-medium" style={{ color: 'var(--ink-muted)' }}>{label}</p>
+                </div>
+              ))}
+            </div>
+
+            <div className="grid grid-cols-1 gap-6 lg:grid-cols-3">
+              {/* Sessions + Schedule */}
+              <div className="space-y-6 lg:col-span-2">
+                {/* Active Sessions */}
+                <Card className={`${GLASS_CARD} p-6`}>
+                  <CardHeader className="flex flex-row items-center justify-between p-0 pb-4" style={{ borderBottom: '1px solid var(--glass-border)' }}>
+                    <div>
+                      <CardTitle className="font-heading text-2xl" style={{ color: 'var(--ink)' }}>Session Rooms</CardTitle>
+                      <CardDescription className="font-medium" style={{ color: 'var(--ink-muted)' }}>Join scheduled realtime sessions</CardDescription>
+                    </div>
+                    <ClipboardList className="h-5 w-5" style={{ color: 'var(--ink-muted)' }} />
+                  </CardHeader>
+                  <CardContent className="space-y-3 p-0 pt-4">
+                    {sessions.length === 0 ? (
+                      <div className="rounded-xl border border-dashed py-10 text-center" style={{ borderColor: 'var(--glass-border)', background: 'var(--sage-light)' }}>
+                        <p className="font-medium" style={{ color: 'var(--ink-muted)' }}>No sessions scheduled.</p>
+                      </div>
+                    ) : (
+                      sessions.map((session) => (
+                        <div
+                          key={session.id}
+                          className="flex flex-col gap-4 rounded-xl p-4 hover-lift sm:flex-row sm:items-center sm:justify-between"
+                          style={{ background: 'var(--sage-light)', border: '1px solid var(--glass-border)' }}
+                        >
+                          <div className="flex items-center gap-3">
+                            <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl text-sm font-bold text-white" style={{ background: 'linear-gradient(135deg, var(--sage), var(--sage-mid))' }}>
+                              {nameInitials(session.client?.firstName, session.client?.lastName) || '🙂'}
+                            </div>
+                            <div>
+                              <p className="font-semibold" style={{ color: 'var(--ink)' }}>
+                                {session.client?.firstName} {session.client?.lastName}
+                              </p>
+                              <p className="mt-0.5 flex items-center gap-1.5 text-xs font-medium" style={{ color: 'var(--ink-muted)' }}>
+                                {session.status === 'ACTIVE' && (
+                                  <span className="live-dot inline-block h-2 w-2 shrink-0 rounded-full" style={{ background: 'var(--c-accent)' }}></span>
+                                )}
+                                {new Date(session.scheduledAt).toLocaleDateString(undefined, {
+                                  weekday: 'short', month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit'
+                                })}
+                              </p>
+                            </div>
+                          </div>
+                          <Button
+                            onClick={() => handleStartSession(session.id)}
+                            className="btn-press flex items-center gap-1 rounded-lg text-sm font-semibold"
+                            style={{ background: 'var(--sage)', color: '#fff', border: 'none' }}
+                          >
+                            <Play className="h-4 w-4" /> Enter Room <ArrowRight className="ml-1 h-3 w-3" />
+                          </Button>
+                        </div>
+                      ))
+                    )}
+                  </CardContent>
+                </Card>
+
+                {/* Upcoming Schedule */}
+                <Card className={`${GLASS_CARD} p-6`}>
+                  <CardHeader className="flex flex-row items-center justify-between p-0 pb-4" style={{ borderBottom: '1px solid var(--glass-border)' }}>
+                    <div>
+                      <CardTitle className="font-heading text-2xl" style={{ color: 'var(--ink)' }}>Appointment Schedule</CardTitle>
+                      <CardDescription className="font-medium" style={{ color: 'var(--ink-muted)' }}>Bookings overview</CardDescription>
+                    </div>
+                    <Calendar className="h-5 w-5" style={{ color: 'var(--ink-muted)' }} />
+                  </CardHeader>
+                  <CardContent className="space-y-3 p-0 pt-4">
+                    {bookings.length === 0 ? (
+                      <div className="rounded-xl border border-dashed py-10 text-center" style={{ borderColor: 'var(--glass-border)', background: 'var(--sage-light)' }}>
+                        <p className="font-medium" style={{ color: 'var(--ink-muted)' }}>No appointments booked.</p>
+                      </div>
+                    ) : (
+                      bookings.map((booking) => (
+                        <div key={booking.id} className="flex items-center justify-between rounded-xl p-4 hover-lift" style={{ background: 'var(--sage-light)', border: '1px solid var(--glass-border)' }}>
+                          <div className="flex items-center gap-3">
+                            <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl" style={{ background: 'var(--glass-bg)', border: '1px solid var(--glass-border)', color: 'var(--sage)' }}>
+                              <CalendarClock className="h-5 w-5" />
+                            </div>
+                            <div>
+                              <p className="font-semibold" style={{ color: 'var(--ink)' }}>
+                                {booking.client?.firstName} {booking.client?.lastName}
+                              </p>
+                              <p className="mt-0.5 text-xs font-medium" style={{ color: 'var(--ink-muted)' }}>
+                                {new Date(booking.dateTime).toLocaleDateString(undefined, {
+                                  month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit'
+                                })} • {booking.duration} mins
+                              </p>
+                            </div>
+                          </div>
+                        </div>
+                      ))
+                    )}
+                  </CardContent>
+                </Card>
+              </div>
+
+              {/* Client Directory */}
+              <div>
+                <Card className={`${GLASS_CARD} stagger-1 p-6`}>
+                  <CardHeader className="flex flex-row items-center justify-between p-0 pb-4" style={{ borderBottom: '1px solid var(--glass-border)' }}>
+                    <div>
+                      <CardTitle className="font-heading text-2xl" style={{ color: 'var(--ink)' }}>Client Directory</CardTitle>
+                      <CardDescription className="font-medium" style={{ color: 'var(--ink-muted)' }}>Manage your cohort</CardDescription>
+                    </div>
+                    <UserCheck className="h-5 w-5" style={{ color: 'var(--ink-muted)' }} />
+                  </CardHeader>
+                  <CardContent className="space-y-4 p-0 pt-4">
+                    {clients.length === 0 ? (
+                      <p className="py-4 text-center text-sm font-medium" style={{ color: 'var(--ink-muted)' }}>No clients assigned yet.</p>
+                    ) : (
+                      clients.map((client) => (
+                        <div key={client.id} className="rounded-xl p-4 hover-lift" style={{ background: 'var(--sage-light)', border: '1px solid var(--glass-border)' }}>
+                          <div className="flex items-center gap-3">
+                            <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl text-sm font-bold text-white" style={{ background: 'linear-gradient(135deg, var(--sage), var(--sage-mid))' }}>
+                              {nameInitials(client.firstName, client.lastName) || '🙂'}
+                            </div>
+                            <p className="font-bold" style={{ color: 'var(--ink)' }}>{client.firstName} {client.lastName}</p>
+                          </div>
+                          <div className="mt-2 flex flex-wrap gap-1">
+                            {client.diagnosis.map((tag) => (
+                              <span key={tag} className="rounded-full px-2 py-0.5 text-[10px] font-semibold" style={{ background: 'var(--c-accent-bg)', color: 'var(--c-accent)' }}>
+                                {tag}
+                              </span>
+                            ))}
+                          </div>
+                          <Button
+                            onClick={() => handleStartSession(undefined, client.userId)}
+                            className="btn-press mt-3 w-full rounded-lg text-xs font-semibold"
+                            style={{ background: 'var(--sage)', color: '#fff', border: 'none' }}
+                          >
+                            Launch Direct Session
+                          </Button>
+                        </div>
+                      ))
+                    )}
+                  </CardContent>
+                </Card>
+              </div>
+            </div>
+          </main>
+        )}
+      </div>
 
       {/* Book Appointment Modal */}
       <Dialog open={isBookModalOpen} onOpenChange={setIsBookModalOpen}>
@@ -528,8 +599,8 @@ export default function Home() {
             </div>
             <div className="space-y-1">
               <label className="text-sm font-semibold" style={{ color: 'var(--ink-muted)' }}>Date & Time</label>
-              <input 
-                type="datetime-local" 
+              <input
+                type="datetime-local"
                 value={dateTime}
                 onChange={(e) => setDateTime(e.target.value)}
                 className="w-full rounded-xl p-3 text-sm focus-visible:outline-none"
@@ -551,8 +622,8 @@ export default function Home() {
             </div>
           </div>
           <DialogFooter>
-            <Button variant="ghost" onClick={() => setIsBookModalOpen(false)} className="rounded-xl font-medium" style={{ color: 'var(--ink-muted)' }}>Cancel</Button>
-            <Button onClick={handleCreateBooking} disabled={loading} className="rounded-xl font-semibold px-5" style={{ background: 'var(--sage)', color: '#fff', border: 'none' }}>Book</Button>
+            <Button variant="ghost" onClick={() => setIsBookModalOpen(false)} className="btn-press rounded-xl font-medium" style={{ color: 'var(--ink-muted)' }}>Cancel</Button>
+            <Button onClick={handleCreateBooking} disabled={loading} className="btn-press rounded-xl font-semibold px-5" style={{ background: 'var(--sage)', color: '#fff', border: 'none' }}>Book</Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>
@@ -580,11 +651,105 @@ export default function Home() {
             </div>
           </div>
           <DialogFooter>
-            <Button variant="ghost" onClick={() => setIsSessionModalOpen(false)} className="rounded-xl font-medium" style={{ color: 'var(--ink-muted)' }}>Cancel</Button>
-            <Button onClick={() => handleStartSession()} disabled={loading || !selectedClientId} className="rounded-xl font-semibold px-5" style={{ background: 'var(--sage)', color: '#fff', border: 'none' }}>Launch Room</Button>
+            <Button variant="ghost" onClick={() => setIsSessionModalOpen(false)} className="btn-press rounded-xl font-medium" style={{ color: 'var(--ink-muted)' }}>Cancel</Button>
+            <Button onClick={() => handleStartSession()} disabled={loading || !selectedClientId} className="btn-press rounded-xl font-semibold px-5" style={{ background: 'var(--sage)', color: '#fff', border: 'none' }}>Launch Room</Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>
-    </div>
+
+      {/* Add Patient (invite) Modal */}
+      <Dialog open={isAddPatientModalOpen} onOpenChange={(open) => { if (!open) resetAddPatient(); else setIsAddPatientModalOpen(true); }}>
+        <DialogContent className="rounded-2xl max-w-md" style={{ background: 'var(--glass-strong)', backdropFilter: 'blur(24px)', border: '1px solid var(--glass-border)' }}>
+          {!inviteLink ? (
+            <>
+              <DialogHeader>
+                <DialogTitle className="text-2xl font-heading" style={{ color: 'var(--ink)' }}>Add New Patient</DialogTitle>
+                <DialogDescription className="font-medium" style={{ color: 'var(--ink-muted)' }}>
+                  Enter the patient's name and disorder. We'll generate an invite link for them to sign up and join their session.
+                </DialogDescription>
+              </DialogHeader>
+              <div className="space-y-4 py-4">
+                <div className="grid grid-cols-2 gap-3">
+                  <div className="space-y-1">
+                    <label className="text-sm font-semibold" style={{ color: 'var(--ink-muted)' }}>First Name</label>
+                    <input
+                      value={patientFirstName}
+                      onChange={(e) => setPatientFirstName(e.target.value)}
+                      placeholder="John"
+                      className="w-full rounded-xl p-3 text-sm focus-visible:outline-none"
+                      style={{ background: 'var(--glass-bg)', border: '1px solid var(--glass-border)', color: 'var(--ink)' }}
+                    />
+                  </div>
+                  <div className="space-y-1">
+                    <label className="text-sm font-semibold" style={{ color: 'var(--ink-muted)' }}>Last Name</label>
+                    <input
+                      value={patientLastName}
+                      onChange={(e) => setPatientLastName(e.target.value)}
+                      placeholder="Doe"
+                      className="w-full rounded-xl p-3 text-sm focus-visible:outline-none"
+                      style={{ background: 'var(--glass-bg)', border: '1px solid var(--glass-border)', color: 'var(--ink)' }}
+                    />
+                  </div>
+                </div>
+                <div className="space-y-1">
+                  <label className="text-sm font-semibold" style={{ color: 'var(--ink-muted)' }}>Disorder / Diagnosis (comma-separated)</label>
+                  <input
+                    value={patientDiagnosisInput}
+                    onChange={(e) => setPatientDiagnosisInput(e.target.value)}
+                    placeholder="ADHD, Anxiety, Dyslexia"
+                    className="w-full rounded-xl p-3 text-sm focus-visible:outline-none"
+                    style={{ background: 'var(--glass-bg)', border: '1px solid var(--glass-border)', color: 'var(--ink)' }}
+                  />
+                </div>
+              </div>
+              <DialogFooter>
+                <Button variant="ghost" onClick={resetAddPatient} className="btn-press rounded-xl font-medium" style={{ color: 'var(--ink-muted)' }}>Cancel</Button>
+                <Button onClick={handleAddPatient} disabled={loading || !patientFirstName.trim()} className="btn-press rounded-xl font-semibold px-5" style={{ background: 'var(--sage)', color: '#fff', border: 'none' }}>
+                  {loading ? 'Generating...' : 'Generate Invite'}
+                </Button>
+              </DialogFooter>
+            </>
+          ) : (
+            <>
+              <DialogHeader>
+                <DialogTitle className="text-2xl font-heading" style={{ color: 'var(--ink)' }}>Invite Link Ready</DialogTitle>
+                <DialogDescription className="font-medium" style={{ color: 'var(--ink-muted)' }}>
+                  Share this link with {patientFirstName}. They'll sign up and see their assigned session.
+                </DialogDescription>
+              </DialogHeader>
+              <div className="space-y-3 py-4">
+                <div className="flex items-center gap-2 rounded-xl p-3" style={{ background: 'var(--sage-light)', border: '1px solid var(--glass-border)' }}>
+                  <span className="flex-1 truncate text-sm font-medium" style={{ color: 'var(--ink)' }}>{inviteLink}</span>
+                  <button onClick={handleCopyInvite} className="btn-press flex h-8 w-8 shrink-0 items-center justify-center rounded-lg" style={{ background: 'var(--sage)', color: '#fff' }}>
+                    {copied ? <Check className="h-4 w-4" /> : <Copy className="h-4 w-4" />}
+                  </button>
+                </div>
+                <div className="flex gap-2">
+                  <a
+                    href={`https://wa.me/?text=${encodeURIComponent(`You're invited to a STAAD therapy session. Sign up here: ${inviteLink}`)}`}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="btn-press flex-1 rounded-xl py-2.5 text-center text-sm font-semibold"
+                    style={{ background: 'var(--c-accent-bg)', color: 'var(--c-accent)' }}
+                  >
+                    Share via WhatsApp
+                  </a>
+                  <a
+                    href={`mailto:?subject=${encodeURIComponent('Your STAAD therapy session invite')}&body=${encodeURIComponent(`You're invited to a STAAD therapy session. Sign up here: ${inviteLink}`)}`}
+                    className="btn-press flex-1 rounded-xl py-2.5 text-center text-sm font-semibold"
+                    style={{ background: 'var(--c-accent-bg)', color: 'var(--c-accent)' }}
+                  >
+                    Share via Email
+                  </a>
+                </div>
+              </div>
+              <DialogFooter>
+                <Button onClick={resetAddPatient} className="btn-press rounded-xl font-semibold px-5" style={{ background: 'var(--sage)', color: '#fff', border: 'none' }}>Done</Button>
+              </DialogFooter>
+            </>
+          )}
+        </DialogContent>
+      </Dialog>
+    </DashboardLayout>
   );
 }

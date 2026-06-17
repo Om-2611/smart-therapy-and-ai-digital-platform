@@ -1,94 +1,31 @@
 'use client'
 import { useState } from 'react'
 import { X } from 'lucide-react'
-
-interface ModuleItem {
-  id: string
-  name: string
-  emoji: string
-  desc: string
-}
-
-interface Category {
-  id: string
-  name: string
-  desc: string
-  emoji: string
-  iconBg: string
-  iconBorder: string
-  modules: ModuleItem[]
-}
-
-const CATEGORIES: Category[] = [
-  {
-    id: 'sld',
-    name: 'SLD',
-    desc: 'Specific Learning Disorder',
-    emoji: '📚',
-    iconBg: 'rgba(120,90,220,0.25)',
-    iconBorder: 'rgba(120,90,220,0.3)',
-    modules: [
-      { id: 'digital-sand-tray', name: 'Digital Sand Tray', emoji: '🏖️', desc: 'Non-verbal expression · emotional processing' },
-      { id: 'word-building', name: 'Word Building', emoji: '🔤', desc: 'Phonics · spelling · decoding' },
-      { id: 'whack-a-mole-math', name: 'Whack-a-Mole Math', emoji: '🔨', desc: 'Math fluency · number recognition' },
-      { id: 'pixel-art-coding', name: 'Pixel Art Coding', emoji: '🎨', desc: 'Sequential thinking · pattern recognition' },
-      { id: 'bubble_splash', name: 'Bubble Splash', emoji: '🫧', desc: 'Sight words · reading fluency' },
-    ],
-  },
-  {
-    id: 'adhd',
-    name: 'ADHD',
-    desc: 'Attention Deficit Hyperactivity Disorder',
-    emoji: '⚡',
-    iconBg: 'rgba(220,150,40,0.22)',
-    iconBorder: 'rgba(220,150,40,0.3)',
-    modules: [
-      { id: 'n-back-challenge', name: 'N-Back Challenge', emoji: '🧠', desc: 'Working memory · clinically validated' },
-      { id: 'maze', name: 'Virtual Maze', emoji: '🌀', desc: 'Sustained attention · motor planning' },
-      { id: 'simon-says', name: 'Simon Says', emoji: '🎮', desc: 'Executive function · inhibitory control' },
-    ],
-  },
-  {
-    id: 'anxiety-dep',
-    name: 'Anxiety & Depression',
-    desc: 'Anxiety and mood disorders',
-    emoji: '🌿',
-    iconBg: 'rgba(74,124,111,0.25)',
-    iconBorder: 'rgba(74,124,111,0.3)',
-    modules: [
-      { id: '5-4-3-2-1-grounding', name: '5-4-3-2-1 Grounding', emoji: '🌱', desc: 'Sensory anchoring · anxiety reduction' },
-      { id: 'emotional-charades', name: 'Emotional Charades', emoji: '🎭', desc: 'Emotion identification · social learning' },
-      { id: 'virtual-box-popping', name: 'Virtual Box Popping', emoji: '📦', desc: 'Tension release · cognitive defusion' },
-      { id: 'worry-box', name: 'Worry Box', emoji: '🗃️', desc: 'Worry containment · externalisation' },
-    ],
-  },
-  {
-    id: 'id',
-    name: 'ID',
-    desc: 'Intellectual Disability',
-    emoji: '🌟',
-    iconBg: 'rgba(40,130,210,0.22)',
-    iconBorder: 'rgba(40,130,210,0.3)',
-    modules: [
-      { id: 'drag-drop-sorting', name: 'Drag & Drop Sorting', emoji: '🗂️', desc: 'Categorisation · concept formation' },
-      { id: 'social-story-sequencing', name: 'Social Story Sequencing', emoji: '📖', desc: 'Narrative comprehension · social prep' },
-      { id: 'virtual-shop', name: 'Virtual Shop', emoji: '🛒', desc: 'Money skills · daily living' },
-    ],
-  },
-]
+import { MODULE_CATEGORIES, type ModuleItem } from '@/lib/modules'
 
 interface ModuleSelectorPanelProps {
   open: boolean
   onClose: () => void
   onLaunch: (moduleId: string, moduleName: string) => void
+  // When provided, only these module ids are shown (per-therapist access).
+  // null / undefined means unrestricted (all modules).
+  allowedModuleIds?: string[] | null
 }
 
-export default function ModuleSelectorPanel({ open, onClose, onLaunch }: ModuleSelectorPanelProps) {
+export default function ModuleSelectorPanel({ open, onClose, onLaunch, allowedModuleIds }: ModuleSelectorPanelProps) {
   const hoverStyles = `
-    .hover\\:bg-white-12:hover { background: rgba(255,255,255,0.12); }
-    .hover\\:bg-white-10:hover { background: rgba(255,255,255,0.10); }
+    .hover\\:bg-white-12:hover { background: #DBB69A; }
+    .hover\\:bg-white-10:hover { background: #B5D3C9; }
   `
   const [currentCategory, setCurrentCategory] = useState<string | null>(null)
+
+  // Per-therapist access filter; null/undefined keeps every module.
+  const allowSet = allowedModuleIds == null ? null : new Set(allowedModuleIds)
+  const CATEGORIES = allowSet
+    ? MODULE_CATEGORIES
+        .map((c) => ({ ...c, modules: c.modules.filter((m) => allowSet.has(m.id)) }))
+        .filter((c) => c.modules.length > 0)
+    : MODULE_CATEGORIES
 
   const category = currentCategory ? CATEGORIES.find(c => c.id === currentCategory) : null
 
@@ -111,11 +48,12 @@ export default function ModuleSelectorPanel({ open, onClose, onLaunch }: ModuleS
         bottom: 64,
         width: 280,
         zIndex: 25,
-        background: 'rgba(20,30,26,0.42)',
+        background: 'rgba(28, 28, 28, 0.55)',
         backdropFilter: 'blur(20px) saturate(1.4)',
         WebkitBackdropFilter: 'blur(20px) saturate(1.4)',
-        borderRight: '1px solid rgba(255,255,255,0.13)',
-        boxShadow: '2px 0 24px rgba(0,0,0,0.18)',
+        borderRight: '1px solid rgba(255, 255, 255, 0.14)',
+        borderRadius: 20,
+        boxShadow: '0 8px 32px rgba(0, 0, 0, 0.25)',
         transform: open ? 'translateX(0)' : 'translateX(-100%)',
         transition: 'transform 0.3s cubic-bezier(0.4,0,0.2,1)',
         display: 'flex',
@@ -126,7 +64,7 @@ export default function ModuleSelectorPanel({ open, onClose, onLaunch }: ModuleS
       <div
         style={{
           background: 'rgba(0,0,0,0.08)',
-          borderBottom: '1px solid rgba(255,255,255,0.08)',
+          borderBottom: '1px solid rgba(255, 255, 255, 0.14)',
           padding: '14px 16px',
           display: 'flex',
           alignItems: 'center',
@@ -147,8 +85,8 @@ export default function ModuleSelectorPanel({ open, onClose, onLaunch }: ModuleS
             height: 22,
             borderRadius: 5,
             border: 'none',
-            background: 'rgba(255,255,255,0.06)',
-            color: 'rgba(255,255,255,0.5)',
+            background: '#E8897A',
+            color: '#FFFFFF',
             fontSize: 12,
             cursor: 'pointer',
             display: 'flex',
@@ -231,9 +169,9 @@ export default function ModuleSelectorPanel({ open, onClose, onLaunch }: ModuleS
                     alignItems: 'center',
                     gap: 9,
                     padding: '9px 11px',
-                    borderRadius: 9,
-                    background: 'rgba(255,255,255,0.04)',
-                    border: '1px solid rgba(255,255,255,0.07)',
+                    borderRadius: 18,
+                    background: '#A8C9BE',
+                    border: '1px solid rgba(30,53,48,0.18)',
                     transition: 'background 0.15s',
                   }}
                 >
@@ -242,7 +180,7 @@ export default function ModuleSelectorPanel({ open, onClose, onLaunch }: ModuleS
                       width: 32,
                       height: 32,
                       borderRadius: 7,
-                      background: 'rgba(255,255,255,0.07)',
+                      background: 'rgba(30,53,48,0.12)',
                       display: 'flex',
                       alignItems: 'center',
                       justifyContent: 'center',
@@ -253,10 +191,10 @@ export default function ModuleSelectorPanel({ open, onClose, onLaunch }: ModuleS
                     {mod.emoji}
                   </div>
                   <div style={{ flex: 1, minWidth: 0 }}>
-                    <div style={{ fontSize: 12, fontWeight: 500, color: 'rgba(255,255,255,0.9)' }}>
+                    <div style={{ fontSize: 12, fontWeight: 500, color: '#1E3530' }}>
                       {mod.name}
                     </div>
-                    <div style={{ fontSize: 10, color: 'rgba(255,255,255,0.38)', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+                    <div style={{ fontSize: 10, color: 'rgba(30,53,48,0.65)', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
                       {mod.desc}
                     </div>
                   </div>
@@ -266,9 +204,9 @@ export default function ModuleSelectorPanel({ open, onClose, onLaunch }: ModuleS
                     style={{
                       padding: '4px 10px',
                       borderRadius: 6,
-                      border: '1px solid rgba(74,124,111,0.4)',
-                      background: 'rgba(74,124,111,0.3)',
-                      color: '#b8d4ce',
+                      border: '1px solid rgba(44,44,44,0.25)',
+                      background: '#EFC93D',
+                      color: '#2C2C2C',
                       fontSize: 10,
                       cursor: 'pointer',
                       flexShrink: 0,
@@ -294,9 +232,9 @@ export default function ModuleSelectorPanel({ open, onClose, onLaunch }: ModuleS
                   alignItems: 'center',
                   gap: 10,
                   padding: '11px 12px',
-                  borderRadius: 10,
-                  background: 'rgba(255,255,255,0.06)',
-                  border: '1px solid rgba(255,255,255,0.09)',
+                  borderRadius: 18,
+                  background: '#D4A98A',
+                  border: '1px solid rgba(60,36,21,0.18)',
                   cursor: 'pointer',
                   transition: 'background 0.15s',
                 }}
@@ -318,10 +256,10 @@ export default function ModuleSelectorPanel({ open, onClose, onLaunch }: ModuleS
                   {cat.emoji}
                 </div>
                 <div style={{ flex: 1, minWidth: 0 }}>
-                  <div style={{ fontSize: 12, fontWeight: 500, color: 'rgba(255,255,255,0.85)' }}>
+                  <div style={{ fontSize: 12, fontWeight: 500, color: '#3C2415' }}>
                     {cat.name}
                   </div>
-                  <div style={{ fontSize: 10, color: 'rgba(255,255,255,0.42)', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+                  <div style={{ fontSize: 10, color: 'rgba(60,36,21,0.7)', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
                     {cat.desc}
                   </div>
                 </div>
@@ -329,15 +267,15 @@ export default function ModuleSelectorPanel({ open, onClose, onLaunch }: ModuleS
                   <div
                     style={{
                       fontSize: 9,
-                      color: 'rgba(255,255,255,0.3)',
-                      background: 'rgba(255,255,255,0.06)',
+                      color: 'rgba(60,36,21,0.7)',
+                      background: 'rgba(60,36,21,0.12)',
                       borderRadius: 8,
                       padding: '2px 7px',
                     }}
                   >
                     {cat.modules.length}
                   </div>
-                  <span style={{ color: 'rgba(255,255,255,0.25)', fontSize: 11 }}>›</span>
+                  <span style={{ color: 'rgba(60,36,21,0.6)', fontSize: 11 }}>›</span>
                 </div>
               </div>
             ))}

@@ -1,6 +1,10 @@
 import type { Config } from "tailwindcss";
 
 const config: Config = {
+  // Dark variants follow the `.dark` class toggled by ThemeProvider (not the OS
+  // `prefers-color-scheme`). Without this, `dark:` utilities leak into the app's
+  // light mode on OS-dark machines, overriding the cream theme.
+  darkMode: 'class',
   content: [
     "./src/pages/**/*.{js,ts,jsx,tsx,mdx}",
     "./src/components/**/*.{js,ts,jsx,tsx,mdx}",

@@ -22,6 +22,15 @@ import DragDropSorting from '@/components/modules/id/DragDropSorting'
 import SocialStorySequencing from '@/components/modules/id/SocialStorySequencing'
 import VirtualShop from '@/components/modules/id/VirtualShop'
 import SimonSays from '@/components/modules/adhd/SimonSays'
+import EmotionWheel from '@/components/modules/general/EmotionWheel'
+import SafeSpaceBuilder from '@/components/modules/general/SafeSpaceBuilder'
+import DefusionRiver from '@/components/modules/general/DefusionRiver'
+import ThoughtChallenger from '@/components/modules/general/ThoughtChallenger'
+import MicroQuestBoard from '@/components/modules/general/MicroQuestBoard'
+import ValuesCardSort from '@/components/modules/general/ValuesCardSort'
+import UrgeSurfing from '@/components/modules/general/UrgeSurfing'
+import WorryVault from '@/components/modules/general/WorryVault'
+import FactsVsFeelings from '@/components/modules/general/FactsVsFeelings'
 
 const MODULES = [
   { id: 'maze', name: 'Maze', icon: '🌀', label: 'Maze' },
@@ -42,6 +51,15 @@ const MODULES = [
   { id: 'social-story-sequencing', name: 'Social Story Sequencing', icon: '📖', label: 'Stories' },
   { id: 'virtual-shop', name: 'Virtual Shop', icon: '🛒', label: 'Shop' },
   { id: 'simon-says', name: 'Simon Says', icon: '🎮', label: 'Simon' },
+  { id: 'emotion-wheel', name: 'Emotion Wheel', icon: '🎡', label: 'Emotion' },
+  { id: 'safe-space-builder', name: 'Safe Space Builder', icon: '🏠', label: 'SafeSpace' },
+  { id: 'defusion-river', name: 'Defusion River', icon: '🌊', label: 'Defusion' },
+  { id: 'thought-challenger', name: 'Thought Challenger', icon: '⚖️', label: 'Thoughts' },
+  { id: 'micro-quest-board', name: 'Micro Quest Board', icon: '🗺️', label: 'Quests' },
+  { id: 'values-card-sort', name: 'Values Card Sort', icon: '🃏', label: 'Values' },
+  { id: 'urge-surfing', name: 'Urge Surfing', icon: '🏄', label: 'Urge' },
+  { id: 'worry-vault', name: 'Worry Vault', icon: '🗄️', label: 'Vault' },
+  { id: 'facts-vs-feelings', name: 'Facts vs Feelings', icon: '🔍', label: 'Facts' },
 ]
 
 const MODULE_INFO: Record<string, { title: string; subtitle: string }> = {
@@ -64,6 +82,15 @@ const MODULE_INFO: Record<string, { title: string; subtitle: string }> = {
   'social-story-sequencing': { title: 'Social Story Sequencing', subtitle: 'Narrative comprehension · social prep' },
   'virtual-shop': { title: 'Virtual Shop', subtitle: 'Money skills · daily living' },
   'simon-says': { title: 'Simon Says', subtitle: 'Executive function · inhibitory control' },
+  'emotion-wheel': { title: 'Emotion Wheel', subtitle: 'Emotion identification · granular awareness' },
+  'safe-space-builder': { title: 'Safe Space Builder', subtitle: 'Grounding · personalized calm environment' },
+  'defusion-river': { title: 'Defusion River', subtitle: 'Cognitive defusion · thought observation' },
+  'thought-challenger': { title: 'Thought Challenger', subtitle: 'CBT · evidence-based thought restructuring' },
+  'micro-quest-board': { title: 'Micro Quest Board', subtitle: 'Behavioral activation · micro-goals' },
+  'values-card-sort': { title: 'Values Card Sort', subtitle: 'ACT · values clarification & commitment' },
+  'urge-surfing': { title: 'Urge Surfing', subtitle: 'DBT · urge tolerance · mindfulness' },
+  'worry-vault': { title: 'Worry Vault', subtitle: 'Worry containment · scheduled worry time' },
+  'facts-vs-feelings': { title: 'Facts vs Feelings', subtitle: 'Reality testing · emotion-fact distinction' },
 }
 
 interface GlassModulePanelProps {
@@ -129,14 +156,32 @@ export default function GlassModulePanel({
         return <VirtualShop sessionId={sessionId} role={role} isLocked={isLocked} />
       case 'simon-says':
         return <SimonSays sessionId={sessionId} role={role} isLocked={isLocked} />
+      case 'emotion-wheel':
+        return <EmotionWheel sessionId={sessionId} role={role} isLocked={isLocked} />
+      case 'safe-space-builder':
+        return <SafeSpaceBuilder sessionId={sessionId} role={role} isLocked={isLocked} />
+      case 'defusion-river':
+        return <DefusionRiver sessionId={sessionId} role={role} isLocked={isLocked} />
+      case 'thought-challenger':
+        return <ThoughtChallenger sessionId={sessionId} role={role} isLocked={isLocked} />
+      case 'micro-quest-board':
+        return <MicroQuestBoard sessionId={sessionId} role={role} isLocked={isLocked} />
+      case 'values-card-sort':
+        return <ValuesCardSort sessionId={sessionId} role={role} isLocked={isLocked} />
+      case 'urge-surfing':
+        return <UrgeSurfing sessionId={sessionId} role={role} isLocked={isLocked} />
+      case 'worry-vault':
+        return <WorryVault sessionId={sessionId} role={role} isLocked={isLocked} />
+      case 'facts-vs-feelings':
+        return <FactsVsFeelings sessionId={sessionId} role={role} isLocked={isLocked} />
       default:
         return (
           <div className="flex flex-col items-center justify-center h-full text-center px-4">
             <span style={{ fontSize: 36, marginBottom: 12 }}>🎯</span>
-            <span style={{ fontSize: 14, fontWeight: 500, color: 'var(--ink)', marginBottom: 4 }}>
+            <span style={{ fontSize: 14, fontWeight: 500, color: '#FFFFFF', marginBottom: 4 }}>
               {info?.title || 'Ready for Activity'}
             </span>
-            <span style={{ fontSize: 11, color: 'var(--ink-muted)' }}>
+            <span style={{ fontSize: 11, color: 'rgba(255,255,255,0.6)' }}>
               {info?.subtitle || (isTherapist
                 ? 'Select a module below to begin'
                 : 'Your therapist will choose an activity soon.')}
@@ -151,10 +196,12 @@ export default function GlassModulePanel({
       style={{
         width: 420,
         height: '100%',
-        background: 'var(--glass-bg)',
-        backdropFilter: 'blur(24px)',
-        WebkitBackdropFilter: 'blur(24px)',
-        borderLeft: '1px solid var(--glass-border)',
+        background: 'rgba(28, 28, 28, 0.55)',
+        backdropFilter: 'blur(20px) saturate(1.4)',
+        WebkitBackdropFilter: 'blur(20px) saturate(1.4)',
+        borderLeft: '1px solid rgba(255, 255, 255, 0.14)',
+        borderRadius: 20,
+        boxShadow: '0 8px 32px rgba(0, 0, 0, 0.25)',
         display: 'flex',
         flexDirection: 'column',
       }}
@@ -176,7 +223,7 @@ export default function GlassModulePanel({
         style={{
           height: 56,
           padding: '0 16px',
-          borderBottom: '1px solid var(--glass-border)',
+          borderBottom: '1px solid rgba(255, 255, 255, 0.14)',
           flexShrink: 0,
           display: 'flex',
           alignItems: 'center',
@@ -189,7 +236,7 @@ export default function GlassModulePanel({
               width: 28,
               height: 28,
               borderRadius: 8,
-              background: 'var(--sage-light)',
+              background: '#A8C9BE',
               display: 'flex',
               alignItems: 'center',
               justifyContent: 'center',
@@ -199,10 +246,10 @@ export default function GlassModulePanel({
             {activeModule ? MODULES.find(m => m.id === activeModule)?.icon || '🎯' : '🎯'}
           </div>
           <div>
-            <div style={{ fontSize: 14, fontWeight: 500, color: 'var(--ink)' }}>
+            <div style={{ fontSize: 14, fontWeight: 500, color: '#FFFFFF' }}>
               {info?.title || 'No activity'}
             </div>
-            <div style={{ fontSize: 11, color: 'var(--ink-muted)' }}>
+            <div style={{ fontSize: 11, color: 'rgba(255,255,255,0.6)' }}>
               {info?.subtitle || 'Waiting for selection'}
             </div>
           </div>
@@ -215,9 +262,9 @@ export default function GlassModulePanel({
                 width: 24,
                 height: 24,
                 borderRadius: 6,
-                border: `1px solid ${isLocked ? 'var(--accent)' : 'var(--glass-border)'}`,
-                background: isLocked ? 'var(--accent-bg)' : 'transparent',
-                color: isLocked ? 'var(--accent)' : 'var(--ink-muted)',
+                border: `1px solid ${isLocked ? '#EFC93D' : 'rgba(255,255,255,0.14)'}`,
+                background: isLocked ? '#EFC93D' : 'transparent',
+                color: isLocked ? '#2C2C2C' : 'rgba(255,255,255,0.6)',
                 cursor: 'pointer',
                 display: 'flex',
                 alignItems: 'center',
@@ -235,9 +282,9 @@ export default function GlassModulePanel({
                 width: 24,
                 height: 24,
                 borderRadius: 6,
-                border: '1px solid var(--glass-border)',
-                background: 'transparent',
-                color: 'var(--ink-muted)',
+                border: '1px solid #E8897A',
+                background: '#E8897A',
+                color: '#FFFFFF',
                 cursor: 'pointer',
                 display: 'flex',
                 alignItems: 'center',
@@ -277,14 +324,17 @@ export default function GlassModulePanel({
                 gap: 8,
                 padding: '8px 14px',
                 borderRadius: 10,
-                background: 'rgba(15,30,26,0.85)',
-                border: '1px solid rgba(255,255,255,0.15)',
-                color: 'var(--ink)',
+                background: 'rgba(28, 28, 28, 0.55)',
+                backdropFilter: 'blur(20px) saturate(1.4)',
+                WebkitBackdropFilter: 'blur(20px) saturate(1.4)',
+                border: '1px solid rgba(255, 255, 255, 0.14)',
+                boxShadow: '0 8px 32px rgba(0, 0, 0, 0.25)',
+                color: '#FFFFFF',
                 fontSize: 12,
                 fontWeight: 500,
               }}
             >
-              <Lock size={13} style={{ color: 'var(--accent)' }} />
+              <Lock size={13} style={{ color: '#EFC93D' }} />
               Therapist is controlling
             </div>
           </div>

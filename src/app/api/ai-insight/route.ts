@@ -1,4 +1,5 @@
 import { NextResponse } from 'next/server'
+import { prisma } from '@/lib/db'
 import { runAnalysis } from '@/lib/rag/analysis'
 import { checkAIConsent, getSessionTranscript } from '@/lib/rag/transcript-store'
 import type { ClientProfile } from '@/lib/rag/retrieval'
@@ -95,6 +96,17 @@ export async function POST(request: Request) {
       },
       { merge: true }
     )
+
+    // Log AI analysis as a usage event for the admin dashboard (therapistId here
+    // is the Firebase uid; resolve to the therapist profile). Never block on this.
+    try {
+      const t = await prisma.profileTherapist.findUnique({ where: { userId: therapistId }, select: { id: true } })
+      if (t) {
+        await prisma.usageEvent.create({ data: { therapistId: t.id, sessionId, type: 'AI_ANALYSIS' } })
+      }
+    } catch (e) {
+      console.error('Failed to log AI usage event:', e)
+    }
 
     return NextResponse.json({ insight })
   } catch (error: any) {

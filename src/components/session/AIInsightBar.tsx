@@ -47,6 +47,15 @@ const MODULE_NAMES: Record<string, string> = {
   'drag-drop-sorting':  'Drag & Drop Sorting',
   'social-story':       'Social Story',
   'virtual-shop':       'Virtual Shop',
+  'emotion-wheel':      'Emotion Wheel',
+  'safe-space-builder': 'Safe Space Builder',
+  'defusion-river':     'Defusion River',
+  'thought-challenger': 'Thought Challenger',
+  'micro-quest-board':  'Micro Quest Board',
+  'values-card-sort':   'Values Card Sort',
+  'urge-surfing':       'Urge Surfing',
+  'worry-vault':        'Worry Vault',
+  'facts-vs-feelings':  'Facts vs Feelings',
 }
 
 export default function AIInsightBar({
@@ -92,32 +101,32 @@ export default function AIInsightBar({
       >
         <div
           style={{
-            background: 'rgba(14,22,20,0.82)',
-            backdropFilter: 'blur(24px)',
-            WebkitBackdropFilter: 'blur(24px)',
+            background: 'rgba(28, 28, 28, 0.55)',
+            backdropFilter: 'blur(20px) saturate(1.4)',
+            WebkitBackdropFilter: 'blur(20px) saturate(1.4)',
             border: insight.riskFlag
-              ? '1px solid rgba(200,96,42,0.5)'
-              : '1px solid rgba(255,255,255,0.12)',
-            borderRadius: '12px',
+              ? '1px solid rgba(232,137,122,0.6)'
+              : '1px solid rgba(255, 255, 255, 0.14)',
+            borderRadius: '20px',
             padding: '14px 18px',
             pointerEvents: 'all',
             transform: mounted ? 'translateY(0)' : 'translateY(-110%)',
             opacity: mounted ? 1 : 0,
             transition: 'all 0.35s cubic-bezier(0.4,0,0.2,1)',
             boxShadow: insight.riskFlag
-              ? '0 4px 24px rgba(200,96,42,0.2)'
-              : '0 4px 24px rgba(0,0,0,0.3)',
+              ? '0 8px 32px rgba(232,137,122,0.25)'
+              : '0 8px 32px rgba(0, 0, 0, 0.25)',
           }}
         >
           {insight.riskFlag && (
             <div style={{
-              background: 'rgba(200,96,42,0.15)',
-              border: '1px solid rgba(200,96,42,0.3)',
+              background: 'rgba(232,137,122,0.18)',
+              border: '1px solid rgba(232,137,122,0.4)',
               borderRadius: '8px',
               padding: '8px 12px',
               marginBottom: '10px',
               fontSize: '12px',
-              color: '#e8936a',
+              color: '#E8897A',
               fontWeight: 500,
             }}>
               Risk indicator detected — review transcript
@@ -164,10 +173,10 @@ export default function AIInsightBar({
             <button
               onClick={onDismiss}
               style={{
-                background: 'transparent',
-                border: '1px solid rgba(255,255,255,0.12)',
+                background: '#E8897A',
+                border: '1px solid #E8897A',
                 borderRadius: '6px',
-                color: 'rgba(255,255,255,0.4)',
+                color: '#FFFFFF',
                 fontSize: '12px',
                 padding: '2px 8px',
                 cursor: 'pointer',
@@ -229,9 +238,9 @@ export default function AIInsightBar({
                   onDismiss()
                 }}
                 style={{
-                  background: 'rgba(74,124,111,0.25)',
-                  border: '1px solid rgba(74,124,111,0.4)',
-                  borderRadius: '8px',
+                  background: '#A8C9BE',
+                  border: '1px solid rgba(30,53,48,0.25)',
+                  borderRadius: '18px',
                   padding: '8px 14px',
                   cursor: 'pointer',
                   fontFamily: 'DM Sans, sans-serif',
@@ -241,7 +250,7 @@ export default function AIInsightBar({
               >
                 <div style={{
                   fontSize: '9px',
-                  color: 'rgba(184,212,206,0.7)',
+                  color: 'rgba(30,53,48,0.7)',
                   marginBottom: '2px',
                 }}>
                   Suggested
@@ -249,13 +258,13 @@ export default function AIInsightBar({
                 <div style={{
                   fontSize: '11px',
                   fontWeight: 500,
-                  color: '#b8d4ce',
+                  color: '#1E3530',
                 }}>
                   {MODULE_NAMES[insight.module] ?? insight.module}
                 </div>
                 <div style={{
                   fontSize: '9px',
-                  color: 'rgba(74,124,111,0.8)',
+                  color: 'rgba(30,53,48,0.7)',
                   marginTop: '2px',
                 }}>
                   Launch →

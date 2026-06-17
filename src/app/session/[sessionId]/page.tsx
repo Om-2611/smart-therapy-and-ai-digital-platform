@@ -22,6 +22,7 @@ import GlassModulePanel from '@/components/GlassModulePanel';
 import NotesPanel from '@/components/NotesPanel';
 import ReactionOverlay from '@/components/ReactionOverlay';
 import ModuleSelectorPanel from '@/components/ModuleSelectorPanel';
+import { resolveAllowedModuleIds } from '@/lib/modules';
 
 interface SessionState {
   sessionId: string;
@@ -72,6 +73,14 @@ export default function SessionRoomPage({ params }: { params: { sessionId: strin
     await handleModuleSwitch(moduleId);
     setSelectorOpen(false);
     showToast(`${moduleName} launched`);
+    // Log module usage for the admin dashboard (best-effort).
+    if (isTherapist && profile?.id) {
+      fetch('/api/usage', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ therapistId: profile.id, type: 'MODULE_LAUNCH', label: moduleId, sessionId }),
+      }).catch(() => {});
+    }
   };
 
   const handleModuleClose = async () => {
@@ -163,6 +172,17 @@ export default function SessionRoomPage({ params }: { params: { sessionId: strin
 
     return () => unsubscribe();
   }, [sessionId, uid, role, profile, router, setActiveSessionId, setTherapistControl, isTherapist]);
+
+  // Promote the scheduled session to ACTIVE once someone joins the room.
+  // Idempotent on the server: only a SCHEDULED session is transitioned.
+  useEffect(() => {
+    if (!uid || !sessionId) return;
+    fetch(`/api/sessions/${sessionId}`, {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ action: 'start' }),
+    }).catch(() => {});
+  }, [uid, sessionId]);
 
   useEffect(() => {
     setIsModuleActive(activeModule !== null);
@@ -298,6 +318,25 @@ export default function SessionRoomPage({ params }: { params: { sessionId: strin
         });
       } catch {}
     }
+    // Mark the scheduled session as COMPLETED in the database so it moves into
+    // the client's session history once the call is cut.
+    try {
+      await fetch(`/api/sessions/${sessionId}`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ action: 'end' }),
+      });
+    } catch {}
+    // Log transcription volume for the admin dashboard (therapist side, best-effort).
+    if (isTherapist && profile?.id && transcription.chunkCount > 0) {
+      try {
+        await fetch('/api/usage', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ therapistId: profile.id, type: 'TRANSCRIPTION', count: transcription.chunkCount, sessionId }),
+        });
+      } catch {}
+    }
     setActiveSessionId(null);
     if (typeof window !== 'undefined') {
       window.location.href = '/';
@@ -357,9 +396,11 @@ export default function SessionRoomPage({ params }: { params: { sessionId: strin
             gap: 12,
           }}
         >
-          <span style={{ fontFamily: "'DM Serif Display', serif", fontSize: 18, color: 'var(--sage-mid)', fontStyle: 'italic', letterSpacing: -0.5 }}>
-            staad.
-          </span>
+          <img
+            src="/assests/staad-logo-horizontal.svg"
+            alt="STAAD"
+            style={{ height: 40, width: 'auto', display: 'block' }}
+          />
 
           <div
             style={{
@@ -512,6 +553,7 @@ export default function SessionRoomPage({ params }: { params: { sessionId: strin
                   open={selectorOpen}
                   onClose={() => setSelectorOpen(false)}
                   onLaunch={handleModuleLaunch}
+                  allowedModuleIds={resolveAllowedModuleIds(profile)}
                 />
               )}
 

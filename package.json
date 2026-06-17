@@ -16,7 +16,9 @@
     "test:retrieval": "tsx scripts/test-retrieval.ts",
     "test:ingest": "tsx scripts/test-ingest.ts",
     "test:analysis": "tsx scripts/test-analysis.ts",
-    "test:e2e": "tsx scripts/test-e2e-rag.ts"
+    "test:e2e": "tsx scripts/test-e2e-rag.ts",
+    "seed:admin": "node --env-file=.env scripts/seed-admin.cjs",
+    "seed:plans": "node --env-file=.env scripts/seed-plans.cjs"
   },
   "dependencies": {
     "@base-ui/react": "^1.4.1",
@@ -35,6 +37,7 @@
     "livekit-server-sdk": "^2.15.3",
     "lucide-react": "^1.16.0",
     "next": "^14.2.35",
+    "nodemailer": "^8.0.11",
     "openai": "^6.41.0",
     "pdf-parse": "^2.4.5",
     "react": "^18",
@@ -46,6 +49,7 @@
   },
   "devDependencies": {
     "@types/node": "^20.19.41",
+    "@types/nodemailer": "^8.0.1",
     "@types/pdf-parse": "^1.1.5",
     "@types/react": "^18.3.28",
     "@types/react-dom": "^18.3.7",

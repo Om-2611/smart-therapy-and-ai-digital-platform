@@ -24,7 +24,7 @@ export default function LocalVideoPip() {
         borderRadius: 12,
         overflow: 'hidden',
         background: 'linear-gradient(135deg, #1a2e28, #142420)',
-        border: pipHover ? '1.5px solid var(--sage)' : '1.5px solid rgba(255,255,255,0.14)',
+        border: pipHover ? '1.5px solid #A8C9BE' : '1.5px solid rgba(255,255,255,0.14)',
         zIndex: 20,
         transition: 'border-color 0.2s, transform 0.2s',
         transform: pipHover ? 'scale(1.03)' : 'scale(1)',
@@ -37,7 +37,7 @@ export default function LocalVideoPip() {
         />
       ) : (
         <div className="flex items-center justify-center h-full">
-          <span style={{ fontSize: 22, color: 'var(--ink-muted)' }}>
+          <span style={{ fontSize: 22, color: 'rgba(255,255,255,0.6)' }}>
             {userName?.charAt(0)?.toUpperCase() || 'Y'}
           </span>
         </div>
@@ -62,7 +62,7 @@ export default function LocalVideoPip() {
           bottom: 4,
           left: 6,
           fontSize: 9,
-          color: 'var(--ink-muted)',
+          color: 'rgba(255,255,255,0.6)',
         }}
       >
         {userName}

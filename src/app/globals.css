@@ -7,58 +7,72 @@
 @tailwind utilities;
 
 :root {
-  /* Warm off-white background and Sage Green color palette */
-  --background: 120 20% 98%;
-  --foreground: 120 15% 15%;
-  --page-bg: #dde6e2;
+  /* Warm cream background with a calming Sage Green accent */
+  --background: 40 38% 96%;
+  --foreground: 36 18% 16%;
 
-  --card: 0 0% 100%;
-  --card-foreground: 120 15% 15%;
+  /* Warm cream page with a subtle repeating dot texture (28px grid).
+     Used directly as `background: var(--page-bg)` on full-page containers. */
+  --page-bg:
+    radial-gradient(rgba(196, 168, 130, 0.18) 1px, transparent 1px) 0 0 / 28px 28px,
+    #F5EFE4;
 
-  --popover: 0 0% 100%;
-  --popover-foreground: 120 15% 15%;
+  --card: 42 56% 99%;
+  --card-foreground: 36 18% 16%;
 
-  /* Sage Green Palette */
-  --primary: 120 20% 35%;
-  --primary-foreground: 120 10% 98%;
+  --popover: 42 56% 99%;
+  --popover-foreground: 36 18% 16%;
 
-  --secondary: 120 15% 90%;
-  --secondary-foreground: 120 20% 30%;
+  /* Primary accent #8B6340 ≈ hsl(28 37% 40%) */
+  --primary: 28 37% 40%;
+  --primary-foreground: 40 30% 98%;
 
-  --muted: 120 10% 93%;
-  --muted-foreground: 120 10% 50%;
+  --secondary: 40 30% 90%;
+  --secondary-foreground: 36 20% 28%;
 
-  --accent: 120 15% 88%;
-  --accent-foreground: 120 20% 25%;
+  --muted: 40 25% 92%;
+  --muted-foreground: 36 12% 45%;
 
-  --destructive: 0 84.2% 60.2%;
-  --destructive-foreground: 0 0% 98%;
+  --accent: 40 30% 88%;
+  --accent-foreground: 36 22% 24%;
 
-  --border: 120 10% 85%;
-  --input: 120 10% 85%;
-  --ring: 120 20% 35%;
+  --destructive: 0 72% 55%;
+  --destructive-foreground: 40 30% 98%;
 
-  --radius: 1rem;
+  /* Borders #D4C4A8 ≈ hsl(38 34% 75%) */
+  --border: 38 34% 75%;
+  --input: 38 34% 75%;
+  --ring: 28 37% 40%;
 
-  /* Glass tokens */
-  --glass-bg: rgba(255, 255, 255, 0.85);
-  --glass-border: rgba(74, 124, 111, 0.15);
-  --glass-strong: rgba(255, 255, 255, 0.95);
-  --ink: #1a2e28;
-  --ink-muted: rgba(26, 46, 40, 0.55);
-  --ink-faint: rgba(26, 46, 40, 0.2);
-  --glass-shadow: 0 1px 3px rgba(74, 124, 111, 0.08), 0 4px 12px rgba(74, 124, 111, 0.06);
-  --sage: #4a7c6f;
-  --sage-light: rgba(74, 124, 111, 0.1);
-  --sage-mid: #6ba395;
-  --accent: #c8602a;
-  --accent-bg: rgba(200, 96, 42, 0.12);
+  --radius: 14px;
+
+  /* Glass / surface tokens (warm creamy) */
+  --glass-bg: rgba(255, 251, 244, 0.75);
+  --glass-border: #D4C4A8;
+  --glass-strong: rgba(255, 251, 244, 0.92);
+  --nav-bg: rgba(245, 239, 228, 0.7);
+  --ink: #2C1F0E;
+  --ink-muted: #8B7355;
+  --ink-faint: rgba(139, 115, 85, 0.4);
+  --glass-shadow: 0 1px 3px rgba(139, 99, 64, 0.07), 0 6px 18px rgba(139, 99, 64, 0.06);
+  --glass-shadow-lg: 0 10px 24px rgba(139, 99, 64, 0.14);
+  /* `--sage` = primary accent #8B6340 (variable name kept for compatibility) */
+  --sage: #8B6340;
+  --sage-light: #F0E8D8;
+  --sage-mid: #A87A4F;
+  /* `--c-accent` = secondary accent #C4784A (highlights, tags, live dot) */
+  --c-accent: #C4784A;
+  --c-accent-bg: rgba(196, 120, 74, 0.14);
+  --accent: #C4784A;
+  --accent-bg: rgba(196, 120, 74, 0.14);
 }
 
 .dark {
   --background: 120 10% 10%;
   --foreground: 120 10% 95%;
-  --page-bg: #14211d;
+  --page-bg:
+    url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='160' height='160'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.85' numOctaves='2' stitchTiles='stitch'/%3E%3CfeColorMatrix type='saturate' values='0'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)' opacity='0.03'/%3E%3C/svg%3E") repeat,
+    radial-gradient(135% 110% at 50% 0%, #1a2a25 0%, #14211d 60%, #101b18 100%);
 
   --card: 120 10% 13%;
   --card-foreground: 120 10% 95%;
@@ -93,6 +107,15 @@
   --ink-muted: rgba(255, 255, 255, 0.5);
   --ink-faint: rgba(255, 255, 255, 0.18);
   --glass-shadow: 0 4px 20px rgba(0, 0, 0, 0.3);
+  --glass-shadow-lg: 0 8px 28px rgba(0, 0, 0, 0.4);
+  --nav-bg: rgba(18, 28, 25, 0.92);
+
+  /* Keep dark mode's existing warm accents (don't inherit the light values) */
+  --sage: #9c7d59;
+  --sage-light: rgba(156, 125, 89, 0.08);
+  --sage-mid: #b39873;
+  --c-accent: #d6814f;
+  --c-accent-bg: rgba(214, 129, 79, 0.18);
 }
 
 * {
@@ -155,4 +178,92 @@ h1, h2, h3, h4, h5, h6 {
   15% { opacity: 1; }
   75% { opacity: 1; }
   100% { opacity: 0; }
+}
+
+/* ── Tasteful entrance + hover motion ───────────────────────────── */
+@keyframes fadeUp {
+  from { opacity: 0; transform: translateY(14px); }
+  to   { opacity: 1; transform: none; }
+}
+
+@keyframes fadeIn {
+  from { opacity: 0; }
+  to   { opacity: 1; }
+}
+
+@keyframes scaleIn {
+  from { opacity: 0; transform: scale(0.97); }
+  to   { opacity: 1; transform: none; }
+}
+
+.animate-fade-up { animation: fadeUp 0.55s cubic-bezier(0.22, 0.61, 0.36, 1) both; }
+.animate-fade-in { animation: fadeIn 0.55s ease both; }
+.animate-scale-in { animation: scaleIn 0.45s cubic-bezier(0.22, 0.61, 0.36, 1) both; }
+
+/* Stagger helpers for lists/grids */
+.stagger-1 { animation-delay: 0.06s; }
+.stagger-2 { animation-delay: 0.12s; }
+.stagger-3 { animation-delay: 0.18s; }
+.stagger-4 { animation-delay: 0.24s; }
+
+/* Gentle lift on interactive surfaces */
+.hover-lift {
+  transition: transform 0.25s cubic-bezier(0.22, 0.61, 0.36, 1),
+              box-shadow 0.25s ease;
+  will-change: transform;
+}
+.hover-lift:hover {
+  transform: translateY(-3px);
+  box-shadow: var(--glass-shadow-lg);
+}
+
+/* Soft floating background blobs (decorative, behind content) */
+@keyframes blobFloat {
+  0%, 100% { transform: translate(0, 0) scale(1); }
+  33%      { transform: translate(3%, -4%) scale(1.08); }
+  66%      { transform: translate(-3%, 3%) scale(0.94); }
+}
+
+.blob {
+  position: absolute;
+  border-radius: 9999px;
+  filter: blur(70px);
+  will-change: transform;
+}
+.animate-blob { animation: blobFloat 22s ease-in-out infinite; }
+
+/* Button press feedback */
+.btn-press { transition: transform 0.15s ease, box-shadow 0.15s ease; }
+.btn-press:hover { transform: translateY(-1px); }
+.btn-press:active { transform: scale(0.97); }
+
+/* Stat card hover — gentle lift + soft warm shadow */
+.stat-hover { transition: transform 0.25s ease, box-shadow 0.25s ease; }
+.stat-hover:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 10px 24px rgba(139, 99, 64, 0.14);
+}
+
+/* Pulsing dot for live session times */
+@keyframes livePulse {
+  0%, 100% { opacity: 1; transform: scale(1); }
+  50%      { opacity: 0.35; transform: scale(0.8); }
+}
+.live-dot { animation: livePulse 2s ease-in-out infinite; }
+
+@media (prefers-reduced-motion: reduce) {
+  .animate-fade-up,
+  .animate-fade-in,
+  .animate-scale-in,
+  .animate-pulse-slow,
+  .animate-float-up,
+  .animate-blob,
+  .live-dot {
+    animation: none !important;
+  }
+  .hover-lift,
+  .stat-hover,
+  .btn-press { transition: none; }
+  .hover-lift:hover,
+  .stat-hover:hover { transform: none; }
 }

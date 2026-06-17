@@ -48,11 +48,15 @@ export default function RemoteVideoArea({ participantName = 'Participant' }: Rem
           display: 'flex',
           alignItems: 'center',
           gap: 8,
-          background: 'var(--glass-bg)',
+          background: 'rgba(255, 255, 255, 0.16)',
+          backdropFilter: 'blur(18px) saturate(1.3)',
+          WebkitBackdropFilter: 'blur(18px) saturate(1.3)',
+          border: '1px solid rgba(255, 255, 255, 0.22)',
           borderRadius: 20,
+          boxShadow: '0 4px 20px rgba(0, 0, 0, 0.15)',
           padding: '6px 16px',
           fontSize: 13,
-          color: 'var(--ink)',
+          color: '#1A1A1A',
         }}
       >
         <span

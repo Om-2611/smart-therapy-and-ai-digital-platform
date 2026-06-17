@@ -56,6 +56,15 @@ export const AVAILABLE_MODULES = [
   'drag-drop-sorting',
   'social-story',
   'virtual-shop',
+  'emotion-wheel',
+  'safe-space-builder',
+  'defusion-river',
+  'thought-challenger',
+  'micro-quest-board',
+  'values-card-sort',
+  'urge-surfing',
+  'worry-vault',
+  'facts-vs-feelings',
 ]
 
 export async function retrieveRAGContext(

@@ -29,7 +29,10 @@ export default function AuthProvider({ children }: { children: React.ReactNode }
             const data = await res.json();
             if (data.user) {
               const role = data.user.role;
-              const profile = role === 'THERAPIST' ? data.user.therapist : data.user.client;
+              const profile =
+                role === 'THERAPIST' ? data.user.therapist
+                : role === 'ADMIN' ? data.user.admin
+                : data.user.client;
               setRoleAndProfile(role, profile);
             }
           } else if (res.status === 404) {

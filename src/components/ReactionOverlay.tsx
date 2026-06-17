@@ -73,11 +73,12 @@ export default function ReactionOverlay({ sessionId }: ReactionOverlayProps) {
           bottom: 72,
           left: '50%',
           transform: barOpen ? 'translateX(-50%) translateY(0)' : 'translateX(-50%) translateY(20px)',
-          background: 'var(--glass-bg)',
-          backdropFilter: 'blur(20px)',
-          WebkitBackdropFilter: 'blur(20px)',
-          border: '1px solid var(--glass-border)',
+          background: 'rgba(255, 255, 255, 0.16)',
+          backdropFilter: 'blur(18px) saturate(1.3)',
+          WebkitBackdropFilter: 'blur(18px) saturate(1.3)',
+          border: '1px solid rgba(255, 255, 255, 0.22)',
           borderRadius: 30,
+          boxShadow: '0 4px 20px rgba(0, 0, 0, 0.15)',
           padding: '6px 12px',
           opacity: barOpen ? 1 : 0,
           pointerEvents: barOpen ? 'all' : 'none',
@@ -88,7 +89,7 @@ export default function ReactionOverlay({ sessionId }: ReactionOverlayProps) {
           gap: 6,
         }}
       >
-        <span style={{ fontSize: 9, color: 'var(--ink-faint)', textTransform: 'uppercase', letterSpacing: 0.8, marginRight: 4 }}>
+        <span style={{ fontSize: 9, color: 'rgba(0,0,0,0.5)', textTransform: 'uppercase', letterSpacing: 0.8, marginRight: 4 }}>
           Send
         </span>
         {EMOJIS.map((emoji) => (

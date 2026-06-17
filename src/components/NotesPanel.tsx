@@ -38,10 +38,12 @@ export default function NotesPanel({ open, onClose, sessionId }: NotesPanelProps
         left: 0,
         bottom: 64,
         width: 260,
-        background: 'var(--glass-bg)',
-        backdropFilter: 'blur(24px)',
-        WebkitBackdropFilter: 'blur(24px)',
-        borderRight: '1px solid var(--glass-border)',
+        background: 'rgba(28, 28, 28, 0.55)',
+        backdropFilter: 'blur(20px) saturate(1.4)',
+        WebkitBackdropFilter: 'blur(20px) saturate(1.4)',
+        borderRight: '1px solid rgba(255, 255, 255, 0.14)',
+        borderRadius: 20,
+        boxShadow: '0 8px 32px rgba(0, 0, 0, 0.25)',
         zIndex: 25,
         transform: open ? 'translateX(0)' : 'translateX(-100%)',
         transition: 'transform 0.22s cubic-bezier(0.4,0,0.2,1)',
@@ -51,10 +53,10 @@ export default function NotesPanel({ open, onClose, sessionId }: NotesPanelProps
       }}
     >
       <div className="flex items-center justify-between mb-4">
-        <span style={{ fontSize: 13, fontWeight: 500, color: 'var(--ink)' }}>Session notes</span>
+        <span style={{ fontSize: 13, fontWeight: 500, color: '#FFFFFF' }}>Session notes</span>
         <button
           onClick={onClose}
-          style={{ background: 'transparent', border: 'none', color: 'var(--ink-muted)', cursor: 'pointer' }}
+          style={{ background: 'transparent', border: 'none', color: 'rgba(255,255,255,0.6)', cursor: 'pointer' }}
         >
           <X size={16} />
         </button>
@@ -66,10 +68,10 @@ export default function NotesPanel({ open, onClose, sessionId }: NotesPanelProps
         style={{
           flex: 1,
           background: 'transparent',
-          border: '1px solid var(--glass-border)',
+          border: '1px solid rgba(255, 255, 255, 0.14)',
           borderRadius: 8,
           padding: 10,
-          color: 'var(--ink)',
+          color: '#FFFFFF',
           fontSize: 12,
           fontFamily: "'DM Sans', sans-serif",
           resize: 'none',
@@ -85,8 +87,8 @@ export default function NotesPanel({ open, onClose, sessionId }: NotesPanelProps
             padding: '8px 0',
             borderRadius: 8,
             border: 'none',
-            background: 'var(--sage-light)',
-            color: 'var(--sage-mid)',
+            background: '#A8C9BE',
+            color: '#1E3530',
             fontSize: 12,
             fontWeight: 500,
             cursor: saving || !text.trim() ? 'default' : 'pointer',
@@ -96,7 +98,7 @@ export default function NotesPanel({ open, onClose, sessionId }: NotesPanelProps
           {saving ? 'Saving...' : 'Save note'}
         </button>
         {saved && (
-          <span style={{ fontSize: 11, color: 'var(--sage-mid)' }}>✓ Note saved</span>
+          <span style={{ fontSize: 11, color: '#A8C9BE' }}>✓ Note saved</span>
         )}
       </div>
     </div>
