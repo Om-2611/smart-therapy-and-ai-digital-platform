@@ -3,6 +3,7 @@
 import { useState, useEffect, useRef, useCallback, useMemo } from 'react'
 import { doc, onSnapshot, updateDoc, arrayUnion } from 'firebase/firestore'
 import { db } from '@/lib/firebase'
+import { logModuleEvent } from '@/lib/sessionEvents'
 
 interface VirtualShopProps {
   sessionId: string
@@ -233,13 +234,18 @@ export default function VirtualShop({ sessionId, role, isLocked }: VirtualShopPr
         'moduleState.vsScore': score + 1,
         'moduleState.vsPurchaseHistory': arrayUnion(rc),
       })
+      logModuleEvent(sessionId, {
+        module: 'virtual-shop',
+        type: 'purchase_completed',
+        detail: `Bought ${itemCount} item${itemCount === 1 ? '' : 's'} for ${fmtPrice(total, currency)} (difficulty ${difficulty})${shoppingList.length ? ', shopping list complete' : ''}`,
+      })
       if ('speechSynthesis' in window) {
         const u = new SpeechSynthesisUtterance('Well done! You bought everything on your list!')
         u.rate = 0.85
         window.speechSynthesis.speak(u)
       }
     }, 700)
-  }, [canPay, paying, walletBalance, basket, total, walletAmount, score, write])
+  }, [canPay, paying, walletBalance, basket, total, walletAmount, score, write, sessionId, itemCount, currency, difficulty, shoppingList.length])
 
   const resetShop = useCallback(() => {
     if (!isT && completed) return

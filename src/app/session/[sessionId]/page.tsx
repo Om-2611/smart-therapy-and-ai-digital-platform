@@ -337,6 +337,20 @@ export default function SessionRoomPage({ params }: { params: { sessionId: strin
         });
       } catch {}
     }
+    // Kick off the end-of-session AI report while the transcript is still fresh
+    // in Firestore (the cleanup cron clears transcripts after 24h). `keepalive`
+    // lets the request outlive the imminent redirect; the server route runs the
+    // LLM generation to completion independently of this page.
+    if (isTherapist) {
+      try {
+        fetch('/api/session-report', {
+          method: 'POST',
+          keepalive: true,
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ sessionId }),
+        });
+      } catch {}
+    }
     setActiveSessionId(null);
     if (typeof window !== 'undefined') {
       window.location.href = '/';

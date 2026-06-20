@@ -3,6 +3,7 @@
 import { useState, useEffect, useRef, useCallback, useMemo } from 'react'
 import { doc, onSnapshot, updateDoc } from 'firebase/firestore'
 import { db } from '@/lib/firebase'
+import { logModuleEvent } from '@/lib/sessionEvents'
 
 interface SocialStorySequencingProps {
   sessionId: string
@@ -282,6 +283,14 @@ export default function SocialStorySequencing({ sessionId, role, isLocked }: Soc
     if (wrong.size === 0) {
       setCorrectSlots(correct)
       write({ 'moduleState.ssCompleted': true, 'moduleState.ssStoriesDone': storiesDone + 1 })
+      const storyTitle = customStory && storyId === 'custom'
+        ? customStory.title
+        : STORIES.find(s => s.id === storyId)?.title ?? storyId
+      logModuleEvent(sessionId, {
+        module: 'social-story-sequencing',
+        type: 'story_completed',
+        detail: `Sequenced "${storyTitle}" correctly in ${(attempts || 0) + 1} attempt${(attempts || 0) + 1 === 1 ? '' : 's'}`,
+      })
       showToast('🌟 You got the story right!')
       setTimeout(() => {
         const p = activePanels.sort((a, b) => a.correctIndex - b.correctIndex)
@@ -317,7 +326,7 @@ export default function SocialStorySequencing({ sessionId, role, isLocked }: Soc
         if (correctPanelId) setHintPanel(correctPanelId)
       }
     }
-  }, [allFilled, placed, slotCount, panelMap, write, storiesDone, showToast, activePanels, readAloud, attempts])
+  }, [allFilled, placed, slotCount, panelMap, write, storiesDone, showToast, activePanels, readAloud, attempts, sessionId, storyId, customStory])
 
   useEffect(() => {
     if (completed && waiting && !showAnswer) {

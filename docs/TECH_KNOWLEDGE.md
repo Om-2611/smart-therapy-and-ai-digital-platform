@@ -10,15 +10,19 @@
 ## 1. What this is, in one paragraph
 
 STAAD Therapy is a **Next.js 14 (App Router)** web app for **collaborative tele-therapy**:
-a therapist and a client join a live **LiveKit** video room, the therapist's browser streams
-mixed audio to **Deepgram** for live diarized transcription, and an on-demand **RAG + LLM**
+a therapist and a client join a live **LiveKit** video room, the therapist's browser opens a
+**per-participant** **Sarvam AI** stream for live **multilingual** (Indian languages +
+code-switching) transcription — translated to **English** — and an on-demand **RAG + LLM**
 pipeline (**NVIDIA NIM**) produces structured clinical insights (emotions, summary, next
 steps, suggested therapy module, risk flag). Inside the room the therapist can launch ~24
-interactive **therapy modules**. Persistent relational data lives in **Neon PostgreSQL
-(Prisma)** with **pgvector** for study-material retrieval; real-time session state, consent,
-transcript, and AI insight live in **Firestore**. Auth is **Firebase**. An **Admin** role
-monitors usage and governs per-therapist tool access; a **Subscription** layer (no payments
-yet) lets therapists request plans that the admin approves.
+interactive **therapy modules**, whose meaningful client actions are logged to a session
+event timeline. At session end an **OpenRouter** LLM generates an editable **English session
+report** from the full transcript + module activity + in-call notes. Persistent relational
+data lives in **Neon PostgreSQL (Prisma)** with **pgvector** for study-material retrieval;
+real-time session state, consent, transcript, module events, notes, and AI insight live in
+**Firestore**. Auth is **Firebase**. An **Admin** role monitors usage and governs
+per-therapist tool access; a **Subscription** layer (no payments yet) lets therapists request
+plans that the admin approves.
 
 ---
 
@@ -34,8 +38,9 @@ yet) lets therapists request plans that the admin approves.
 | Vector search | pgvector (1024-dim, cosine, IVFFlat) | `document_chunks.embedding` |
 | Realtime DB | Firestore (client + Admin SDK) | `liveSessions/*`, `sessions/*` |
 | Video/Audio | LiveKit (`livekit-client`, `@livekit/components-react`) + LiveKit Cloud | SFU |
-| Speech-to-text | Deepgram Nova-3 (browser WebSocket) | `en-IN`, diarization, VAD, 16kHz linear16 |
-| LLM | NVIDIA NIM `meta/llama-3.1-70b-instruct` | JSON out, temp 0.2, ~1024 tokens |
+| Speech-to-text | Sarvam AI `saaras:v3` (browser WebSocket, per-track) | `translate` mode → English; 22 Indian langs + code-switching; 16kHz pcm_s16le. Replaced Deepgram Nova-3. |
+| Insight LLM | NVIDIA NIM `meta/llama-3.1-70b-instruct` | live AI insight; JSON out, temp 0.2, ~1024 tokens |
+| Report LLM | OpenRouter (`OPENROUTER_MODEL`, default `deepseek/deepseek-chat-v3:free`) | end-of-session English report; OpenAI-compatible, swappable via env |
 | Embeddings | NVIDIA NIM `nv-embedqa-e5-v5` | 1024-dim, needs `input_type` |
 | Email | Nodemailer (SMTP) | Help/support tickets |
 | Hosting | Vercel (+ Vercel Cron) | Daily transcript cleanup 02:00 |
@@ -79,8 +84,11 @@ Source of truth: `prisma/schema.prisma`. Enums: `Role`, `SessionStatus`, `Invite
 **Clinical / scheduling**
 - `Booking` (therapist↔client, dateTime, duration, status).
 - `Session` (therapist↔client, `SessionStatus` SCHEDULED→ACTIVE→COMPLETED/CANCELLED,
-  scheduledAt/startedAt/endedAt, confirmedByPatient) → 1:N `TherapistNote`.
+  scheduledAt/startedAt/endedAt, confirmedByPatient) → 1:N `TherapistNote`, 1:1 `SessionReport`.
 - `TherapistNote` (per session, content, isPrivate).
+- `SessionReport` (1:1 with Session, `sessionId @unique`): end-of-session AI report. `content`
+  (Markdown, English, therapist-editable), `model`, `aiGenerated`, `editedByTherapist`/`editedAt`,
+  `visibleToClient` (false now — lets us expose reports to clients later without a schema change).
 - `DocumentChunk` (`document_chunks`): therapist study material — fileName, chunkIndex,
   chunkText, `embedding vector(1024)`, metadata; `@@index([therapistId])`.
 
@@ -119,9 +127,15 @@ Source of truth: `prisma/schema.prisma`. Enums: `Role`, `SessionStatus`, `Invite
 
 **Live session / AI**
 - `GET /api/livekit-token` — LiveKit join token.
-- `POST /api/deepgram-token` — short-lived (~10s) Deepgram key for the browser.
+- `POST /api/sarvam-token` — returns the Sarvam STT key for the browser WebSocket (auth-gated).
+  ⚠️ Sarvam has no ephemeral-token mechanism + browser WS can't set headers, so the key is
+  ultimately a query param (tracked tech debt; route isolates future hardening).
+- `POST /api/deepgram-token` — **legacy** (~10s temp key); unused since the Sarvam switch, kept as fallback.
 - `POST /api/ai-insight` — gates on AI consent + transcript presence, runs `runAnalysis()`,
   writes `aiInsight` to Firestore, logs an `AI_ANALYSIS` UsageEvent.
+- `GET/POST/PATCH /api/session-report` — GET stored report; POST generates/regenerates it
+  (full transcript + module events + in-call notes → OpenRouter → upsert `SessionReport`);
+  PATCH saves the therapist's edits. Auto-triggered on session End via a `keepalive` POST.
 - `GET /api/cleanup-transcripts` — cron; clears transcripts >24h (gated by `CRON_SECRET`).
 
 **Acquisition**
@@ -168,7 +182,26 @@ Source of truth: `prisma/schema.prisma`. Enums: `Role`, `SessionStatus`, `Invite
 **AIInsight contract (JSON):** `{ emotions[], summary, steps[], module, riskFlag, riskDetail }`.
 `riskFlag` must trip on any self-harm/suicide/violence/danger signal (even indirect),
 otherwise conservative-false. Live transcription runs **therapist-browser-only** (cost +
-dedupe); diarization still labels speakers.
+dedupe). Speaker labelling is now **per-track** (one Sarvam socket per LiveKit participant —
+therapist mic → `therapist`, client mic → `client`), so labels are exact, not diarized guesses.
+
+**End-of-session report pipeline (`src/lib/report/`):**
+| Module | Role |
+|---|---|
+| `session-data.ts` | Admin-SDK read of `sessions/{id}` → transcript + `moduleEvents` + `therapistNotes` |
+| `openrouter-client.ts` | OpenAI-compatible OpenRouter client; `REPORT_MODEL` from `OPENROUTER_MODEL` |
+| `generate.ts` | `REPORT_SYSTEM_PROMPT` + `generateSessionReport()` → structured English Markdown report |
+
+Inputs all live on one Firestore doc: the (English) `transcript[]`, the `moduleEvents[]`
+activity timeline (`src/lib/sessionEvents.ts` `logModuleEvent()`), and `therapistNotes[]`
+(appended by `NotesPanel`). The report is generated on Session End (and on first view if
+missing / on Regenerate), persisted to Postgres `SessionReport`, and edited via the report
+drawer in `/sessions`.
+
+**Module activity logging:** `logModuleEvent(sessionId, {module, type, detail})` appends to
+`sessions/{id}.moduleEvents[]` from the single actor's browser (no dupes). Wired so far into
+Whack-a-Mole Math, Social Story Sequencing, Virtual Shop, and Defusion River; expand to more
+modules by adding one call at each meaningful client action.
 
 ---
 
@@ -181,9 +214,11 @@ session logic — other session components avoid editing its logic). Tree:
 `ReactionOverlay`) / `GlassModulePanel` (renders active module) / `AIConsentBanner` / BottomBar.
 
 Firestore docs per session: `liveSessions/{id}` (activeModuleId, therapistControl lock,
-participants, timestamps) and `sessions/{id}` (aiConsent, transcript[], aiInsight,
-transcriptLastUpdated). Lifecycle also updates the Postgres `Session` (start/end) so
-completed sessions surface in client history.
+participants, timestamps, per-module `moduleState`) and `sessions/{id}` (aiConsent,
+transcript[], aiInsight, transcriptLastUpdated, **moduleEvents[]** activity timeline,
+**therapistNotes[]** in-call notes). Lifecycle also updates the Postgres `Session`
+(start/end) so completed sessions surface in client history, and triggers `SessionReport`
+generation on End.
 
 **Therapy modules:** canonical registry in `src/lib/modules.ts` —
 `MODULE_CATEGORIES` (SLD, ADHD, Anxiety & Depression, ID, General), `ALL_MODULE_IDS`,
@@ -207,8 +242,10 @@ token-driven via `globals.css` (`--page-bg`, `--ink`, `--sage`, `--glass-*`, `--
 ## 9. Environment, scripts, infra
 
 **Env vars:** `DATABASE_URL`; `LIVEKIT_API_KEY/SECRET`, `NEXT_PUBLIC_LIVEKIT_URL`;
-`NVIDIA_API_KEY`; `DEEPGRAM_API_KEY/PROJECT_ID`; `CRON_SECRET`;
-`SMTP_HOST/PORT/USER/PASS/FROM`; `FIREBASE_PROJECT_ID/CLIENT_EMAIL/PRIVATE_KEY`.
+`NVIDIA_API_KEY`; `SARVAM_API_KEY` (live STT); `OPENROUTER_API_KEY` + optional
+`OPENROUTER_MODEL`/`OPENROUTER_SITE_URL` (report LLM); `DEEPGRAM_API_KEY/PROJECT_ID` (legacy);
+`CRON_SECRET`; `SMTP_HOST/PORT/USER/PASS/FROM`;
+`FIREBASE_PROJECT_ID/CLIENT_EMAIL/PRIVATE_KEY`.
 
 **Scripts:** `dev`/`build`/`lint`/`start`; RAG/infra tests
 (`test:pgvector|nvidia|ingest|transcription|retrieval|analysis|e2e`, `debug:embedding|models`,
@@ -232,6 +269,14 @@ On Windows, `generate` hits an **EPERM lock** on `query_engine-windows.dll.node`
 - **UsageEvents accrue forward only** (no backfill).
 - **`ScriptProcessorNode`** (deprecated) for audio capture — migrate to `AudioWorklet` for
   production.
+- **Sarvam key exposure** — the STT key reaches the browser as a WS query param (no ephemeral
+  token available). `/api/sarvam-token` isolates it; harden via Sarvam ephemeral tokens or a
+  server audio proxy when available.
+- **Report generation is unverified at runtime** — built + type-checked but not yet run against
+  live Sarvam/OpenRouter; confirm the Sarvam result field (`transcript` vs `translation`) and
+  the report flow in a real session.
+- **Report auto-gen relies on `keepalive`** at session End (within the 24h transcript TTL); on
+  serverless this should later move to a proper background job/queue.
 - **Invite flow** has no time picker (`scheduledAt` defaults to now).
 - **CSS quirks:** `--accent` declared twice in `:root` (hex overrides HSL); dashboard cards
   use `bg-white` rather than the `--card` token.

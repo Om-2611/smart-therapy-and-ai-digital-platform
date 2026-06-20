@@ -3,6 +3,7 @@
 import { useState, useEffect, useCallback } from 'react'
 import { doc, onSnapshot, updateDoc } from 'firebase/firestore'
 import { db } from '@/lib/firebase'
+import { logModuleEvent } from '@/lib/sessionEvents'
 
 interface DefusionRiverProps {
   sessionId: string
@@ -49,8 +50,13 @@ export default function DefusionRiver({ sessionId, role, isLocked }: DefusionRiv
     if (!t) return
     const leaf: Leaf = { id: `dr${Date.now()}-${Math.random().toString(36).slice(2, 6)}`, text: t, posX: 0, posY: 20 + Math.random() * 50 }
     write({ 'moduleState.drThought': t, 'moduleState.drLeaves': [...leaves, leaf] })
+    logModuleEvent(sessionId, {
+      module: 'defusion-river',
+      type: 'thought_defused',
+      detail: `Practiced defusing the thought: "${t}"`,
+    })
     if (!txt) setInput('')
-  }, [isT, input, leaves, write])
+  }, [isT, input, leaves, write, sessionId])
 
   const releaseAll = useCallback(() => { if (isT) write({ 'moduleState.drLeaves': [] }) }, [isT, write])
   const togglePause = useCallback(() => { if (isT) write({ 'moduleState.drPaused': !paused }) }, [isT, paused, write])

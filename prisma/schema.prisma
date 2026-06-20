@@ -146,7 +146,32 @@ model Session {
   createdAt   DateTime         @default(now())
   updatedAt   DateTime         @updatedAt
 
-  notes TherapistNote[]
+  notes  TherapistNote[]
+  report SessionReport?
+}
+
+// End-of-session AI clinical report. One per session. Generated from the full
+// transcript + in-session module activity + therapist's in-call notes, then
+// editable by the therapist. `visibleToClient` is false for now (therapist-only)
+// but lets us expose reports to clients later without a schema change.
+model SessionReport {
+  id          String   @id @default(uuid())
+  sessionId   String   @unique
+  session     Session  @relation(fields: [sessionId], references: [id], onDelete: Cascade)
+  therapistId String
+  clientId    String
+  content     String   // report body (Markdown, English) — editable by therapist
+  language    String   @default("en")
+  model       String?  // which LLM produced the draft
+  aiGenerated       Boolean   @default(true)
+  editedByTherapist Boolean   @default(false)
+  editedAt          DateTime?
+  visibleToClient   Boolean   @default(false)
+  generatedAt DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  @@index([therapistId])
+  @@index([clientId])
 }
 
 model Invite {

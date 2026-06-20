@@ -6,7 +6,7 @@ import { useSessionStore } from '@/store/useSessionStore';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { Button } from '@/components/ui/button';
 import { Select, SelectTrigger, SelectValue, SelectContent, SelectItem } from '@/components/ui/select';
-import { Play, ArrowRight, FileText, X, Send, Loader2 } from 'lucide-react';
+import { Play, ArrowRight, FileText, X, Send, Loader2, Sparkles, RefreshCw, Pencil, Save } from 'lucide-react';
 import DashboardLayout from '@/components/layout/DashboardLayout';
 
 interface SessionData {
@@ -29,6 +29,15 @@ interface NoteData {
   content: string;
   createdAt: string;
   isPrivate: boolean;
+}
+
+interface ReportData {
+  content: string;
+  model?: string | null;
+  aiGenerated?: boolean;
+  editedByTherapist?: boolean;
+  generatedAt?: string;
+  updatedAt?: string;
 }
 
 const CARD_BASE =
@@ -57,6 +66,16 @@ export default function SessionsPage() {
   const [notesLoading, setNotesLoading] = useState(false);
   const [newNoteContent, setNewNoteContent] = useState('');
   const [savingNote, setSavingNote] = useState(false);
+
+  // Report drawer
+  const [reportDrawerOpen, setReportDrawerOpen] = useState(false);
+  const [reportSessionId, setReportSessionId] = useState<string | null>(null);
+  const [report, setReport] = useState<ReportData | null>(null);
+  const [reportLoading, setReportLoading] = useState(false);
+  const [generating, setGenerating] = useState(false);
+  const [editingReport, setEditingReport] = useState(false);
+  const [reportDraft, setReportDraft] = useState('');
+  const [savingReport, setSavingReport] = useState(false);
 
   useEffect(() => {
     if (!uid) { router.push('/auth'); return; }
@@ -110,6 +129,55 @@ export default function SessionsPage() {
   const handleStartSession = (sessionId: string) => {
     setActiveSessionId(sessionId);
     router.push(`/session/${sessionId}`);
+  };
+
+  const generateReport = async (sessionId: string) => {
+    setGenerating(true);
+    try {
+      const res = await fetch('/api/session-report', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ sessionId }),
+      });
+      if (res.ok) { const d = await res.json(); setReport(d.report); setEditingReport(false); }
+    } catch (err) { console.error(err); }
+    setGenerating(false);
+  };
+
+  const openReportDrawer = async (sessionId: string) => {
+    setReportSessionId(sessionId);
+    setReportDrawerOpen(true);
+    setEditingReport(false);
+    setReport(null);
+    setReportLoading(true);
+    try {
+      const res = await fetch(`/api/session-report?sessionId=${sessionId}`);
+      if (res.ok) {
+        const d = await res.json();
+        if (d.report) setReport(d.report);
+        else await generateReport(sessionId); // none yet → generate on first view
+      }
+    } catch (err) { console.error(err); }
+    setReportLoading(false);
+  };
+
+  const startEditingReport = () => {
+    setReportDraft(report?.content ?? '');
+    setEditingReport(true);
+  };
+
+  const saveReport = async () => {
+    if (!reportSessionId) return;
+    setSavingReport(true);
+    try {
+      const res = await fetch('/api/session-report', {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ sessionId: reportSessionId, content: reportDraft }),
+      });
+      if (res.ok) { const d = await res.json(); setReport(d.report); setEditingReport(false); }
+    } catch (err) { console.error(err); }
+    setSavingReport(false);
   };
 
   const nameInitials = (f?: string, l?: string) => `${(f || '')[0] ?? ''}${(l || '')[0] ?? ''}`.toUpperCase();
@@ -234,6 +302,11 @@ export default function SessionsPage() {
                         <FileText className="h-3.5 w-3.5" /> View Notes
                       </button>
                     )}
+                    {(session.status === 'COMPLETED') && role === 'THERAPIST' && (
+                      <button onClick={() => openReportDrawer(session.id)} className="btn-press flex items-center gap-1.5 rounded-lg px-4 py-2 text-xs font-semibold text-white" style={{ background: 'var(--sage)', border: 'none' }}>
+                        <Sparkles className="h-3.5 w-3.5" /> Report
+                      </button>
+                    )}
                   </div>
                 </div>
               </div>
@@ -308,6 +381,87 @@ export default function SessionsPage() {
                         Save Note
                       </button>
                     </div>
+                  </div>
+                )}
+              </div>
+            )}
+          </div>
+        </div>
+      )}
+
+      {/* Report Drawer */}
+      {reportDrawerOpen && (
+        <div className="fixed inset-0 z-50 flex justify-end">
+          <div className="absolute inset-0 bg-black/20 backdrop-blur-sm" onClick={() => setReportDrawerOpen(false)} />
+          <div
+            className="relative w-full max-w-lg h-full overflow-y-auto p-6 animate-fade-in"
+            style={{ background: 'var(--glass-strong)', backdropFilter: 'blur(24px)', borderLeft: '1px solid var(--glass-border)' }}
+          >
+            <div className="flex items-center justify-between mb-4">
+              <h2 className="font-heading text-xl" style={{ color: 'var(--ink)' }}>Session Report</h2>
+              <button onClick={() => setReportDrawerOpen(false)} className="btn-press flex h-8 w-8 items-center justify-center rounded-lg" style={{ color: 'var(--ink-muted)' }}>
+                <X className="h-4 w-4" />
+              </button>
+            </div>
+
+            {(reportLoading || generating) ? (
+              <div className="flex flex-col items-center justify-center py-16 gap-3">
+                <Loader2 className="h-7 w-7 animate-spin" style={{ color: 'var(--sage)' }} />
+                <p className="text-sm font-medium" style={{ color: 'var(--ink-muted)' }}>
+                  {generating ? 'Generating report…' : 'Loading…'}
+                </p>
+              </div>
+            ) : !report ? (
+              <div className="flex flex-col items-center justify-center py-16 gap-4">
+                <p className="text-sm font-medium text-center" style={{ color: 'var(--ink-muted)' }}>No report yet for this session.</p>
+                {reportSessionId && (
+                  <button onClick={() => generateReport(reportSessionId)} className="btn-press flex items-center gap-1.5 rounded-lg px-4 py-2 text-xs font-semibold text-white" style={{ background: 'var(--sage)', border: 'none' }}>
+                    <Sparkles className="h-3.5 w-3.5" /> Generate Report
+                  </button>
+                )}
+              </div>
+            ) : (
+              <div className="space-y-3">
+                {/* Meta + actions */}
+                <div className="flex items-center justify-between flex-wrap gap-2">
+                  <span className="text-[11px] font-medium" style={{ color: 'var(--ink-muted)' }}>
+                    {report.editedByTherapist ? 'Edited by therapist' : 'AI-generated draft'}
+                    {report.model ? ` · ${report.model}` : ''}
+                  </span>
+                  {!editingReport && (
+                    <div className="flex items-center gap-2">
+                      <button onClick={() => reportSessionId && generateReport(reportSessionId)} className="btn-press flex items-center gap-1.5 rounded-lg px-3 py-1.5 text-xs font-semibold" style={{ background: 'transparent', border: '1px solid var(--glass-border)', color: 'var(--ink-muted)' }}>
+                        <RefreshCw className="h-3.5 w-3.5" /> Regenerate
+                      </button>
+                      <button onClick={startEditingReport} className="btn-press flex items-center gap-1.5 rounded-lg px-3 py-1.5 text-xs font-semibold text-white" style={{ background: 'var(--sage)', border: 'none' }}>
+                        <Pencil className="h-3.5 w-3.5" /> Edit
+                      </button>
+                    </div>
+                  )}
+                </div>
+
+                {editingReport ? (
+                  <>
+                    <textarea
+                      value={reportDraft}
+                      autoFocus
+                      onChange={(e) => setReportDraft(e.target.value)}
+                      className="w-full rounded-xl p-4 text-sm leading-relaxed focus-visible:outline-none"
+                      style={{ background: 'var(--glass-bg)', border: '1px solid var(--glass-border)', color: 'var(--ink)', minHeight: '60vh', resize: 'vertical', fontFamily: "'DM Sans', sans-serif" }}
+                    />
+                    <div className="flex justify-end gap-2">
+                      <button onClick={() => setEditingReport(false)} className="btn-press rounded-lg px-4 py-2 text-xs font-semibold" style={{ background: 'transparent', border: '1px solid var(--glass-border)', color: 'var(--ink-muted)' }}>
+                        Cancel
+                      </button>
+                      <button onClick={saveReport} disabled={savingReport} className="btn-press flex items-center gap-1.5 rounded-lg px-4 py-2 text-xs font-semibold text-white" style={{ background: 'var(--sage)', border: 'none', opacity: savingReport ? 0.6 : 1 }}>
+                        {savingReport ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Save className="h-3.5 w-3.5" />}
+                        Save
+                      </button>
+                    </div>
+                  </>
+                ) : (
+                  <div className="rounded-xl p-4 text-sm whitespace-pre-wrap leading-relaxed" style={{ background: 'var(--sage-light)', color: 'var(--ink)' }}>
+                    {report.content}
                   </div>
                 )}
               </div>

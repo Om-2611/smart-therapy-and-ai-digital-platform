@@ -2,6 +2,7 @@
 import { useState, useEffect, useRef, useCallback } from 'react'
 import { doc, onSnapshot, updateDoc } from 'firebase/firestore'
 import { db } from '@/lib/firebase'
+import { logModuleEvent } from '@/lib/sessionEvents'
 
 interface WhackAMoleMathProps {
   sessionId: string
@@ -339,6 +340,14 @@ export default function WhackAMoleMath({ sessionId, role, isLocked }: WhackAMole
     const next = !isPlaying
     setIsPlaying(next)
     writeToFirestore({ 'moduleState.wamIsPlaying': next })
+
+    if (!next && score > 0) {
+      logModuleEvent(sessionId, {
+        module: 'whack-a-mole-math',
+        type: 'practice_summary',
+        detail: `Math practice (${operation}, ${difficulty}): ${score} correct answer${score === 1 ? '' : 's'}`,
+      })
+    }
 
     if (next) {
       if (!question) {

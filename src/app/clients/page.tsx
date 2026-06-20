@@ -189,7 +189,7 @@ export default function ClientsPage() {
                 </div>
                 <div className="flex gap-2">
                   <button
-                    onClick={() => router.push(`/sessions?clientId=${client.userId}`)}
+                    onClick={() => router.push(`/sessions?clientId=${client.id}`)}
                     className="btn-press flex-1 rounded-lg py-2 text-xs font-semibold"
                     style={{ background: 'var(--glass-bg)', border: '1px solid var(--glass-border)', color: 'var(--ink-muted)' }}
                   >
