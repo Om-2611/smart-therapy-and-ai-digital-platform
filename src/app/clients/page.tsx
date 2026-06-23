@@ -51,11 +51,42 @@ export default function ClientsPage() {
   const [inviteLink, setInviteLink] = useState('');
   const [copied, setCopied] = useState(false);
   const [adding, setAdding] = useState(false);
+  const [startingId, setStartingId] = useState<string | null>(null);
 
   useEffect(() => {
     if (!uid || role !== 'THERAPIST') { router.push('/auth'); return; }
     fetchData();
   }, [uid, role]);
+
+  // Start a live session from a patient card. Must CREATE a real Session row
+  // first (status SCHEDULED) and navigate to its id — otherwise the call page
+  // runs against a non-existent session, the start/end PATCH 404s, and the
+  // session is never saved or listed. (The old button linked to `/session/new`,
+  // which has no route and fell through to sessionId="new".)
+  const handleStartSession = async (clientId: string) => {
+    if (!profile || startingId) return;
+    setStartingId(clientId);
+    try {
+      const res = await fetch('/api/sessions', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          therapistId: profile.id,
+          clientId,
+          scheduledAt: new Date().toISOString(),
+        }),
+      });
+      if (res.ok) {
+        const { session } = await res.json();
+        router.push(`/session/${session.id}`);
+        return;
+      }
+      console.error('Failed to create session:', await res.text());
+    } catch (err) {
+      console.error('Failed to start session:', err);
+    }
+    setStartingId(null);
+  };
 
   const fetchData = async () => {
     if (!profile) return;
@@ -196,11 +227,12 @@ export default function ClientsPage() {
                     View Sessions
                   </button>
                   <button
-                    onClick={() => router.push(`/session/new?clientId=${client.userId}`)}
-                    className="btn-press flex-1 rounded-lg py-2 text-xs font-semibold text-white"
+                    onClick={() => handleStartSession(client.id)}
+                    disabled={startingId === client.id}
+                    className="btn-press flex-1 rounded-lg py-2 text-xs font-semibold text-white disabled:opacity-60"
                     style={{ background: 'var(--sage)', border: 'none' }}
                   >
-                    Start Session
+                    {startingId === client.id ? 'Starting…' : 'Start Session'}
                   </button>
                 </div>
               </div>

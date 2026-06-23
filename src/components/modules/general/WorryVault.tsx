@@ -3,6 +3,7 @@
 import { useState, useEffect, useCallback } from 'react'
 import { doc, onSnapshot, updateDoc } from 'firebase/firestore'
 import { db } from '@/lib/firebase'
+import { logModuleEvent } from '@/lib/sessionEvents'
 
 interface WorryVaultProps {
   sessionId: string
@@ -45,6 +46,11 @@ export default function WorryVault({ sessionId, role, isLocked }: WorryVaultProp
     if (!t || !canInteract) return
     const w: Worry = { id: `wv${Date.now()}-${Math.random().toString(36).slice(2, 6)}`, text: t, locked: false }
     write({ 'moduleState.wvWorries': [...worries, w] })
+    logModuleEvent(sessionId, {
+      module: 'worry-vault',
+      type: 'worry_locked',
+      detail: `Locked a worry in the vault for later: "${t}"`,
+    })
     setText('')
     // timed delay — worry "settles in" then locks
     setSettling(w.id)
@@ -53,7 +59,7 @@ export default function WorryVault({ sessionId, role, isLocked }: WorryVaultProp
       const updated = [...worries, w].map(x => x.id === w.id ? { ...x, locked: true } : x)
       write({ 'moduleState.wvWorries': updated })
     }, 1600)
-  }, [text, canInteract, worries, write])
+  }, [text, canInteract, worries, write, sessionId])
 
   const reopenWorry = useCallback((id: string) => {
     if (!isT) return
@@ -67,8 +73,16 @@ export default function WorryVault({ sessionId, role, isLocked }: WorryVaultProp
 
   const releaseSelected = useCallback(() => {
     if (!isT || !selected) return
+    const releasedText = worries.find(w => w.id === selected)?.text
     write({ 'moduleState.wvWorries': worries.filter(w => w.id !== selected), 'moduleState.wvSelectedWorry': null, 'moduleState.wvVaultOpen': false })
-  }, [isT, selected, worries, write])
+    if (releasedText) {
+      logModuleEvent(sessionId, {
+        module: 'worry-vault',
+        type: 'worry_released',
+        detail: `Let go of a vaulted worry: "${releasedText}"`,
+      })
+    }
+  }, [isT, selected, worries, write, sessionId])
 
   const selectedWorry = worries.find(w => w.id === selected)
   const lockedWorries = worries.filter(w => w.locked && w.id !== selected)

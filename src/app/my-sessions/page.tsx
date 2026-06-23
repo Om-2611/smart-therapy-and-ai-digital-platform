@@ -4,14 +4,22 @@ import React, { useState, useEffect } from 'react';
 import { useAuthStore } from '@/store/useAuthStore';
 import { useSessionStore } from '@/store/useSessionStore';
 import { useRouter } from 'next/navigation';
-import { Play, ArrowRight } from 'lucide-react';
+import { Play, ArrowRight, FileText, ChevronDown } from 'lucide-react';
 import DashboardLayout from '@/components/layout/DashboardLayout';
+import SessionReportView from '@/components/report/SessionReportView';
 
 interface SessionData {
   id: string;
   scheduledAt: string;
   status: string;
   therapist?: { firstName: string; lastName: string };
+}
+
+interface ReportData {
+  content: string;
+  generatedAt?: string;
+  editedByTherapist?: boolean;
+  editedAt?: string;
 }
 
 const CARD_BASE =
@@ -26,11 +34,32 @@ export default function MySessionsPage() {
   const [sessions, setSessions] = useState<SessionData[]>([]);
   const [loading, setLoading] = useState(true);
 
+  // Per-session report state (fetched fresh on open so therapist edits always show).
+  const [openReportId, setOpenReportId] = useState<string | null>(null);
+  const [reports, setReports] = useState<Record<string, ReportData | null>>({});
+  const [reportLoading, setReportLoading] = useState<string | null>(null);
+
   useEffect(() => {
     if (!uid) { router.push('/auth'); return; }
     if (role === 'THERAPIST') { router.push('/sessions'); return; }
     fetchSessions();
   }, [uid, role, profile]);
+
+  const toggleReport = async (sessionId: string) => {
+    if (openReportId === sessionId) { setOpenReportId(null); return; }
+    setOpenReportId(sessionId);
+    setReportLoading(sessionId);
+    try {
+      const res = await fetch(`/api/session-report?sessionId=${sessionId}`);
+      const data = res.ok ? await res.json() : null;
+      setReports((prev) => ({ ...prev, [sessionId]: data?.report ?? null }));
+    } catch (err) {
+      console.error(err);
+      setReports((prev) => ({ ...prev, [sessionId]: null }));
+    } finally {
+      setReportLoading(null);
+    }
+  };
 
   const fetchSessions = async () => {
     if (!profile) return;
@@ -128,28 +157,63 @@ export default function MySessionsPage() {
             {pastSessions.length > 0 && (
               <div className="space-y-3">
                 <h2 className="font-heading text-lg mt-8" style={{ color: 'var(--ink)' }}>Past Sessions</h2>
-                {pastSessions.map((s, i) => (
-                  <div key={s.id} className={`${GLASS_CARD} p-4 stagger-${Math.min(i + 1, 4)}`}>
-                    <div className="flex items-center justify-between">
-                      <div className="flex items-center gap-3">
-                        <div className="flex h-10 w-10 items-center justify-center rounded-xl" style={{ background: 'var(--sage-light)', color: 'var(--sage)' }}>
-                          <Play className="h-4 w-4" />
+                {pastSessions.map((s, i) => {
+                  const isOpen = openReportId === s.id;
+                  const report = reports[s.id];
+                  const isReportLoading = reportLoading === s.id;
+                  return (
+                    <div key={s.id} className={`${GLASS_CARD} stagger-${Math.min(i + 1, 4)}`}>
+                      <button onClick={() => toggleReport(s.id)} className="w-full p-4 text-left">
+                        <div className="flex items-center justify-between gap-3">
+                          <div className="flex items-center gap-3">
+                            <div className="flex h-10 w-10 items-center justify-center rounded-xl" style={{ background: 'var(--sage-light)', color: 'var(--sage)' }}>
+                              <Play className="h-4 w-4" />
+                            </div>
+                            <div>
+                              <p className="text-sm font-semibold" style={{ color: 'var(--ink)' }}>
+                                Session with {s.therapist?.firstName || 'therapist'}
+                              </p>
+                              <p className="text-xs font-medium" style={{ color: 'var(--ink-muted)' }}>
+                                {new Date(s.scheduledAt).toLocaleDateString(undefined, { weekday: 'short', month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' })}
+                              </p>
+                            </div>
+                          </div>
+                          <div className="flex shrink-0 items-center gap-2">
+                            <span className="hidden items-center gap-1 text-xs font-semibold sm:flex" style={{ color: 'var(--sage)' }}>
+                              <FileText className="h-3.5 w-3.5" /> {isOpen ? 'Hide report' : 'View report'}
+                            </span>
+                            <ChevronDown className={`h-4 w-4 transition-transform ${isOpen ? 'rotate-180' : ''}`} style={{ color: 'var(--ink-muted)' }} />
+                          </div>
                         </div>
-                        <div>
-                          <p className="text-sm font-semibold" style={{ color: 'var(--ink)' }}>
-                            Session with {s.therapist?.firstName || 'therapist'}
-                          </p>
-                          <p className="text-xs font-medium" style={{ color: 'var(--ink-muted)' }}>
-                            {new Date(s.scheduledAt).toLocaleDateString(undefined, { weekday: 'short', month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' })}
-                          </p>
+                      </button>
+
+                      {isOpen && (
+                        <div className="px-4 pb-4">
+                          {isReportLoading ? (
+                            <div className="flex justify-center py-6">
+                              <div className="h-6 w-6 animate-spin rounded-full border-2 border-[var(--sage)] border-t-transparent"></div>
+                            </div>
+                          ) : report ? (
+                            <div className="rounded-xl p-5" style={{ background: '#ffffff', border: '1px solid var(--glass-border)' }}>
+                              <SessionReportView
+                                content={report.content}
+                                meta={{
+                                  dateLabel: new Date(report.generatedAt || s.scheduledAt).toLocaleDateString('en-GB', { day: 'numeric', month: 'long', year: 'numeric' }),
+                                  sessionLabel: s.therapist?.firstName ? `Therapist: ${s.therapist.firstName} ${s.therapist.lastName ?? ''}`.trim() : undefined,
+                                  statusLabel: report.editedByTherapist ? 'Updated by your therapist' : 'AI-generated draft',
+                                }}
+                              />
+                            </div>
+                          ) : (
+                            <p className="py-4 text-center text-sm font-medium" style={{ color: 'var(--ink-muted)' }}>
+                              Your therapist hasn't shared a report for this session yet.
+                            </p>
+                          )}
                         </div>
-                      </div>
-                      <span className="rounded-full px-2.5 py-0.5 text-[11px] font-bold" style={{ color: 'var(--c-accent)', background: 'var(--c-accent-bg)' }}>
-                        Completed
-                      </span>
+                      )}
                     </div>
-                  </div>
-                ))}
+                  );
+                })}
               </div>
             )}
           </>

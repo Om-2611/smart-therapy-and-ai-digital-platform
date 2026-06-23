@@ -2,6 +2,7 @@
 import { useState, useEffect, useRef, useCallback } from 'react'
 import { doc, onSnapshot, updateDoc } from 'firebase/firestore'
 import { db } from '@/lib/firebase'
+import { logModuleEvent } from '@/lib/sessionEvents'
 
 interface WordBuildingProps {
   sessionId: string
@@ -230,6 +231,13 @@ export default function WordBuilding({ sessionId, role, isLocked }: WordBuilding
     setScore(newScore)
     writeToFirestore({ 'moduleState.wbScore': newScore })
     setCelebrating(true)
+    if (isTherapist) {
+      logModuleEvent(sessionId, {
+        module: 'word-building',
+        type: 'word_built',
+        detail: `Correctly built the word "${targetWord}" (${newScore} word${newScore === 1 ? '' : 's'} this session)`,
+      })
+    }
 
     speakWord(targetWord)
 
@@ -255,7 +263,7 @@ export default function WordBuilding({ sessionId, role, isLocked }: WordBuilding
     return () => {
       if (timerRef.current) clearTimeout(timerRef.current)
     }
-  }, [targetWord, slots, tiles, checked, speakWord, writeToFirestore, advanceToNextWord])
+  }, [targetWord, slots, tiles, checked, speakWord, writeToFirestore, advanceToNextWord, isTherapist, sessionId])
 
   const poolTileIndices = slots.reduce((used, idx) => {
     if (idx !== null) used.add(idx)

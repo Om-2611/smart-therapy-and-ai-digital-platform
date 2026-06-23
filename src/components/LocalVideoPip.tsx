@@ -1,31 +1,33 @@
 'use client'
 import { useLocalParticipant, VideoTrack } from '@livekit/components-react'
 import { Track } from 'livekit-client'
-import { useState } from 'react'
+import { useState, type CSSProperties } from 'react'
 import { useAuthStore } from '@/store/useAuthStore'
 
-export default function LocalVideoPip() {
+export default function LocalVideoPip({ docked = false }: { docked?: boolean }) {
   const { localParticipant, cameraTrack } = useLocalParticipant()
   const { profile } = useAuthStore()
   const [pipHover, setPipHover] = useState(false)
   const userName = profile ? `${profile.firstName} ${profile.lastName}` : 'You'
   const hasVideo = localParticipant && (cameraTrack?.isSubscribed || localParticipant.isCameraEnabled)
 
+  // `docked` renders the self-view as a tile in the top strip (replacing the
+  // static "You" thumbnail). Default is the floating overlay over the video.
+  const positionStyle: CSSProperties = docked
+    ? { position: 'relative', width: 140, height: 84, flexShrink: 0 }
+    : { position: 'absolute', bottom: 92, left: 18, width: 132, height: 96, zIndex: 18 }
+
   return (
     <div
       onMouseEnter={() => setPipHover(true)}
       onMouseLeave={() => setPipHover(false)}
       style={{
-        position: 'absolute',
-        bottom: 80,
-        left: 20,
-        width: 120,
-        height: 90,
-        borderRadius: 12,
+        ...positionStyle,
+        borderRadius: 14,
         overflow: 'hidden',
         background: 'linear-gradient(135deg, #1a2e28, #142420)',
-        border: pipHover ? '1.5px solid #A8C9BE' : '1.5px solid rgba(255,255,255,0.14)',
-        zIndex: 20,
+        border: pipHover ? '2px solid #3fae6a' : '2px solid rgba(255,255,255,0.18)',
+        boxShadow: '0 8px 22px rgba(0,0,0,0.28)',
         transition: 'border-color 0.2s, transform 0.2s',
         transform: pipHover ? 'scale(1.03)' : 'scale(1)',
       }}

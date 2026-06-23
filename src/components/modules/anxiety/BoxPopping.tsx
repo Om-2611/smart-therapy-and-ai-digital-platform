@@ -3,6 +3,7 @@
 import { useState, useEffect, useRef, useCallback, useMemo } from 'react'
 import { doc, onSnapshot, updateDoc, arrayUnion } from 'firebase/firestore'
 import { db } from '@/lib/firebase'
+import { logModuleEvent } from '@/lib/sessionEvents'
 
 interface BoxPoppingProps {
   sessionId: string
@@ -213,6 +214,24 @@ export default function BoxPopping({ sessionId, role, isLocked }: BoxPoppingProp
     prevPct.current = 0
     write({ 'moduleState.bpPopped': [], 'moduleState.bpEndMood': '' })
   }, [isT, write])
+
+  // Log activity completion once (therapist browser only) — popping each bubble
+  // individually would flood the report, so we record the milestone instead.
+  const loggedDoneRef = useRef(false)
+  useEffect(() => {
+    if (!isT) return
+    if (allDone && !loggedDoneRef.current) {
+      loggedDoneRef.current = true
+      logModuleEvent(sessionId, {
+        module: 'virtual-box-popping',
+        type: 'completed',
+        detail: mode === 'wrap'
+          ? `Completed the bubble-wrap popping exercise (${total} bubbles)`
+          : `Released all ${total} worry balloon${total === 1 ? '' : 's'}`,
+      })
+    }
+    if (!allDone) loggedDoneRef.current = false
+  }, [allDone, isT, sessionId, mode, total])
 
   const gc = GRID_MAP[gridSize] || GRID_MAP.medium
   const iA = intensity === 'gentle' ? 0.3 : intensity === 'satisfying' ? 0.5 : 0.4
@@ -481,7 +500,7 @@ export default function BoxPopping({ sessionId, role, isLocked }: BoxPoppingProp
               <div style={{ fontSize: 12, color: 'rgba(255,255,255,0.6)', marginTop: 4 }}>How do you feel now?</div>
               <div style={{ display: 'flex', gap: 10, fontSize: 24 }}>
                 {MOOD_EMOJIS.map(e => (
-                  <button key={e} onClick={() => { setEndMood(e); write({ 'moduleState.bpEndMood': e }) }}
+                  <button key={e} onClick={() => { setEndMood(e); write({ 'moduleState.bpEndMood': e }); logModuleEvent(sessionId, { module: 'virtual-box-popping', type: 'mood_check', detail: `Reported feeling "${e}" after releasing worries` }) }}
                     style={{
                       background: 'rgba(255,255,255,0.08)', border: '1px solid rgba(255,255,255,0.1)',
                       borderRadius: 10, padding: '6px 8px', cursor: 'pointer', fontSize: 20, transition: 'all 0.15s',

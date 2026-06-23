@@ -22,6 +22,9 @@ export interface AIInsight {
   steps: string[]
   module: string
   riskFlag: boolean
+  // Populated by the dedicated safety pass (src/lib/rag/safety.ts).
+  riskLevel?: 'none' | 'watch' | 'urgent'
+  riskDetail?: string
   generatedAt: number
   transcriptWindowMinutes: number
 }

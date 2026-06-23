@@ -1,8 +1,7 @@
 'use client'
-import { useState } from 'react'
-import { doc, updateDoc } from 'firebase/firestore'
-import { db } from '@/lib/firebase'
+import { useEffect, useRef } from 'react'
 import { Lock, LockOpen } from 'lucide-react'
+import { logModuleEvent } from '@/lib/sessionEvents'
 import MazeModule from '@/components/modules/MazeModule'
 import BubbleSplashModule from '@/components/modules/BubbleSplashModule'
 import TalkingCalculatorModule from '@/components/modules/TalkingCalculatorModule'
@@ -116,6 +115,27 @@ export default function GlassModulePanel({
   const info = activeModule ? MODULE_INFO[activeModule] : null
 
   const role = isTherapist ? 'therapist' : 'client'
+
+  // Record a "module opened" event whenever the therapist launches/switches a
+  // module. Logged from the therapist browser only (the actor) to avoid the
+  // synced client duplicating it, and once per distinct open. This guarantees
+  // every module appears in the session report's activity log even if the module
+  // itself logs no finer-grained actions.
+  const loggedModuleRef = useRef<string | null>(null)
+  useEffect(() => {
+    if (!isTherapist || !activeModule) {
+      loggedModuleRef.current = null
+      return
+    }
+    if (loggedModuleRef.current === activeModule) return
+    loggedModuleRef.current = activeModule
+    const name = MODULE_INFO[activeModule]?.title || MODULES.find(m => m.id === activeModule)?.name || activeModule
+    logModuleEvent(sessionId, {
+      module: activeModule,
+      type: 'module_opened',
+      detail: `Opened the "${name}" activity`,
+    })
+  }, [activeModule, isTherapist, sessionId])
 
   const renderModule = () => {
     switch (activeModule) {

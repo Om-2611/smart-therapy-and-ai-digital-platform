@@ -31,6 +31,18 @@ export function buildAnalysisPrompt(context: RAGContext): string {
   sections.push(context.transcript)
   sections.push('END TRANSCRIPT')
 
+  sections.push('\nIN-SESSION ACTIVITY (what the client actually did in modules):')
+  if (context.moduleEvents.length > 0) {
+    for (const e of context.moduleEvents) sections.push(`- ${e}`)
+  } else {
+    sections.push('No module activity recorded yet this session.')
+  }
+
+  if (context.inCallNotes.length > 0) {
+    sections.push("\nTHERAPIST'S IN-CALL NOTES:")
+    for (const n of context.inCallNotes) sections.push(`- ${n}`)
+  }
+
   if (context.hasStudyMaterial) {
     sections.push('\nRELEVANT STUDY MATERIAL:')
     for (const chunk of context.studyMaterial) {

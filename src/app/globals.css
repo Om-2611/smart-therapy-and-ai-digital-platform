@@ -149,8 +149,13 @@ h1, h2, h3, h4, h5, h6 {
   background: rgba(120, 150, 120, 0.5);
 }
 
-/* Select dropdown z-index fix */
-[data-radix-popper-content-wrapper] {
+/* Select dropdown z-index fix.
+   This project uses Base UI (not Radix), so the popup is the [data-slot]
+   element below — the old [data-radix-popper-content-wrapper] selector never
+   matched and dropdowns rendered under the Dialog backdrop (z-50), making their
+   options unclickable. The z-index is set on the Positioner in select.tsx; this
+   rule is a CSS safety net for both the select and dialog popups. */
+[data-slot="select-content"] {
   z-index: 9999 !important;
 }
 

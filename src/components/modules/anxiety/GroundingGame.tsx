@@ -3,6 +3,7 @@
 import { useState, useEffect, useRef, useCallback } from 'react'
 import { doc, onSnapshot, updateDoc } from 'firebase/firestore'
 import { db } from '@/lib/firebase'
+import { logModuleEvent } from '@/lib/sessionEvents'
 
 interface GroundingGameProps {
   sessionId: string
@@ -144,6 +145,11 @@ export default function GroundingGame({ sessionId, role, isLocked }: GroundingGa
       } else {
         setCompleted(true)
         writeToFirestore({ 'moduleState.ggCompleted': true })
+        logModuleEvent(sessionId, {
+          module: 'grounding-game',
+          type: 'completed',
+          detail: `Completed the 5-4-3-2-1 grounding exercise (named 15 things across the senses)${startMood ? `, having started feeling "${startMood}"` : ''}`,
+        })
         setTimeout(() => setTransitioning(false), 100)
       }
     }, 800)
@@ -168,6 +174,11 @@ export default function GroundingGame({ sessionId, role, isLocked }: GroundingGa
     } else if (completed) {
       setEndMood(mood)
       writeToFirestore({ 'moduleState.ggEndMood': mood })
+      logModuleEvent(sessionId, {
+        module: 'grounding-game',
+        type: 'mood_check',
+        detail: `After grounding, reported feeling "${mood}"`,
+      })
     }
   }
 

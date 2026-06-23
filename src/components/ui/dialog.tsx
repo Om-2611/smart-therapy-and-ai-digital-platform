@@ -7,8 +7,14 @@ import { cn } from "@/lib/utils"
 import { Button } from "@/components/ui/button"
 import { XIcon } from "lucide-react"
 
-function Dialog({ ...props }: DialogPrimitive.Root.Props) {
-  return <DialogPrimitive.Root data-slot="dialog" {...props} />
+// Default to non-modal. In Base UI's *modal* mode everything outside the dialog
+// (including a Select/dropdown popup, which portals to <body>) is made inert, so
+// the Select's anchor positioner never runs and its popup collapses to 0×0 —
+// options render but have no clickable area. Non-modal keeps click-outside-to-
+// close and avoids trapping the portaled dropdowns. Override with modal if a
+// given dialog has no nested popups and needs scroll-lock/focus-trap.
+function Dialog({ modal = false, ...props }: DialogPrimitive.Root.Props) {
+  return <DialogPrimitive.Root data-slot="dialog" modal={modal} {...props} />
 }
 
 function DialogTrigger({ ...props }: DialogPrimitive.Trigger.Props) {

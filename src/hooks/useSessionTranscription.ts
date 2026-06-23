@@ -28,7 +28,21 @@ interface Pipe {
   processor: ScriptProcessorNode
 }
 
-const SARVAM_WS = 'wss://api.sarvam.ai/speech-to-text/ws'
+// We connect to our OWN server-side proxy (same origin), which holds the Sarvam
+// key and adds it as a header upstream. Browsers can't set WS headers, and
+// Sarvam rejects query-param auth — hence the proxy. See server.js.
+function buildProxyUrl(sessionId: string, speaker: string): string {
+  const proto = window.location.protocol === 'https:' ? 'wss:' : 'ws:'
+  const params = new URLSearchParams({
+    model: 'saaras:v3',
+    mode: 'translate',
+    high_vad_sensitivity: 'true',
+    vad_signals: 'true',
+    sid: sessionId,
+    speaker,
+  })
+  return `${proto}//${window.location.host}/api/sarvam-stream?${params.toString()}`
+}
 
 // Sarvam streaming audio chunks are base64-encoded PCM (s16le) wrapped in JSON.
 function pcmToBase64(int16: Int16Array): string {
@@ -51,7 +65,6 @@ export function useSessionTranscription({
 }: UseSessionTranscriptionOptions) {
   const { room } = useSessionRoom()
   const pipesRef = useRef<Map<string, Pipe>>(new Map())
-  const keyRef = useRef<string | null>(null)
   const startTimeRef = useRef<number>(0)
   const startedRef = useRef(false)
   const [state, setState] = useState<TranscriptionState>({
@@ -103,17 +116,10 @@ export function useSessionTranscription({
   // Open a Sarvam socket + audio graph for one participant track.
   const startPipe = useCallback(
     (key: string, track: MediaStreamTrack, speaker: TranscriptChunk['speaker']) => {
-      if (pipesRef.current.has(key) || !keyRef.current) return
+      if (pipesRef.current.has(key)) return
 
-      // translate mode → English out; language auto-detected (multilingual).
-      const params = new URLSearchParams({
-        'api-subscription-key': keyRef.current,
-        model: 'saaras:v3',
-        mode: 'translate',
-        high_vad_sensitivity: 'true',
-        vad_signals: 'true',
-      })
-      const ws = new WebSocket(`${SARVAM_WS}?${params.toString()}`)
+      // Connect to our proxy (translate mode → English out, multilingual in).
+      const ws = new WebSocket(buildProxyUrl(sessionId, speaker))
 
       const ctx = new AudioContext({ sampleRate: 16000 })
       const source = ctx.createMediaStreamSource(new MediaStream([track]))
@@ -166,7 +172,7 @@ export function useSessionTranscription({
 
       pipesRef.current.set(key, { ws, ctx, source, processor })
     },
-    [writeChunk]
+    [writeChunk, sessionId]
   )
 
   const addRemoteMic = useCallback(
@@ -179,6 +185,17 @@ export function useSessionTranscription({
     [startPipe]
   )
 
+  // The local mic (therapist) is published asynchronously by LiveKit, often a
+  // beat AFTER room.state flips to 'connected'. So we attach it both at start
+  // and whenever it (re)appears; startPipe de-dupes by key, so this is safe.
+  const addLocalMic = useCallback(() => {
+    if (!room) return
+    const track = room.localParticipant
+      .getTrackPublication(Track.Source.Microphone)
+      ?.track?.mediaStreamTrack
+    if (track) startPipe('local', track, 'therapist')
+  }, [room, startPipe])
+
   const stopTranscription = useCallback(() => {
     for (const key of Array.from(pipesRef.current.keys())) stopPipe(key)
     startedRef.current = false
@@ -186,38 +203,22 @@ export function useSessionTranscription({
     console.log('[Transcription] Stopped')
   }, [stopPipe])
 
-  const startTranscription = useCallback(async () => {
+  const startTranscription = useCallback(() => {
     if (!shouldRun || !room || startedRef.current) return
     startedRef.current = true
-    try {
-      const res = await fetch('/api/sarvam-token', {
-        method: 'POST',
-        headers: {
-          authorization: 'Bearer ' + room.localParticipant.identity,
-          'content-type': 'application/json',
-        },
-      })
-      if (!res.ok) throw new Error('Failed to get transcription key')
-      const { key } = await res.json()
-      keyRef.current = key
-      startTimeRef.current = Date.now()
+    startTimeRef.current = Date.now()
 
-      // Local mic = therapist (this hook only runs in the therapist browser).
-      const localMic = room.localParticipant
-        .getTrackPublication(Track.Source.Microphone)
-        ?.track?.mediaStreamTrack
-      if (localMic) startPipe('local', localMic, 'therapist')
+    // Local mic = therapist (this hook only runs in the therapist browser). May
+    // not be published yet — the LocalTrackPublished listener below catches it.
+    addLocalMic()
 
-      // Existing remote mics = client(s).
-      room.remoteParticipants.forEach((p) => addRemoteMic(p))
-    } catch (e) {
-      console.error('[Transcription] Start failed:', e)
-      startedRef.current = false
-      setState((s) => ({ ...s, error: String(e), isRecording: false }))
-    }
-  }, [shouldRun, room, startPipe, addRemoteMic])
+    // Existing remote mics = client(s).
+    room.remoteParticipants.forEach((p) => addRemoteMic(p))
+  }, [shouldRun, room, addLocalMic, addRemoteMic])
 
-  // Attach a client pipe if the remote mic arrives after we start.
+  // Attach pipes for mics that arrive after we start: remote (client) mics via
+  // TrackSubscribed, and the local (therapist) mic via LocalTrackPublished —
+  // the latter is the common case, since the mic publishes just after connect.
   useEffect(() => {
     if (!shouldRun || !room) return
     const onSubscribed = (
@@ -225,18 +226,25 @@ export function useSessionTranscription({
       _pub: unknown,
       participant: RemoteParticipant
     ) => {
-      if (track.source === Track.Source.Microphone && keyRef.current) {
+      if (track.source === Track.Source.Microphone && startedRef.current) {
         addRemoteMic(participant)
+      }
+    }
+    const onLocalPublished = (pub: { source?: Track.Source }) => {
+      if (pub.source === Track.Source.Microphone && startedRef.current) {
+        addLocalMic()
       }
     }
     const onLeft = (participant: RemoteParticipant) => stopPipe(participant.identity)
     room.on(RoomEvent.TrackSubscribed, onSubscribed)
+    room.on(RoomEvent.LocalTrackPublished, onLocalPublished)
     room.on(RoomEvent.ParticipantDisconnected, onLeft)
     return () => {
       room.off(RoomEvent.TrackSubscribed, onSubscribed)
+      room.off(RoomEvent.LocalTrackPublished, onLocalPublished)
       room.off(RoomEvent.ParticipantDisconnected, onLeft)
     }
-  }, [shouldRun, room, addRemoteMic, stopPipe])
+  }, [shouldRun, room, addLocalMic, addRemoteMic, stopPipe])
 
   useEffect(() => {
     if (!shouldRun || !room) return

@@ -3,6 +3,7 @@
 import { useState, useEffect, useCallback } from 'react'
 import { doc, onSnapshot, updateDoc } from 'firebase/firestore'
 import { db } from '@/lib/firebase'
+import { logModuleEvent } from '@/lib/sessionEvents'
 
 interface FactsVsFeelingsProps {
   sessionId: string
@@ -76,7 +77,14 @@ export default function FactsVsFeelings({ sessionId, role, isLocked }: FactsVsFe
     }
     const updated = cards.map(c => c.id === id ? { ...c, bin } : c)
     write({ 'moduleState.ffCards': updated })
-  }, [cards, canInteract, isT, overrideId, write])
+    if (bin !== 'pool') {
+      logModuleEvent(sessionId, {
+        module: 'facts-vs-feelings',
+        type: 'card_sorted',
+        detail: `Sorted "${card.text}" as a ${bin === 'facts' ? 'Fact' : bin === 'feelings' ? 'Feeling' : 'Story'}`,
+      })
+    }
+  }, [cards, canInteract, isT, overrideId, write, sessionId])
 
   const overrideCard = useCallback((id: string) => {
     if (!isT) return

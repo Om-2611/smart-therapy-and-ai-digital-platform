@@ -3,6 +3,7 @@
 import { useState, useEffect, useCallback } from 'react'
 import { doc, onSnapshot, updateDoc } from 'firebase/firestore'
 import { db } from '@/lib/firebase'
+import { logModuleEvent } from '@/lib/sessionEvents'
 
 interface ValuesCardSortProps {
   sessionId: string
@@ -61,8 +62,16 @@ export default function ValuesCardSort({ sessionId, role, isLocked }: ValuesCard
       // promote remaining important to final
       const updated = cards.map(c => c.bucket === 'important' ? { ...c, bucket: 'final' as Bucket } : c)
       write({ 'moduleState.vsCards': updated, 'moduleState.vsRound': 3 })
+      const coreValues = updated.filter(c => c.bucket === 'final').map(c => c.text)
+      if (coreValues.length) {
+        logModuleEvent(sessionId, {
+          module: 'values-card-sort',
+          type: 'core_values',
+          detail: `Identified core values: ${coreValues.join(', ')}`,
+        })
+      }
     }
-  }, [isT, round, cards, write])
+  }, [isT, round, cards, write, sessionId])
 
   const sortCard = useCallback((id: string, bucket: Bucket) => {
     if (!canInteract) return
@@ -87,8 +96,19 @@ export default function ValuesCardSort({ sessionId, role, isLocked }: ValuesCard
 
   const highlight = useCallback((id: string) => {
     if (!canInteract) return
-    write({ 'moduleState.vsHighlighted': highlighted === id ? '' : id })
-  }, [canInteract, highlighted, write])
+    const turningOn = highlighted !== id
+    write({ 'moduleState.vsHighlighted': turningOn ? id : '' })
+    if (turningOn) {
+      const val = cards.find(c => c.id === id)?.text
+      if (val) {
+        logModuleEvent(sessionId, {
+          module: 'values-card-sort',
+          type: 'value_reflection',
+          detail: `Reflected that the value "${val}" has been lived least lately`,
+        })
+      }
+    }
+  }, [canInteract, highlighted, write, cards, sessionId])
 
   const pool = cards.filter(c => c.bucket === 'pool')
   const important = cards.filter(c => c.bucket === 'important')

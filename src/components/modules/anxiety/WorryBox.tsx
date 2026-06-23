@@ -3,6 +3,7 @@
 import { useState, useEffect, useRef, useCallback, useMemo } from 'react'
 import { doc, onSnapshot, updateDoc, arrayUnion } from 'firebase/firestore'
 import { db } from '@/lib/firebase'
+import { logModuleEvent } from '@/lib/sessionEvents'
 
 interface WorryBoxProps {
   sessionId: string
@@ -120,12 +121,17 @@ export default function WorryBox({ sessionId, role, isLocked }: WorryBoxProps) {
         setFlyingNote(null)
         const worry: Worry = { id: `w${Date.now()}-${Math.random().toString(36).slice(2, 6)}`, text: t, color, timestamp: Date.now(), kept: false }
         write({ 'moduleState.wbWorries': arrayUnion(worry) })
+        logModuleEvent(sessionId, {
+          module: 'worry-box',
+          type: 'worry_added',
+          detail: anonymous ? 'Added a worry to the Worry Box' : `Added a worry: "${t}"`,
+        })
         setLidAnim(true)
         setTimeout(() => setLidAnim(false), LID_DUR)
         setShowInput(false)
       }, NOTE_FLY_DUR)
     }
-  }, [text, canInteract, inputVisible, write])
+  }, [text, canInteract, inputVisible, write, sessionId, anonymous])
 
   const toggleKept = useCallback((id: string) => {
     if (!isT) return
@@ -140,9 +146,14 @@ export default function WorryBox({ sessionId, role, isLocked }: WorryBoxProps) {
       setTearing(prev => { const n = new Set(prev); n.delete(id); return n })
       const updated = worriesRef.current.filter(w => w.id !== id)
       write({ 'moduleState.wbWorries': updated })
+      logModuleEvent(sessionId, {
+        module: 'worry-box',
+        type: 'worry_released',
+        detail: anonymous ? 'Released (let go of) a worry' : `Let go of the worry: "${text}"`,
+      })
       showToast(`"${text.length > 20 ? text.slice(0, 20) + '…' : text}" released 🌬️`)
     }, TEAR_DUR)
-  }, [isT, write, showToast])
+  }, [isT, write, showToast, sessionId, anonymous])
 
   const clearAll = useCallback(() => {
     if (!isT) return

@@ -3,6 +3,7 @@
 import { useState, useEffect, useCallback } from 'react'
 import { doc, onSnapshot, updateDoc } from 'firebase/firestore'
 import { db } from '@/lib/firebase'
+import { logModuleEvent } from '@/lib/sessionEvents'
 
 interface ThoughtChallengerProps {
   sessionId: string
@@ -58,8 +59,13 @@ export default function ThoughtChallenger({ sessionId, role, isLocked }: Thought
     const t = thoughtInput.trim()
     if (!t || !isT) return
     write({ 'moduleState.tcThought': t })
+    logModuleEvent(sessionId, {
+      module: 'thought-challenger',
+      type: 'thought_set',
+      detail: `Examined the automatic thought: "${t}"`,
+    })
     setThoughtInput('')
-  }, [thoughtInput, isT, write])
+  }, [thoughtInput, isT, write, sessionId])
 
   const addCard = useCallback(() => {
     const t = cardInput.trim()
@@ -96,7 +102,12 @@ export default function ThoughtChallenger({ sessionId, role, isLocked }: Thought
     const againstStr = against.length ? against.join(', ') : 'other evidence'
     const text = `Some ${forStr} may be true, but ${againstStr} shows it's not absolute.`
     write({ 'moduleState.tcReframe': text })
-  }, [isT, cards, write])
+    logModuleEvent(sessionId, {
+      module: 'thought-challenger',
+      type: 'reframe_generated',
+      detail: `Generated a balanced reframe: "${text}"`,
+    })
+  }, [isT, cards, write, sessionId])
 
   const saveNotes = useCallback(async () => {
     if (!isT) return

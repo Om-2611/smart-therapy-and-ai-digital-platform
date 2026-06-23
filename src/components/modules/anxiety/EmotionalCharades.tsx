@@ -3,6 +3,7 @@
 import { useState, useEffect, useRef, useCallback } from 'react'
 import { doc, onSnapshot, updateDoc, arrayUnion } from 'firebase/firestore'
 import { db } from '@/lib/firebase'
+import { logModuleEvent } from '@/lib/sessionEvents'
 
 interface EmotionalCharadesProps {
   sessionId: string
@@ -291,6 +292,12 @@ export default function EmotionalCharades({ sessionId, role, isLocked }: Emotion
     setCheckIns(prev => [...prev, checkIn])
     writeToFirestore({
       'moduleState.ecCheckIns': arrayUnion(checkIn),
+    })
+    const emo = CARDS.find(c => c.id === emotionId)?.label || emotionId
+    logModuleEvent(sessionId, {
+      module: 'emotional-charades',
+      type: 'emotion_check_in',
+      detail: `Emotional check-in: reported feeling "${emo}"`,
     })
   }
 

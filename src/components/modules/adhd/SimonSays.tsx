@@ -3,6 +3,7 @@
 import { useState, useEffect, useRef, useCallback, useMemo } from 'react'
 import { doc, onSnapshot, updateDoc } from 'firebase/firestore'
 import { db } from '@/lib/firebase'
+import { logModuleEvent } from '@/lib/sessionEvents'
 
 interface SimonSaysProps {
   sessionId: string
@@ -302,6 +303,20 @@ export default function SimonSays({ sessionId, role, isLocked }: SimonSaysProps)
     window.addEventListener('keydown', onKey)
     return () => window.removeEventListener('keydown', onKey)
   }, [mode, isPlaying, gameOver, isT, handleSimonRespond])
+
+  // Log the sequencing result once when a game ends (therapist browser only).
+  const loggedOverRef = useRef(false)
+  useEffect(() => {
+    if (gameOver && isT && !loggedOverRef.current) {
+      loggedOverRef.current = true
+      logModuleEvent(sessionId, {
+        module: 'simon-says',
+        type: 'game_over',
+        detail: `Finished a Simon Says round (best sequence length ${Math.max(bestRound, round)}, score ${score})`,
+      })
+    }
+    if (!gameOver) loggedOverRef.current = false
+  }, [gameOver, isT, sessionId, bestRound, round, score])
 
   const handleStart = useCallback(() => {
     if (!isT) return

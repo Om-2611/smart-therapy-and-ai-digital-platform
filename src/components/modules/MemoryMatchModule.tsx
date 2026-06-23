@@ -1,8 +1,9 @@
 'use client';
 
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { useAuthStore } from '@/store/useAuthStore';
 import { updateModuleState, subscribeToModuleState } from '@/services/sessionSync';
+import { logModuleEvent } from '@/lib/sessionEvents';
 
 interface MemoryCard {
   id: number;
@@ -17,11 +18,28 @@ interface MemoryMatchModuleProps {
   isLocked: boolean;
 }
 
-export default function MemoryMatchModule({ sessionId, isLocked }: MemoryMatchModuleProps) {
+export default function MemoryMatchModule({ sessionId, role, isLocked }: MemoryMatchModuleProps) {
   const { uid } = useAuthStore();
-  
+  const isTherapist = role === 'therapist';
+
   const [cards, setCards] = useState<MemoryCard[]>([]);
   const isInteractive = !isLocked;
+
+  // Log the win once when every pair is matched (therapist browser only, so the
+  // synced client doesn't double-log).
+  const loggedWinRef = useRef(false);
+  useEffect(() => {
+    const allMatched = cards.length > 0 && cards.every(c => c.isMatched);
+    if (allMatched && isTherapist && !loggedWinRef.current) {
+      loggedWinRef.current = true;
+      logModuleEvent(sessionId, {
+        module: 'memory_match',
+        type: 'completed',
+        detail: `Matched all ${cards.length / 2} pairs in Memory Match (working memory)`,
+      });
+    }
+    if (!allMatched) loggedWinRef.current = false;
+  }, [cards, isTherapist, sessionId]);
 
   // Initialize cards
   useEffect(() => {

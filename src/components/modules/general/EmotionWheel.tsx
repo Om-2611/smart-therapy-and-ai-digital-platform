@@ -3,6 +3,7 @@
 import { useState, useEffect, useCallback } from 'react'
 import { doc, onSnapshot, updateDoc } from 'firebase/firestore'
 import { db } from '@/lib/firebase'
+import { logModuleEvent } from '@/lib/sessionEvents'
 
 interface EmotionWheelProps {
   sessionId: string
@@ -101,8 +102,13 @@ export default function EmotionWheel({ sessionId, role, isLocked }: EmotionWheel
       write({ 'moduleState.ewLevel': 3, 'moduleState.ewPath': newPath, 'moduleState.ewSelected': '' })
     } else {
       write({ 'moduleState.ewPath': newPath, 'moduleState.ewSelected': word })
+      logModuleEvent(sessionId, {
+        module: 'emotion-wheel',
+        type: 'emotion_named',
+        detail: `Named the emotion "${word}" (${newPath.join(' › ')})`,
+      })
     }
-  }, [canInteract, path, level, write])
+  }, [canInteract, path, level, write, sessionId])
 
   const goBack = useCallback(() => {
     if (!canInteract || level <= 1) return

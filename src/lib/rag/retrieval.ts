@@ -1,6 +1,6 @@
 import { neon } from '@neondatabase/serverless'
 import { generateEmbedding } from './nvidia-client'
-import { getSessionTranscript } from './transcript-store'
+import { getSessionTranscript, getSessionActivity } from './transcript-store'
 import { formatTranscriptForLLM } from './transcription'
 
 const sql = neon(process.env.DATABASE_URL!)
@@ -31,6 +31,10 @@ export interface PreviousNote {
 export interface RAGContext {
   transcript: string
   transcriptMinutes: number
+  // What actually happened inside therapy modules this session (human-readable).
+  moduleEvents: string[]
+  // The therapist's in-call typed notes this session (optional).
+  inCallNotes: string[]
   studyMaterial: RetrievedChunk[]
   hasStudyMaterial: boolean
   previousNotes: PreviousNote[]
@@ -73,9 +77,10 @@ export async function retrieveRAGContext(
   clientProfile: ClientProfile,
   transcriptWindowMinutes: number = 5
 ): Promise<RAGContext> {
-  const [transcript, previousNotes] = await Promise.all([
+  const [transcript, previousNotes, activity] = await Promise.all([
     retrieveTranscript(sessionId, transcriptWindowMinutes),
     retrievePreviousNotes(therapistId, clientProfile.clientId, 3),
+    getSessionActivity(sessionId),
   ])
 
   const materialChunks = await retrieveStudyMaterial(
@@ -87,6 +92,8 @@ export async function retrieveRAGContext(
   return {
     transcript,
     transcriptMinutes: transcriptWindowMinutes,
+    moduleEvents: activity.moduleEvents,
+    inCallNotes: activity.inCallNotes,
     studyMaterial: materialChunks,
     hasStudyMaterial: materialChunks.length > 0,
     previousNotes,

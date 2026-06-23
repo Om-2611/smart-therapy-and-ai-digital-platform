@@ -3,6 +3,7 @@
 import { useState, useEffect, useRef, useCallback, useMemo } from 'react'
 import { doc, onSnapshot, updateDoc } from 'firebase/firestore'
 import { db } from '@/lib/firebase'
+import { logModuleEvent } from '@/lib/sessionEvents'
 
 interface DragDropSortingProps {
   sessionId: string
@@ -232,8 +233,17 @@ export default function DragDropSorting({ sessionId, role, isLocked }: DragDropS
     }
   }, [canInteract, itemMap, sorted, write, correct, wrong, sortedCount, totalItems])
 
+  const loggedDoneRef = useRef(false)
   useEffect(() => {
     if (allDone && completed) {
+      if (isT && !loggedDoneRef.current) {
+        loggedDoneRef.current = true
+        logModuleEvent(sessionId, {
+          module: 'drag-drop-sorting',
+          type: 'completed',
+          detail: `Completed the "${currentSet.name}" sorting activity (${correct} correct, ${wrong} wrong attempt${wrong === 1 ? '' : 's'})`,
+        })
+      }
       const wc = wrong
       const star = wc === 0 ? '⭐⭐⭐ Perfect!' : wc <= 3 ? '⭐⭐ Great job!' : '⭐ Keep practising!'
       showToast(`All sorted! ${star}`)
@@ -243,7 +253,8 @@ export default function DragDropSorting({ sessionId, role, isLocked }: DragDropS
         speechSynthesis.speak(u)
       }
     }
-  }, [allDone, completed, wrong, showToast])
+    if (!allDone) loggedDoneRef.current = false
+  }, [allDone, completed, wrong, correct, showToast, isT, sessionId, currentSet.name])
 
   const handleReset = useCallback(() => {
     write({ 'moduleState.ddSorted': {}, 'moduleState.ddCorrect': 0, 'moduleState.ddWrong': 0, 'moduleState.ddCompleted': false })

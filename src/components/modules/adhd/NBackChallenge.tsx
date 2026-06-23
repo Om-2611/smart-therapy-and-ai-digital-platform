@@ -2,6 +2,7 @@
 import { useState, useEffect, useRef, useCallback } from 'react'
 import { doc, onSnapshot, updateDoc } from 'firebase/firestore'
 import { db } from '@/lib/firebase'
+import { logModuleEvent } from '@/lib/sessionEvents'
 
 interface NBackChallengeProps {
   sessionId: string
@@ -296,6 +297,20 @@ export default function NBackChallenge({ sessionId, role, isLocked }: NBackChall
 
   const stimTypeLabel = { colors: 'Colors', shapes: 'Shapes', letters: 'Letters', position: 'Position' }[stimulusType]
   const accuracy = hits + misses > 0 ? Math.round((hits / (hits + misses)) * 100) : 0
+
+  // Log the working-memory result once per completed run (therapist browser only).
+  const loggedDoneRef = useRef(false)
+  useEffect(() => {
+    if (complete && isTherapist && !loggedDoneRef.current) {
+      loggedDoneRef.current = true
+      logModuleEvent(sessionId, {
+        module: 'n-back-challenge',
+        type: 'completed',
+        detail: `Completed a ${n}-back working-memory round (${stimTypeLabel}) with ${accuracy}% accuracy (${hits} hits, ${misses} misses)`,
+      })
+    }
+    if (!complete) loggedDoneRef.current = false
+  }, [complete, isTherapist, sessionId, n, stimTypeLabel, accuracy, hits, misses])
 
   const handleTryAgain = () => {
     handleStart()

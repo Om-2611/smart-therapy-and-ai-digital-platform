@@ -8,6 +8,7 @@ import { Button } from '@/components/ui/button';
 import { Select, SelectTrigger, SelectValue, SelectContent, SelectItem } from '@/components/ui/select';
 import { Play, ArrowRight, FileText, X, Send, Loader2, Sparkles, RefreshCw, Pencil, Save } from 'lucide-react';
 import DashboardLayout from '@/components/layout/DashboardLayout';
+import SessionReportView from '@/components/report/SessionReportView';
 
 interface SessionData {
   id: string;
@@ -459,11 +460,26 @@ export default function SessionsPage() {
                       </button>
                     </div>
                   </>
-                ) : (
-                  <div className="rounded-xl p-4 text-sm whitespace-pre-wrap leading-relaxed" style={{ background: 'var(--sage-light)', color: 'var(--ink)' }}>
-                    {report.content}
-                  </div>
-                )}
+                ) : (() => {
+                  const s = sessions.find((x) => x.id === reportSessionId);
+                  const clientName = s?.client ? `${s.client.firstName} ${s.client.lastName}`.trim() : undefined;
+                  const dateSrc = report.generatedAt || s?.scheduledAt;
+                  const dateLabel = dateSrc
+                    ? new Date(dateSrc).toLocaleDateString('en-GB', { day: 'numeric', month: 'long', year: 'numeric' })
+                    : undefined;
+                  return (
+                    <div className="rounded-xl p-5" style={{ background: '#ffffff', border: '1px solid var(--glass-border)' }}>
+                      <SessionReportView
+                        content={report.content}
+                        meta={{
+                          clientName,
+                          dateLabel,
+                          statusLabel: report.editedByTherapist ? 'Edited by therapist' : 'AI-generated draft',
+                        }}
+                      />
+                    </div>
+                  );
+                })()}
               </div>
             )}
           </div>

@@ -2,6 +2,7 @@
 import { useState, useEffect, useRef, useCallback } from 'react'
 import { doc, onSnapshot, updateDoc } from 'firebase/firestore'
 import { db } from '@/lib/firebase'
+import { logModuleEvent } from '@/lib/sessionEvents'
 
 interface PixelArtCodingProps {
   sessionId: string
@@ -470,6 +471,13 @@ export default function PixelArtCoding({ sessionId, role, isLocked }: PixelArtCo
     if (programStatus !== 'out-of-bounds') {
       setProgramStatus('complete')
       setTimeout(() => setProgramStatus('idle'), 2000)
+      if (isTherapist) {
+        logModuleEvent(sessionId, {
+          module: 'pixel-art-coding',
+          type: 'program_completed',
+          detail: 'Completed a coding sequence in Pixel Art Coding (pattern recognition / sequencing)',
+        })
+      }
     }
   }
 

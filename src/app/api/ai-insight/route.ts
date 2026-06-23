@@ -1,7 +1,7 @@
 import { NextResponse } from 'next/server'
 import { prisma } from '@/lib/db'
 import { runAnalysis } from '@/lib/rag/analysis'
-import { checkAIConsent, getSessionTranscript } from '@/lib/rag/transcript-store'
+import { checkAIConsent, getSessionTranscript, appendCopilotEvent } from '@/lib/rag/transcript-store'
 import type { ClientProfile } from '@/lib/rag/retrieval'
 import type { AIInsight } from '@/lib/rag/types'
 
@@ -49,8 +49,11 @@ export async function POST(request: Request) {
       )
     }
 
+    // Dev test mode bypasses the both-consent gate so the copilot can be verified
+    // solo (matches NEXT_PUBLIC_STT_TEST_MODE used for transcription).
+    const sttTestMode = process.env.NEXT_PUBLIC_STT_TEST_MODE === 'true'
     const consent = await checkAIConsent(sessionId)
-    if (!consent) {
+    if (!consent && !sttTestMode) {
       return NextResponse.json(
         {
           error: 'AI analysis not consented',
@@ -96,6 +99,18 @@ export async function POST(request: Request) {
       },
       { merge: true }
     )
+
+    // Lightweight append-only audit trail of every copilot suggestion. Survives
+    // alongside the transcript so the end-of-session report can reference it
+    // (e.g. "copilot flagged a safeguarding concern mid-session"). Never blocks.
+    await appendCopilotEvent(sessionId, {
+      timestamp: Date.now(),
+      summary: insight.summary,
+      module: insight.module,
+      riskFlag: insight.riskFlag,
+      riskLevel: insight.riskLevel ?? 'none',
+      riskDetail: insight.riskDetail ?? '',
+    })
 
     // Log AI analysis as a usage event for the admin dashboard (therapistId here
     // is the Firebase uid; resolve to the therapist profile). Never block on this.

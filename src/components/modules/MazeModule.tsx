@@ -1,8 +1,9 @@
 'use client';
 
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { useAuthStore } from '@/store/useAuthStore';
 import { updateModuleState, subscribeToModuleState } from '@/services/sessionSync';
+import { logModuleEvent } from '@/lib/sessionEvents';
 
 interface MazeState {
   playerPos: { x: number; y: number };
@@ -16,8 +17,9 @@ interface MazeModuleProps {
   isLocked: boolean;
 }
 
-export default function MazeModule({ sessionId, isLocked }: MazeModuleProps) {
+export default function MazeModule({ sessionId, role, isLocked }: MazeModuleProps) {
   const { uid } = useAuthStore();
+  const isTherapist = role === 'therapist';
   const [maze, setMaze] = useState<number[][]>([
     [0, 0, 1, 0, 0],
     [1, 0, 1, 0, 1],
@@ -42,6 +44,20 @@ export default function MazeModule({ sessionId, isLocked }: MazeModuleProps) {
     });
     return () => unsubscribe();
   }, [sessionId]);
+
+  // Log reaching the goal once (therapist browser only).
+  const loggedDoneRef = useRef(false);
+  useEffect(() => {
+    if (state.completed && isTherapist && !loggedDoneRef.current) {
+      loggedDoneRef.current = true;
+      logModuleEvent(sessionId, {
+        module: 'maze',
+        type: 'maze_solved',
+        detail: 'Reached the goal in the Maze activity (sustained attention · motor planning)',
+      });
+    }
+    if (!state.completed) loggedDoneRef.current = false;
+  }, [state.completed, isTherapist, sessionId]);
 
   const movePlayer = (dx: number, dy: number) => {
     if (!isInteractive || state.completed) return;

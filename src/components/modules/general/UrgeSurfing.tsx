@@ -3,6 +3,7 @@
 import { useState, useEffect, useCallback, useRef } from 'react'
 import { doc, onSnapshot, updateDoc } from 'firebase/firestore'
 import { db } from '@/lib/firebase'
+import { logModuleEvent } from '@/lib/sessionEvents'
 
 interface UrgeSurfingProps {
   sessionId: string
@@ -84,7 +85,12 @@ export default function UrgeSurfing({ sessionId, role, isLocked }: UrgeSurfingPr
   const launch = useCallback(() => {
     if (!isT) return
     write({ 'moduleState.usActive': true, 'moduleState.usStartTime': Date.now(), 'moduleState.usPhase': 0, 'moduleState.usPaused': false, 'moduleState.usPausedElapsed': 0, 'moduleState.usUrgeRating': 0 })
-  }, [isT, write])
+    logModuleEvent(sessionId, {
+      module: 'urge-surfing',
+      type: 'started',
+      detail: 'Started a 7-minute urge-surfing exercise (riding the urge wave without acting on it)',
+    })
+  }, [isT, write, sessionId])
 
   const togglePause = useCallback(() => {
     if (!isT) return

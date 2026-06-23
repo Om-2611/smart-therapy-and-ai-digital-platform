@@ -2,6 +2,7 @@
 import { useState, useEffect, useRef, useCallback } from 'react'
 import { doc, onSnapshot, updateDoc } from 'firebase/firestore'
 import { db } from '@/lib/firebase'
+import { logModuleEvent } from '@/lib/sessionEvents'
 
 interface BubbleSplashProps {
   sessionId: string
@@ -367,6 +368,14 @@ export default function BubbleSplash({ sessionId, role, isLocked }: BubbleSplash
     const next = !isPlaying
     setIsPlaying(next)
     writeToFirestore({ 'moduleState.bsIsPlaying': next })
+
+    if (!next && score > 0 && isTherapist) {
+      logModuleEvent(sessionId, {
+        module: 'bubble-splash-sld',
+        type: 'practice_summary',
+        detail: `Reading Bubbles practice (${wordSet}): ${score} bubble${score === 1 ? '' : 's'} popped correctly`,
+      })
+    }
 
     if (next) {
       if (!prompt) {

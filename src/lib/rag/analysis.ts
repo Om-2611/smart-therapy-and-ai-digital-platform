@@ -1,6 +1,7 @@
-import { analyseWithLLM } from './nvidia-client'
+import { chatJSON, COPILOT_MODEL, extractJSON } from '@/lib/report/openrouter-client'
 import { SYSTEM_PROMPT, buildAnalysisPrompt } from './prompt'
 import { retrieveRAGContext, type ClientProfile } from './retrieval'
+import { runSafetyScan } from './safety'
 import type { AIInsight } from './types'
 
 export interface AnalysisOptions {
@@ -36,15 +37,28 @@ export async function runAnalysis(
 
   const userPrompt = buildAnalysisPrompt(context)
 
-  console.log('[Analysis] Calling NVIDIA NIM LLM...')
+  console.log(`[Analysis] Calling OpenRouter (${COPILOT_MODEL}) + parallel safety pass...`)
   const llmStart = Date.now()
-  const raw = await analyseWithLLM(SYSTEM_PROMPT, userPrompt)
+  // Two calls in parallel: the main suggestion AND a dedicated safety scan. The
+  // safety verdict must not depend on whether the suggestion model noticed the
+  // cue, so it runs independently and is merged in. Total latency ≈ the slower
+  // of the two, not the sum.
+  const [raw, safety] = await Promise.all([
+    chatJSON(COPILOT_MODEL, SYSTEM_PROMPT, userPrompt),
+    runSafetyScan(context.transcript),
+  ])
   const llmDuration = Date.now() - llmStart
-  console.log(`[Analysis] LLM responded in ${llmDuration}ms`)
+  console.log(`[Analysis] LLM + safety responded in ${llmDuration}ms (safety: ${safety.level})`)
 
   const insight = parseInsight(raw, transcriptWindowMinutes)
 
-  console.log(`[Analysis] Parsed — emotions: [${insight.emotions.join(', ')}], risk: ${insight.riskFlag}`)
+  // The dedicated safety pass is authoritative for risk: a 'watch' or 'urgent'
+  // verdict raises the flag even if the suggestion model set riskFlag=false.
+  insight.riskLevel = safety.level
+  insight.riskDetail = safety.rationale || insight.riskDetail || ''
+  if (safety.level !== 'none') insight.riskFlag = true
+
+  console.log(`[Analysis] Parsed — emotions: [${insight.emotions.join(', ')}], risk: ${insight.riskFlag} (${insight.riskLevel})`)
 
   return insight
 }
@@ -53,11 +67,9 @@ function parseInsight(
   raw: string,
   transcriptWindowMinutes: number
 ): AIInsight {
-  let parsed: Record<string, unknown>
+  const parsed = extractJSON(raw)
 
-  try {
-    parsed = JSON.parse(raw)
-  } catch {
+  if (!parsed) {
     console.warn('[Analysis] LLM returned invalid JSON, using fallback')
     return {
       emotions: [],
@@ -75,6 +87,7 @@ function parseInsight(
   const steps = normalizeArray(parsed.steps)
   const module = typeof parsed.module === 'string' ? parsed.module : ''
   const riskFlag = typeof parsed.riskFlag === 'boolean' ? parsed.riskFlag : false
+  const riskDetail = typeof parsed.riskDetail === 'string' ? parsed.riskDetail : ''
 
   return {
     emotions,
@@ -82,6 +95,7 @@ function parseInsight(
     steps,
     module,
     riskFlag,
+    riskDetail,
     generatedAt: Date.now(),
     transcriptWindowMinutes,
   }

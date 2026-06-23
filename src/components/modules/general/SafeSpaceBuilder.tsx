@@ -3,6 +3,7 @@
 import { useState, useEffect, useCallback, useRef } from 'react'
 import { doc, onSnapshot, getDoc, setDoc } from 'firebase/firestore'
 import { db } from '@/lib/firebase'
+import { logModuleEvent } from '@/lib/sessionEvents'
 
 interface SafeSpaceBuilderProps {
   sessionId: string
@@ -133,17 +134,28 @@ export default function SafeSpaceBuilder({ sessionId, role, isLocked }: SafeSpac
 
   const addAnchor = useCallback(() => {
     if (!isT || !anchorInput.trim()) return
-    const next = [...anchors, anchorInput.trim()]
+    const anchor = anchorInput.trim()
+    const next = [...anchors, anchor]
     setAnchors(next)
     persist({ anchors: next })
     setAnchorInput('')
-  }, [isT, anchorInput, anchors, persist])
+    logModuleEvent(sessionId, {
+      module: 'safe-space-builder',
+      type: 'anchor_added',
+      detail: `Added a sensory grounding anchor: "${anchor}"`,
+    })
+  }, [isT, anchorInput, anchors, persist, sessionId])
 
   const saveSpace = useCallback(async () => {
     await persist({})
     setSaved(true)
     setTimeout(() => setSaved(false), 1800)
-  }, [persist])
+    logModuleEvent(sessionId, {
+      module: 'safe-space-builder',
+      type: 'space_saved',
+      detail: `Built and saved a personal safe space${name ? ` ("${name}")` : ''} with ${objects.length} comfort object${objects.length === 1 ? '' : 's'}`,
+    })
+  }, [persist, sessionId, name, objects.length])
 
   const bg = BACKGROUNDS.find(b => b.id === background)?.css || BACKGROUNDS[1].css
 

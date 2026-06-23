@@ -2,6 +2,7 @@
 import { useState, useEffect, useRef, useCallback } from 'react'
 import { doc, onSnapshot, updateDoc, arrayUnion } from 'firebase/firestore'
 import { db } from '@/lib/firebase'
+import { logModuleEvent } from '@/lib/sessionEvents'
 
 interface PlacedItem {
   id: string
@@ -351,6 +352,11 @@ export default function DigitalSandTray({ sessionId, role, isLocked }: DigitalSa
           note: note || '',
         }),
         'timestamps.updatedAt': new Date().toISOString(),
+      })
+      logModuleEvent(sessionId, {
+        module: 'digital-sand-tray',
+        type: 'scene_saved',
+        detail: `Saved a sand-tray scene with ${items.length} miniature${items.length === 1 ? '' : 's'} placed${note ? `: "${note}"` : ''}`,
       })
     } catch {}
   }

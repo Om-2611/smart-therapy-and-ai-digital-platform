@@ -3,6 +3,7 @@
 import React, { useState, useEffect } from 'react';
 import { useAuthStore } from '@/store/useAuthStore';
 import { updateModuleState, subscribeToModuleState } from '@/services/sessionSync';
+import { logModuleEvent } from '@/lib/sessionEvents';
 
 interface CalcState {
   display: string;
@@ -43,6 +44,11 @@ export default function TalkingCalculatorModule({ sessionId, isLocked }: Talking
         const evalResult = eval(state.display);
         nextDisplay = String(evalResult);
         nextSpeech = `Equals ${evalResult}`;
+        logModuleEvent(sessionId, {
+          module: 'talking_calculator',
+          type: 'calculation',
+          detail: `Worked out ${state.display} = ${evalResult}`,
+        });
       } catch (err) {
         nextDisplay = 'Error';
         nextSpeech = 'Try again';

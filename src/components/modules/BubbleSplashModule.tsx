@@ -1,8 +1,9 @@
 'use client';
 
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { useAuthStore } from '@/store/useAuthStore';
 import { updateModuleState, subscribeToModuleState } from '@/services/sessionSync';
+import { logModuleEvent } from '@/lib/sessionEvents';
 
 interface Bubble {
   id: number;
@@ -18,10 +19,26 @@ interface BubbleSplashModuleProps {
   isLocked: boolean;
 }
 
-export default function BubbleSplashModule({ sessionId, isLocked }: BubbleSplashModuleProps) {
+export default function BubbleSplashModule({ sessionId, role, isLocked }: BubbleSplashModuleProps) {
   const { uid } = useAuthStore();
+  const isTherapist = role === 'therapist';
   const [bubbles, setBubbles] = useState<Bubble[]>([]);
   const isInteractive = !isLocked;
+
+  // Log when every bubble has been popped (therapist browser only).
+  const loggedDoneRef = useRef(false);
+  useEffect(() => {
+    const allPopped = bubbles.length > 0 && bubbles.every(b => b.popped);
+    if (allPopped && isTherapist && !loggedDoneRef.current) {
+      loggedDoneRef.current = true;
+      logModuleEvent(sessionId, {
+        module: 'bubble_splash',
+        type: 'completed',
+        detail: `Popped all ${bubbles.length} bubbles in Bubble Splash (calming / anxiety relief)`,
+      });
+    }
+    if (!allPopped) loggedDoneRef.current = false;
+  }, [bubbles, isTherapist, sessionId]);
 
   useEffect(() => {
     // Generate initial bubbles if none synced

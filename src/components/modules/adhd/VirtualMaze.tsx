@@ -3,6 +3,7 @@
 import { useState, useEffect, useRef, useCallback } from 'react'
 import { doc, onSnapshot, updateDoc } from 'firebase/firestore'
 import { db } from '@/lib/firebase'
+import { logModuleEvent } from '@/lib/sessionEvents'
 
 interface VirtualMazeProps {
   sessionId: string
@@ -338,13 +339,18 @@ export default function VirtualMaze({ sessionId, role, isLocked }: VirtualMazePr
         'moduleState.vmWrongMoves': wrongMoves,
         'moduleState.vmTimeUp': false,
       })
+      logModuleEvent(sessionId, {
+        module: 'maze',
+        type: 'maze_solved',
+        detail: `Solved the maze in ${elapsedSeconds}s with ${wrongMoves} wrong move${wrongMoves === 1 ? '' : 's'}`,
+      })
     } else {
       writeToFirestore({
         'moduleState.vmPlayerPos': newPos,
         'moduleState.vmVisited': newVisited,
       })
     }
-  }, [canInteract, completed, mazeReady, timeUp, playerPos, gridSize, maze, wrongMoves, visited, goalPos, startTime, writeToFirestore])
+  }, [canInteract, completed, mazeReady, timeUp, playerPos, gridSize, maze, wrongMoves, visited, goalPos, startTime, writeToFirestore, sessionId])
 
   const movePlayerRef = useRef(movePlayer)
   movePlayerRef.current = movePlayer

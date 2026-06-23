@@ -3,6 +3,7 @@
 import { useState, useEffect, useCallback } from 'react'
 import { doc, onSnapshot, setDoc } from 'firebase/firestore'
 import { db } from '@/lib/firebase'
+import { logModuleEvent } from '@/lib/sessionEvents'
 
 interface MicroQuestBoardProps {
   sessionId: string
@@ -65,7 +66,12 @@ export default function MicroQuestBoard({ sessionId, role, isLocked }: MicroQues
     const q: Quest = { id: `q${Date.now()}-${Math.random().toString(36).slice(2, 5)}`, text: questText.trim(), effort, completed: false, completedAt: null, therapistNote: '' }
     const next = [...quests, q]
     setQuests(next); persist(next); setQuestText('')
-  }, [isT, questText, effort, quests, persist])
+    logModuleEvent(sessionId, {
+      module: 'micro-quest-board',
+      type: 'quest_assigned',
+      detail: `Assigned a ${effort} micro-quest: "${q.text}"`,
+    })
+  }, [isT, questText, effort, quests, persist, sessionId])
 
   const removeQuest = useCallback((id: string) => {
     if (!isT) return
@@ -78,8 +84,15 @@ export default function MicroQuestBoard({ sessionId, role, isLocked }: MicroQues
     const next = quests.map(q => q.id === id ? { ...q, completed: !q.completed, completedAt: !q.completed ? Date.now() : null } : q)
     setQuests(next); persist(next)
     const q = quests.find(x => x.id === id)
-    if (q && !q.completed) { setCelebrate(id); setTimeout(() => setCelebrate(null), 1200) }
-  }, [canInteract, quests, persist])
+    if (q && !q.completed) {
+      setCelebrate(id); setTimeout(() => setCelebrate(null), 1200)
+      logModuleEvent(sessionId, {
+        module: 'micro-quest-board',
+        type: 'quest_completed',
+        detail: `Completed the micro-quest: "${q.text}"`,
+      })
+    }
+  }, [canInteract, quests, persist, sessionId])
 
   const setNote = useCallback((id: string, note: string) => {
     if (!isT) return

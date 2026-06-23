@@ -3,9 +3,10 @@
   "version": "0.1.0",
   "private": true,
   "scripts": {
-    "dev": "next dev",
+    "dev": "node server.js",
     "build": "next build",
-    "start": "next start",
+    "start": "node server.js --prod",
+    "dev:next": "next dev",
     "lint": "next lint",
     "test:pgvector": "tsx scripts/test-pgvector.ts",
     "setup:pgvector": "tsx scripts/setup-pgvector.ts",
@@ -45,6 +46,7 @@
     "shadcn": "^4.7.0",
     "tailwind-merge": "^3.6.0",
     "tw-animate-css": "^1.4.0",
+    "ws": "^8.21.0",
     "zustand": "^5.0.13"
   },
   "devDependencies": {
@@ -54,6 +56,7 @@
     "@types/react": "^18.3.28",
     "@types/react-dom": "^18.3.7",
     "@types/react-query": "^1.2.8",
+    "@types/ws": "^8.18.1",
     "eslint": "^8",
     "eslint-config-next": "^16.2.6",
     "marked": "^18.0.4",

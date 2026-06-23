@@ -235,6 +235,13 @@ export default function Home() {
   const initials = `${profile.firstName?.[0] ?? ''}${profile.lastName?.[0] ?? ''}`.toUpperCase();
   const nameInitials = (f?: string, l?: string) => `${f?.[0] ?? ''}${l?.[0] ?? ''}`.toUpperCase();
 
+  // "Session Rooms" should only list sessions you can actually join — not ones
+  // already finished. Without this filter a COMPLETED session keeps showing an
+  // "Enter Room" button forever, making it look like the session never ended.
+  const roomSessions = sessions.filter(
+    (s) => s.status === 'SCHEDULED' || s.status === 'ACTIVE'
+  );
+
   const therapistStats = [
     { icon: Play, label: 'Active rooms', value: sessions.filter((s) => s.status === 'ACTIVE').length },
     { icon: CalendarClock, label: 'Appointments', value: bookings.length },
@@ -308,33 +315,8 @@ export default function Home() {
         {/* CLIENT DASHBOARD */}
         {role === 'CLIENT' && (
           <main className="mt-8 space-y-6">
-            {/* Welcome & Quick Stats */}
-            <div className="grid grid-cols-1 gap-6 md:grid-cols-3">
-              <Card className={`md:col-span-2 ${GLASS_CARD} p-6`}>
-                <div className="flex items-center justify-between">
-                  <div>
-                    <p className="mb-1 text-sm font-medium" style={{ color: 'var(--ink-muted)' }}>Hello!</p>
-                    <h2 className="font-heading text-3xl" style={{ color: 'var(--ink)' }}>Ready for something fun?</h2>
-                    <p className="mt-2 font-medium" style={{ color: 'var(--ink-muted)' }}>Your therapist is waiting for you</p>
-                  </div>
-                  <div className="hidden flex-col items-center gap-2 md:flex">
-                    <div className="text-5xl">🌟</div>
-                    <span className="text-sm font-bold" style={{ color: 'var(--sage)' }}>Great job!</span>
-                  </div>
-                </div>
-              </Card>
-              <Card className={`${GLASS_CARD} stagger-1 p-6`}>
-                <div className="text-center">
-                  <div className="mb-2 text-4xl">🔥</div>
-                  <p className="font-heading text-4xl" style={{ color: 'var(--ink)' }}>{Math.floor(Math.random() * 10) + 3}</p>
-                  <p className="text-sm font-medium" style={{ color: 'var(--ink-muted)' }}>Day Streak</p>
-                  <p className="mt-1 text-xs" style={{ color: 'var(--sage)' }}>Keep it up!</p>
-                </div>
-              </Card>
-            </div>
-
             {/* Upcoming Session Card */}
-            {sessions.length > 0 && (
+            {sessions.length > 0 ? (
               <Card className={`${GLASS_CARD} p-6`}>
                 <div className="flex flex-col justify-between gap-4 md:flex-row md:items-center">
                   <div className="flex items-center gap-4">
@@ -368,54 +350,11 @@ export default function Home() {
                   </Button>
                 </div>
               </Card>
-            )}
-
-            {/* Activity History & Therapist Message */}
-            <div className="grid grid-cols-1 gap-6 md:grid-cols-2">
+            ) : (
               <Card className={`${GLASS_CARD} p-6`}>
-                <CardHeader className="p-0 pb-4">
-                  <CardTitle className="flex items-center gap-2 font-heading text-lg" style={{ color: 'var(--ink)' }}>
-                    📝 Today's Activity
-                  </CardTitle>
-                </CardHeader>
-                <CardContent className="space-y-3 p-0">
-                  {sessions.length > 0 ? (
-                    <div className="space-y-2">
-                      <div className={`flex items-center gap-3 rounded-xl p-3 ${GLASS_INNER}`}>
-                        <span className="text-xl">🎯</span>
-                        <div>
-                          <p className="text-sm font-medium" style={{ color: 'var(--ink)' }}>Maze Challenge</p>
-                          <p className="text-xs" style={{ color: 'var(--ink-muted)' }}>Completed in 3:45</p>
-                        </div>
-                      </div>
-                      <div className={`flex items-center gap-3 rounded-xl p-3 ${GLASS_INNER}`}>
-                        <span className="text-xl">🫧</span>
-                        <div>
-                          <p className="text-sm font-medium" style={{ color: 'var(--ink)' }}>Bubble Splash</p>
-                          <p className="text-xs" style={{ color: 'var(--ink-muted)' }}>12 bubbles popped</p>
-                        </div>
-                      </div>
-                    </div>
-                  ) : (
-                    <p className="py-4 text-center font-medium" style={{ color: 'var(--ink-muted)' }}>No activities yet today</p>
-                  )}
-                </CardContent>
+                <p className="py-4 text-center font-medium" style={{ color: 'var(--ink-muted)' }}>No upcoming sessions yet.</p>
               </Card>
-
-              <Card className={`${GLASS_CARD} stagger-1 p-6`}>
-                <CardHeader className="p-0 pb-4">
-                  <CardTitle className="flex items-center gap-2 font-heading text-lg" style={{ color: 'var(--ink)' }}>
-                    💬 Therapist Note
-                  </CardTitle>
-                </CardHeader>
-                <CardContent className="p-0">
-                  <div className={`rounded-xl p-4 ${GLASS_INNER}`}>
-                    <p className="font-medium italic" style={{ color: 'var(--ink)' }}>"Great progress today! Keep practicing the breathing exercises we learned."</p>
-                    <p className="mt-2 text-xs" style={{ color: 'var(--ink-muted)' }}>— {profile?.firstName}'s Therapist</p>
-                  </div>
-                </CardContent>
-              </Card>
-            </div>
+            )}
           </main>
         )}
 
@@ -448,12 +387,12 @@ export default function Home() {
                     <ClipboardList className="h-5 w-5" style={{ color: 'var(--ink-muted)' }} />
                   </CardHeader>
                   <CardContent className="space-y-3 p-0 pt-4">
-                    {sessions.length === 0 ? (
+                    {roomSessions.length === 0 ? (
                       <div className="rounded-xl border border-dashed py-10 text-center" style={{ borderColor: 'var(--glass-border)', background: 'var(--sage-light)' }}>
                         <p className="font-medium" style={{ color: 'var(--ink-muted)' }}>No sessions scheduled.</p>
                       </div>
                     ) : (
-                      sessions.map((session) => (
+                      roomSessions.map((session) => (
                         <div
                           key={session.id}
                           className="flex flex-col gap-4 rounded-xl p-4 hover-lift sm:flex-row sm:items-center sm:justify-between"

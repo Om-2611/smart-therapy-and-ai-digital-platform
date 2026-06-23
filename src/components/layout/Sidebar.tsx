@@ -13,7 +13,6 @@ import {
   Puzzle,
   User,
   ClipboardList,
-  TrendingUp,
   LifeBuoy,
   Shield,
   CreditCard,
@@ -49,7 +48,6 @@ const therapistNav = [
 const clientNav = [
   { href: '/', label: 'Home', icon: Home },
   { href: '/my-sessions', label: 'My Sessions', icon: Calendar },
-  { href: '/progress', label: 'Progress', icon: TrendingUp },
   { href: '/profile', label: 'Profile', icon: User },
   { href: '/help', label: 'Help & Support', icon: LifeBuoy },
 ];
