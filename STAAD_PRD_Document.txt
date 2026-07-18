@@ -1,0 +1,166 @@
+--- Page 1 ---
+STAAD — Product Requirements Document
+ (PRD)
+ 
+Product Overview
+STAAD is a modern online therapy platform designed specifically for therapists working with SLD, ADHD,
+Anxiety, Depression, Intellectual Disability, Dyslexia, and Autism.
+The platform combines secure live video conferencing, interactive therapy modules, real-time collaborative
+activities, session tracking, and a plugin-based therapy module system.
+Core USP:
+During live therapy sessions, both therapist and client can simultaneously interact with therapy modules
+like Maze, Bubble Splash, Talking Calculator, Matching Games, Attention Tasks, and Memory Games.
+Primary Goal
+Build a production-ready MVP using mostly free/serverless tools with clean architecture, scalable plugin
+system, responsive UI, minimalistic design, calm therapy-focused aesthetics, and maintainable codebase.
+Design Language
+- Calm sage green palette
+- Minimal text-heavy UI
+- Large breathing spaces
+- Rounded corners
+- Soft shadows
+- Warm off-white background
+- DM Sans + DM Serif typography
+- Emotionally calming interface
+
+--- Page 2 ---
+Frontend Stack
+- Next.js 14 App Router
+- TypeScript
+- TailwindCSS
+- Framer Motion
+- ShadCN UI
+- Zustand
+- React Query / TanStack Query
+Deployment:
+- Vercel free tier
+Authentication
+Use Firebase Authentication with:
+- Google OAuth
+- Email/password
+- Role-based authentication
+Roles:
+- therapist
+- client
+- admin
+Database Architecture
+Firestore is used for realtime session state and collaborative synchronization.
+Neon Postgres is used for structured relational data like:
+- users
+- therapists
+- clients
+- bookings
+
+--- Page 3 ---
+- therapist notes
+- progress reports
+- billing
+Storage
+Use Cloudflare R2 for:
+- profile images
+- worksheets
+- reports
+- therapy assets
+- exports
+Video Infrastructure
+Use Daily.co SDK for:
+- live video sessions
+- screen sharing
+- participant controls
+- responsive layouts
+- therapist-controlled sessions
+Core Features
+1. Authentication & onboarding flow
+2. Therapist dashboard
+3. Realtime collaborative session room
+4. Plugin-based therapy modules
+5. Notifications
+6. Analytics
+7. Payments
+8. Progress tracking
+
+--- Page 4 ---
+Session Room Requirements
+- Side-by-side video + module layout
+- Floating controls
+- Therapist module switching
+- Firestore realtime sync
+- Reconnect handling
+- Low latency
+- Optimistic updates
+- Tablet support
+Therapy Module Plugin Contract
+interface TherapyModule {
+  id: string
+  name: string
+  init(): void
+  onInput(data: any): void
+  getState(): any
+  setState(state: any): void
+  destroy(): void
+}
+Starter Therapy Modules
+1. Maze
+2. Bubble Splash
+3. Talking Calculator
+4. Memory Match
+5. Emotion Cards
+Realtime Firestore Structure
+
+--- Page 5 ---
+liveSessions/
+  sessionId/
+    activeModule
+    participants
+    currentState
+    timestamps
+moduleStates/
+  sessionId/
+    moduleId/
+      state
+      updatedBy
+      updatedAt
+Backend Requirements
+Use Next.js API routes/server actions only.
+Required APIs:
+- booking creation
+- session creation
+- therapist notes
+- analytics ingestion
+- module registry
+- payment webhooks
+Security Requirements
+- Firebase security rules
+- rate limiting
+- role validation
+- session authorization
+- signed upload URLs
+- secure environment variables
+- Postgres RLS
+Build Phases
+
+--- Page 6 ---
+PHASE 1
+- onboarding
+- auth
+- therapist dashboard
+PHASE 2
+- session room
+- Daily.co integration
+- realtime sync
+PHASE 3
+- therapy modules
+- plugin system
+PHASE 4
+- analytics
+- payments
+- reports
+PHASE 5
+- optimization
+- testing
+- deployment
+Success Criteria
+The application should feel like:
+“Figma-quality therapy software that is emotionally calming, technically reliable, and easy enough for
+therapists to use without training.”
+

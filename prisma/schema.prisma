@@ -1,0 +1,282 @@
+generator client {
+  provider        = "prisma-client-js"
+  previewFeatures = ["postgresqlExtensions"]
+}
+
+datasource db {
+  provider   = "postgresql"
+  url        = env("DATABASE_URL")
+  extensions = [vector]
+}
+
+enum Role {
+  THERAPIST
+  CLIENT
+  ADMIN
+}
+
+enum SessionStatus {
+  SCHEDULED
+  ACTIVE
+  COMPLETED
+  CANCELLED
+}
+
+enum InviteStatus {
+  PENDING
+  CLAIMED
+  EXPIRED
+}
+
+enum SubscriptionStatus {
+  ACTIVE
+  EXPIRED
+  CANCELLED
+}
+
+enum SubRequestStatus {
+  PENDING
+  APPROVED
+  REJECTED
+}
+
+model User {
+  id        String   @id // Firebase Auth UID
+  email     String   @unique
+  role      Role     @default(CLIENT)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  therapist ProfileTherapist?
+  client    ProfileClient?
+  admin     ProfileAdmin?
+}
+
+model ProfileAdmin {
+  id        String   @id @default(uuid())
+  userId    String   @unique
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  firstName String   @default("Admin")
+  lastName  String   @default("")
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}
+
+model ProfileTherapist {
+  id            String   @id @default(uuid())
+  userId        String   @unique
+  user          User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  firstName     String
+  lastName      String
+  specialty     String[] // SLD, ADHD, Anxiety, Depression, ID, Dyslexia, Autism etc.
+  qualification String?
+  experience    String?
+  bio           String?
+  // Per-therapist module/tool access. When allModulesAllowed is true the
+  // therapist may launch any module; otherwise only those listed in moduleAccess.
+  allModulesAllowed Boolean  @default(true)
+  moduleAccess      String[] @default([])
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+
+  sessions     Session[]
+  notes        TherapistNote[]
+  bookings     Booking[]
+  invites      Invite[]
+  usageEvents  UsageEvent[]
+  subscriptions        Subscription[]
+  subscriptionRequests SubscriptionRequest[]
+}
+
+model ProfileClient {
+  id          String    @id @default(uuid())
+  userId      String    @unique
+  user        User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  firstName   String
+  lastName    String
+  dateOfBirth DateTime
+  gender      String?
+  diagnosis   String[]
+  parentEmail String?
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+  bookings    Booking[]
+  sessions    Session[]
+}
+
+model DocumentChunk {
+  id          String                       @id @default(uuid())
+  therapistId String                       @map("therapist_id")
+  sessionId   String?                      @map("session_id")
+  fileName    String                       @map("file_name")
+  chunkIndex  Int                          @map("chunk_index")
+  chunkText   String                       @map("chunk_text")
+  embedding   Unsupported("vector(1024)")?
+  createdAt   DateTime                     @default(now()) @map("created_at")
+  metadata    Json                         @default("{}")
+
+  @@index([therapistId])
+  @@map("document_chunks")
+}
+
+model Booking {
+  id          String           @id @default(uuid())
+  therapistId String
+  therapist   ProfileTherapist @relation(fields: [therapistId], references: [id])
+  clientId    String
+  client      ProfileClient    @relation(fields: [clientId], references: [id])
+  dateTime    DateTime
+  duration    Int              @default(50) // duration in minutes
+  status      String           @default("pending") // pending, confirmed, cancelled
+  createdAt   DateTime         @default(now())
+  updatedAt   DateTime         @updatedAt
+}
+
+model Session {
+  id          String           @id @default(uuid())
+  therapistId String
+  therapist   ProfileTherapist @relation(fields: [therapistId], references: [id])
+  clientId    String
+  client      ProfileClient    @relation(fields: [clientId], references: [id])
+  status              SessionStatus    @default(SCHEDULED)
+  scheduledAt         DateTime
+  startedAt           DateTime?
+  endedAt             DateTime?
+  confirmedByPatient  Boolean          @default(false)
+  createdAt   DateTime         @default(now())
+  updatedAt   DateTime         @updatedAt
+
+  notes  TherapistNote[]
+  report SessionReport?
+}
+
+// End-of-session AI clinical report. One per session. Generated from the full
+// transcript + in-session module activity + therapist's in-call notes, then
+// editable by the therapist. `visibleToClient` is false for now (therapist-only)
+// but lets us expose reports to clients later without a schema change.
+model SessionReport {
+  id          String   @id @default(uuid())
+  sessionId   String   @unique
+  session     Session  @relation(fields: [sessionId], references: [id], onDelete: Cascade)
+  therapistId String
+  clientId    String
+  content     String   // report body (Markdown, English) — editable by therapist
+  language    String   @default("en")
+  model       String?  // which LLM produced the draft
+  aiGenerated       Boolean   @default(true)
+  editedByTherapist Boolean   @default(false)
+  editedAt          DateTime?
+  visibleToClient   Boolean   @default(false)
+  generatedAt DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  @@index([therapistId])
+  @@index([clientId])
+}
+
+model Invite {
+  id              String           @id @default(uuid())
+  token           String           @unique
+  therapistId     String
+  therapist       ProfileTherapist @relation(fields: [therapistId], references: [id], onDelete: Cascade)
+  firstName       String
+  lastName        String
+  diagnosis       String[]
+  scheduledAt     DateTime         @default(now())
+  status          InviteStatus     @default(PENDING)
+  claimedClientId String?
+  createdAt       DateTime         @default(now())
+  expiresAt       DateTime?
+
+  @@index([therapistId])
+}
+
+// Lightweight resource-usage log for the admin dashboard.
+// type: AI_ANALYSIS | TRANSCRIPTION | MODULE_LAUNCH
+model UsageEvent {
+  id          String           @id @default(uuid())
+  therapistId String
+  therapist   ProfileTherapist @relation(fields: [therapistId], references: [id], onDelete: Cascade)
+  sessionId   String?
+  type        String
+  label       String?
+  count       Int              @default(1)
+  createdAt   DateTime         @default(now())
+
+  @@index([therapistId])
+  @@index([type])
+}
+
+// Subscription plan catalog. Admin-managed. Payments are out of scope, so
+// priceMonthly is display-only. `toolQuota` caps how many therapy tools a plan
+// grants (null = all tools / unlimited).
+model Plan {
+  id             String   @id @default(uuid())
+  name           String   @unique
+  description    String?
+  priceMonthly   Int      @default(0) // display only (INR)
+  durationMonths Int      @default(1) // suggested default term length
+  toolQuota      Int? // null = unlimited (all tools); else max tools allowed
+  isActive       Boolean  @default(true)
+  sortOrder      Int      @default(0)
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+
+  subscriptions Subscription[]
+  requests      SubscriptionRequest[]
+}
+
+// A therapist's active/historical subscription term. The current subscription is
+// the most recent ACTIVE row whose currentPeriodEnd is in the future; absence of
+// one means the therapist is on the free tier.
+model Subscription {
+  id               String             @id @default(uuid())
+  therapistId      String
+  therapist        ProfileTherapist   @relation(fields: [therapistId], references: [id], onDelete: Cascade)
+  planId           String
+  plan             Plan               @relation(fields: [planId], references: [id])
+  status           SubscriptionStatus @default(ACTIVE)
+  months           Int                @default(1)
+  startedAt        DateTime           @default(now())
+  currentPeriodEnd DateTime
+  renewedAt        DateTime?
+  renewalCount     Int                @default(0)
+  moduleAccess     String[]           @default([]) // tools granted by this term
+  createdAt        DateTime           @default(now())
+  updatedAt        DateTime           @updatedAt
+
+  @@index([therapistId])
+  @@index([status])
+}
+
+// A therapist's request to take/upgrade a plan, pending admin approval. Carries
+// the chosen plan, desired term length, and the specific tools requested (capped
+// by the plan's toolQuota). Approval creates a Subscription and applies access.
+model SubscriptionRequest {
+  id          String           @id @default(uuid())
+  therapistId String
+  therapist   ProfileTherapist @relation(fields: [therapistId], references: [id], onDelete: Cascade)
+  planId      String
+  plan        Plan             @relation(fields: [planId], references: [id])
+  months      Int              @default(1)
+  modules     String[]         @default([])
+  status      SubRequestStatus @default(PENDING)
+  note        String?
+  reviewedAt  DateTime?
+  createdAt   DateTime         @default(now())
+
+  @@index([therapistId])
+  @@index([status])
+}
+
+model TherapistNote {
+  id          String           @id @default(uuid())
+  sessionId   String
+  session     Session          @relation(fields: [sessionId], references: [id], onDelete: Cascade)
+  therapistId String
+  therapist   ProfileTherapist @relation(fields: [therapistId], references: [id], onDelete: Cascade)
+  content     String // Calming notes, clinical progress logs
+  isPrivate   Boolean          @default(true)
+  createdAt   DateTime         @default(now())
+  updatedAt   DateTime         @updatedAt
+}

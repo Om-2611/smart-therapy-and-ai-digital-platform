@@ -1,0 +1,14 @@
+{
+  "name": "stt-relay",
+  "version": "1.0.0",
+  "private": true,
+  "description": "Standalone Sarvam STT WebSocket relay, deployed separately from the main app",
+  "main": "server.js",
+  "scripts": {
+    "start": "node server.js"
+  },
+  "dependencies": {
+    "firebase-admin": "^13.10.0",
+    "ws": "^8.21.0"
+  }
+}
