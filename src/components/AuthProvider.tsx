@@ -12,7 +12,16 @@ export default function AuthProvider({ children }: { children: React.ReactNode }
   const router = useRouter();
   const pathname = usePathname();
 
+  // Dev-only: the isolated module preview route (/dev-preview/*) is intentionally
+  // reachable without auth. This bypass is compiled out of production builds and
+  // never affects the real authentication flow for any live route.
+  const isDevPreview = process.env.NODE_ENV === 'development' && pathname.startsWith('/dev-preview');
+
   useEffect(() => {
+    if (isDevPreview) {
+      setLoading(false);
+      return;
+    }
     const unsubscribe = onAuthStateChanged(auth, async (firebaseUser) => {
       if (firebaseUser) {
         setAuthUser(firebaseUser.uid, firebaseUser.email);
@@ -54,7 +63,7 @@ export default function AuthProvider({ children }: { children: React.ReactNode }
     });
 
     return () => unsubscribe();
-  }, [setAuthUser, setRoleAndProfile, clearAuth, router, pathname]);
+  }, [setAuthUser, setRoleAndProfile, clearAuth, router, pathname, isDevPreview]);
 
   if (loading) {
     return (

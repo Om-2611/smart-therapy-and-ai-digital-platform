@@ -5,6 +5,8 @@ import { doc, onSnapshot, updateDoc, arrayUnion, increment } from 'firebase/fire
 import { db } from '@/lib/firebase'
 import { logModuleEvent } from '@/lib/sessionEvents'
 import { AnimatePresence, motion } from 'motion/react'
+import { AnimatedScene } from './shared/animationVerbs'
+import type { SceneMeta, Pose } from './shared/sceneTypes'
 
 interface EmotionDetectiveProps {
   sessionId: string
@@ -391,6 +393,56 @@ const CONFETTI_COLORS = ['#4caf86', '#ffd700', '#ff6b9d', '#74b9ff', '#fd79a8', 
 
 const scenariosFor = (level: Level) => SCENARIOS.filter((s) => s.level === level)
 
+/* Illustrated-scene tags — one per scenario id, mirroring Story Choice
+   Adventure's SCENE_META side-map so the 30 scenario objects stay untouched.
+   `pose` here is the pre-answer resting pose; after the child answers, the
+   character transitions to the pose that matches the correct emotion. */
+const ED_SCENE_META: Record<string, SceneMeta> = {
+  easy_1: { verb: 'social', setting: 'canteen', pose: 'happy', shirt: '#4a7c6f', friendShirt: '#e08a3c', bubble: 'YUM!' },
+  easy_2: { verb: 'waiting', setting: 'classroom', pose: 'worried', shirt: '#4a7c6f', bubble: 'HMM...' },
+  easy_3: { verb: 'achievement', setting: 'classroom', pose: 'happy', shirt: '#3d84c6', bubble: 'YAY!!' },
+  easy_4: { verb: 'spill', setting: 'classroom', pose: 'worried', shirt: '#4a7c6f', object: 'bottle', bubble: 'OOPS!!' },
+  easy_5: { verb: 'waiting', setting: 'classroom', pose: 'worried', shirt: '#6b5ce7', bubble: 'HMM...' },
+  easy_6: { verb: 'waiting', setting: 'classroom', pose: 'worried', shirt: '#4a7c6f', bubble: 'HMM...' },
+  easy_7: { verb: 'social', setting: 'playground', pose: 'happy', shirt: '#4a7c6f', friendShirt: '#f0b400', bubble: 'HI!' },
+  easy_8: { verb: 'social', setting: 'home', pose: 'surprised', shirt: '#4a7c6f', friendShirt: '#d95c7a', bubble: 'OH!' },
+  easy_9: { verb: 'achievement', setting: 'home', pose: 'happy', shirt: '#4a7c6f', bubble: 'WOOHOO!' },
+  easy_10: { verb: 'social', setting: 'home', pose: 'happy', shirt: '#4a7c6f', friendShirt: '#f0b400', bubble: 'AWW!' },
+  mod_11: { verb: 'waiting', setting: 'classroom', pose: 'sad', shirt: '#4a7c6f', bubble: 'HMM...' },
+  mod_12: { verb: 'waiting', setting: 'playground', pose: 'sad', shirt: '#4a7c6f', bubble: 'HMM...' },
+  mod_13: { verb: 'accident', setting: 'classroom', pose: 'worried', shirt: '#4a7c6f', object: 'cup', bubble: 'UH OH...' },
+  mod_14: { verb: 'waiting', setting: 'playground', pose: 'sad', shirt: '#4a7c6f', bubble: 'HMM...' },
+  mod_15: { verb: 'accident', setting: 'classroom', pose: 'worried', shirt: '#4a7c6f', object: 'book', bubble: 'UH OH...' },
+  mod_16: { verb: 'waiting', setting: 'classroom', pose: 'worried', shirt: '#4a7c6f', bubble: 'HMM...' },
+  mod_17: { verb: 'waiting', setting: 'playground', pose: 'sad', shirt: '#c0504a', bubble: 'OH NO...' },
+  mod_18: { verb: 'waiting', setting: 'classroom', pose: 'sad', shirt: '#4a7c6f', bubble: 'HMM...' },
+  mod_19: { verb: 'waiting', setting: 'classroom', pose: 'sad', shirt: '#4a7c6f', bubble: 'HMM...' },
+  mod_20: { verb: 'waiting', setting: 'hallway', pose: 'worried', shirt: '#4a7c6f', bubble: 'HMM...' },
+  adv_21: { verb: 'waiting', setting: 'hallway', pose: 'worried', shirt: '#4a7c6f', bubble: 'HMM...' },
+  adv_22: { verb: 'waiting', setting: 'playground', pose: 'worried', shirt: '#4a7c6f', bubble: 'HMM...' },
+  adv_23: { verb: 'waiting', setting: 'home', pose: 'sad', shirt: '#4a7c6f', bubble: 'OH NO...' },
+  adv_24: { verb: 'waiting', setting: 'home', pose: 'surprised', shirt: '#4a7c6f', bubble: 'HMM...' },
+  adv_25: { verb: 'waiting', setting: 'hallway', pose: 'sad', shirt: '#4a7c6f', bubble: 'HMM...' },
+  adv_26: { verb: 'waiting', setting: 'home', pose: 'sad', shirt: '#4a7c6f', bubble: 'HMM...' },
+  adv_27: { verb: 'waiting', setting: 'classroom', pose: 'sad', shirt: '#4a7c6f', bubble: 'HMM...' },
+  adv_28: { verb: 'waiting', setting: 'hallway', pose: 'worried', shirt: '#4a7c6f', bubble: 'HMM...' },
+  adv_29: { verb: 'waiting', setting: 'classroom', pose: 'worried', shirt: '#4a7c6f', bubble: 'HMM...' },
+  adv_30: { verb: 'achievement', setting: 'classroom', pose: 'happy', shirt: '#4a7c6f', bubble: 'YAY!!' },
+}
+
+const DEFAULT_SCENE_META: SceneMeta = { verb: 'waiting', setting: 'classroom', pose: 'worried', shirt: '#4a7c6f', bubble: 'HMM...' }
+
+// Map a correct-emotion label to the closest available character pose, so the
+// illustration reinforces the emotion after the child answers.
+const EMOTION_POSE: Record<string, Pose> = {
+  Happy: 'happy', Proud: 'happy', Loved: 'happy', Excited: 'happy', Grateful: 'happy',
+  Relieved: 'happy', Warm: 'happy', Motivated: 'happy', Hopeful: 'happy',
+  Surprised: 'surprised', Scared: 'surprised',
+  Sad: 'sad', Disappointed: 'sad', Hurt: 'sad', Lonely: 'sad', 'Left out': 'sad',
+  Hopeless: 'sad', Guilty: 'sad', Humiliated: 'sad', Tired: 'sad',
+}
+const poseForEmotion = (name: string): Pose => EMOTION_POSE[name] ?? 'worried'
+
 // Deterministic shuffle: both participants must see the picker in the SAME order,
 // so the seed is the scenario id rather than Math.random(). Order still varies
 // from scenario to scenario, which is what keeps the answer position unpredictable.
@@ -425,6 +477,8 @@ export default function EmotionDetective({ sessionId, role, isLocked }: EmotionD
   const [revealed, setRevealed] = useState(false)
   const [levelComplete, setLevelComplete] = useState(false)
   const [confetti, setConfetti] = useState<string | null>(null)
+  // Therapist-only, private facilitator popover toggle — local, not synced.
+  const [facOpen, setFacOpen] = useState(false)
 
   const prevSelected = useRef<string | null>(null)
   const confettiTimer = useRef<ReturnType<typeof setTimeout>>()
@@ -467,6 +521,13 @@ export default function EmotionDetective({ sessionId, role, isLocked }: EmotionD
   }, [scenario])
 
   const isCorrectPick = selected === scenario.correctEmotion.en
+
+  // Scene metadata for the illustrated scene. After the answer is revealed, the
+  // character transitions to the pose matching the correct emotion.
+  const sceneMeta: SceneMeta = useMemo(() => {
+    const base = ED_SCENE_META[scenario.id] ?? DEFAULT_SCENE_META
+    return revealed ? { ...base, pose: poseForEmotion(scenario.correctEmotion.en) } : base
+  }, [scenario, revealed])
 
   // Fire confetti when the selection lands on the correct emotion — driven by synced
   // state so the therapist sees the same celebration the child does.
@@ -565,7 +626,13 @@ export default function EmotionDetective({ sessionId, role, isLocked }: EmotionD
         }
       `}</style>
 
-      <div style={{ display: 'flex', flexDirection: 'column', gap: 8, width: '100%', maxWidth: 420, color: '#fff', fontFamily: NUNITO }}>
+      <div
+        style={{
+          display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'safe center',
+          minHeight: '100%', width: '100%', overflowY: 'auto', color: '#fff', fontFamily: NUNITO, padding: '12px 0',
+        }}
+      >
+      <div style={{ display: 'flex', flexDirection: 'column', gap: 20, width: '100%', maxWidth: 760, padding: 24 }}>
         {/* 1 — Header */}
         <div style={{ display: 'flex', alignItems: 'center', gap: 8, minHeight: 36 }}>
           <span style={{ flexShrink: 0, background: badge.bg, color: badge.color, fontSize: 10, fontWeight: 800, padding: '3px 9px', borderRadius: 999 }}>
@@ -704,8 +771,8 @@ export default function EmotionDetective({ sessionId, role, isLocked }: EmotionD
               )}
             </motion.div>
           ) : (
-            <motion.div key="play" style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
-              {/* 3 — Scenario card */}
+            <motion.div key="play" style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
+              {/* 3 — Illustrated scene + caption strip */}
               <AnimatePresence mode="wait">
                 <motion.div
                   key={scenario.id}
@@ -715,48 +782,51 @@ export default function EmotionDetective({ sessionId, role, isLocked }: EmotionD
                   transition={{ type: 'spring', stiffness: 320, damping: 28 }}
                   style={{
                     background: 'rgba(255,255,255,0.07)', border: '1.5px solid rgba(255,255,255,0.14)',
-                    borderRadius: 18, padding: '16px 18px',
+                    borderRadius: 18, position: 'relative', overflow: 'hidden',
                   }}
                 >
-                  <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 8 }}>
-                    <span style={{
-                      fontSize: 9, fontWeight: 700, color: 'rgba(255,255,255,0.45)',
-                      background: 'rgba(255,255,255,0.07)', borderRadius: 999, padding: '2px 8px',
-                    }}>
+                  <div style={{ position: 'absolute', top: 10, right: 12, display: 'flex', alignItems: 'center', gap: 6, zIndex: 8 }}>
+                    <span style={{ fontSize: 10, fontWeight: 700, color: '#5a4632', background: 'rgba(255,255,255,0.72)', borderRadius: 999, padding: '1px 8px' }}>
                       Scenario {idx + 1}
                     </span>
-                    <span style={{ fontSize: 16, display: 'inline-block', animation: 'edDetectiveBounce 1.8s ease-in-out infinite' }}>🔍</span>
+                    <span style={{ fontSize: 15, display: 'inline-block', animation: 'edDetectiveBounce 1.8s ease-in-out infinite' }}>🔍</span>
                   </div>
 
-                  <div style={{ textAlign: 'center', marginBottom: 8 }}>
+                  <AnimatedScene meta={sceneMeta} />
+
+                  {/* caption strip — dark, not a bordered card */}
+                  <div style={{ padding: 14 }}>
                     {showEn && (
-                      <div style={{ fontSize: 11, fontWeight: 700, color: 'rgba(255,255,255,0.45)' }}>
-                        What is this child feeling?
+                      <div style={{ fontSize: language === 'both' ? 14 : 15, fontWeight: 700, color: 'rgba(255,255,255,0.92)', lineHeight: 1.4 }}>
+                        {scenario.en}
                       </div>
                     )}
+                    {language === 'both' && <div style={{ height: 1, background: 'rgba(255,255,255,0.12)', margin: '8px 0' }} />}
                     {showHi && (
-                      <div style={{ fontSize: 11, fontWeight: 600, color: 'rgba(255,255,255,0.45)', fontFamily: DEVANAGARI }}>
-                        यह बच्चा कैसा महसूस कर रहा है?
+                      <div style={{
+                        fontSize: language === 'both' ? 13 : 14, fontWeight: 600, fontFamily: DEVANAGARI, lineHeight: 1.5,
+                        color: language === 'both' ? 'rgba(255,255,255,0.65)' : 'rgba(255,255,255,0.92)',
+                      }}>
+                        {scenario.hi}
                       </div>
                     )}
                   </div>
-
-                  {showEn && (
-                    <div style={{ fontSize: language === 'both' ? 14 : 15, fontWeight: 700, color: 'rgba(255,255,255,0.92)', lineHeight: 1.4, textAlign: 'center' }}>
-                      {scenario.en}
-                    </div>
-                  )}
-                  {language === 'both' && <div style={{ height: 1, background: 'rgba(255,255,255,0.12)', margin: '8px 0' }} />}
-                  {showHi && (
-                    <div style={{
-                      fontSize: language === 'both' ? 13 : 14, fontWeight: 600, fontFamily: DEVANAGARI, lineHeight: 1.5, textAlign: 'center',
-                      color: language === 'both' ? 'rgba(255,255,255,0.65)' : 'rgba(255,255,255,0.92)',
-                    }}>
-                      {scenario.hi}
-                    </div>
-                  )}
                 </motion.div>
               </AnimatePresence>
+
+              {/* Prompt label — kept, moved below the scene */}
+              <div style={{ textAlign: 'center' }}>
+                {showEn && (
+                  <div style={{ fontSize: 12, fontWeight: 700, color: 'rgba(255,255,255,0.5)' }}>
+                    What is this child feeling?
+                  </div>
+                )}
+                {showHi && (
+                  <div style={{ fontSize: 12, fontWeight: 600, color: 'rgba(255,255,255,0.5)', fontFamily: DEVANAGARI }}>
+                    यह बच्चा कैसा महसूस कर रहा है?
+                  </div>
+                )}
+              </div>
 
               {/* 4 — Emotion picker grid */}
               <div style={{ display: 'flex', flexWrap: 'wrap', gap: 12, justifyContent: 'space-between' }}>
@@ -799,10 +869,10 @@ export default function EmotionDetective({ sessionId, role, isLocked }: EmotionD
                         onClick={() => handleSelect(emotion)}
                         disabled={!canInteract || selected !== null}
                         style={{
-                          width: '100%', height: 72, borderRadius: 16, background: bg, border,
-                          display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', gap: 4,
+                          width: '100%', height: 88, borderRadius: 16, background: bg, border,
+                          display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', gap: 5,
                           cursor: !canInteract || selected ? 'default' : 'pointer',
-                          fontFamily: NUNITO, color: '#fff', padding: '4px 6px', transition: 'background 0.18s, border-color 0.18s',
+                          fontFamily: NUNITO, color: '#fff', padding: '6px 8px', transition: 'background 0.18s, border-color 0.18s',
                         }}
                         onMouseEnter={(e) => {
                           if (!canInteract || selected) return
@@ -815,12 +885,12 @@ export default function EmotionDetective({ sessionId, role, isLocked }: EmotionD
                           e.currentTarget.style.borderColor = 'rgba(255,255,255,0.12)'
                         }}
                       >
-                        <span style={{ fontSize: 28, lineHeight: 1 }}>{emotion.emoji}</span>
+                        <span style={{ fontSize: 32, lineHeight: 1 }}>{emotion.emoji}</span>
                         {showEn && (
-                          <span style={{ fontSize: 11, fontWeight: 700, lineHeight: 1.2, textAlign: 'center' }}>{emotion.en}</span>
+                          <span style={{ fontSize: 13, fontWeight: 700, lineHeight: 1.2, textAlign: 'center' }}>{emotion.en}</span>
                         )}
                         {showHi && (
-                          <span style={{ fontSize: 10, fontWeight: 600, fontFamily: DEVANAGARI, color: 'rgba(255,255,255,0.55)', lineHeight: 1.2, textAlign: 'center' }}>
+                          <span style={{ fontSize: 11, fontWeight: 600, fontFamily: DEVANAGARI, color: 'rgba(255,255,255,0.55)', lineHeight: 1.2, textAlign: 'center' }}>
                             {emotion.hi}
                           </span>
                         )}
@@ -919,26 +989,6 @@ export default function EmotionDetective({ sessionId, role, isLocked }: EmotionD
                 )}
               </AnimatePresence>
 
-              {/* 7 — Facilitator panel (always both languages) */}
-              {isT && (
-                <div
-                  style={{
-                    background: 'rgba(107,92,231,0.08)', border: '1px solid rgba(107,92,231,0.2)',
-                    borderRadius: 10, padding: '12px 14px', marginTop: 8,
-                  }}
-                >
-                  <div style={{ fontSize: 11, fontWeight: 800, color: '#a99cf0', marginBottom: 6 }}>💬 Ask the child</div>
-                  <ol style={{ margin: 0, paddingLeft: 16, display: 'flex', flexDirection: 'column', gap: 5 }}>
-                    {FACILITATOR_QS.map((q, i) => (
-                      <li key={i} style={{ fontSize: 11, fontWeight: 600, color: 'rgba(255,255,255,0.75)', lineHeight: 1.4 }}>
-                        <span style={{ display: 'block' }}>{q.en}</span>
-                        <span style={{ display: 'block', fontFamily: DEVANAGARI, color: 'rgba(255,255,255,0.5)' }}>{q.hi}</span>
-                      </li>
-                    ))}
-                  </ol>
-                </div>
-              )}
-
               {/* 8 — Next button */}
               {isT && selected && (
                 <button
@@ -956,6 +1006,51 @@ export default function EmotionDetective({ sessionId, role, isLocked }: EmotionD
             </motion.div>
           )}
         </AnimatePresence>
+      </div>
+
+      {/* Facilitator questions — therapist-only collapsible popover.
+          Never rendered in the DOM for the client role. */}
+      {isT && (
+        <>
+          {facOpen && (
+            <>
+              <div onClick={() => setFacOpen(false)} style={{ position: 'fixed', inset: 0, zIndex: 48 }} />
+              <motion.div
+                initial={{ opacity: 0, y: 8, scale: 0.96 }}
+                animate={{ opacity: 1, y: 0, scale: 1 }}
+                transition={{ duration: 0.18, ease: 'easeOut' }}
+                style={{
+                  position: 'fixed', bottom: 70, right: 8, width: 260,
+                  background: 'rgba(30,25,50,0.97)', borderRadius: 14,
+                  border: '1px solid rgba(107,92,231,0.3)', padding: '12px 14px',
+                  zIndex: 49, boxShadow: '0 12px 32px rgba(0,0,0,0.4)',
+                }}
+              >
+                <div style={{ fontSize: 11, fontWeight: 800, color: '#a99cf0', marginBottom: 6 }}>💬 Ask the child</div>
+                <ol style={{ margin: 0, paddingLeft: 16, display: 'flex', flexDirection: 'column', gap: 5 }}>
+                  {FACILITATOR_QS.map((q, i) => (
+                    <li key={i} style={{ fontSize: 11, fontWeight: 600, color: 'rgba(255,255,255,0.75)', lineHeight: 1.4 }}>
+                      <span style={{ display: 'block' }}>{q.en}</span>
+                      <span style={{ display: 'block', fontFamily: DEVANAGARI, color: 'rgba(255,255,255,0.5)' }}>{q.hi}</span>
+                    </li>
+                  ))}
+                </ol>
+              </motion.div>
+            </>
+          )}
+          <button
+            onClick={() => setFacOpen((o) => !o)}
+            title="Ask the child"
+            style={{
+              position: 'fixed', bottom: 20, right: 20, width: 44, height: 44, borderRadius: '50%',
+              background: 'rgba(107,92,231,0.9)', display: 'flex', alignItems: 'center', justifyContent: 'center',
+              fontSize: 18, cursor: 'pointer', zIndex: 50, boxShadow: '0 6px 20px rgba(107,92,231,0.4)', border: 'none',
+            }}
+          >
+            💬
+          </button>
+        </>
+      )}
       </div>
     </>
   )

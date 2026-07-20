@@ -785,23 +785,23 @@ function Piece({ type }: { type: MaterialType }) {
   if (type === 'stone') {
     return (
       <div style={{ position: 'relative', width: 40, height: 32, borderRadius: 4, background: 'linear-gradient(160deg, #a8a29a 0%, #8a8580 55%, #6b6660 100%)', filter: PIECE_SHADOW }}>
-        <div style={{ position: 'absolute', top: 3, left: 5, right: 9, height: 3, borderRadius: 2, background: 'rgba(255,255,255,0.35)' }} />
-        <div style={{ position: 'absolute', bottom: 5, left: 7, right: 6, height: 1, background: 'rgba(0,0,0,0.15)' }} />
+        <div style={{ position: 'absolute', top: 4, left: 4, right: 4, height: 3, borderRadius: 2, background: 'rgba(255,255,255,0.35)' }} />
+        <div style={{ position: 'absolute', bottom: 3, left: 6, width: 14, height: 2, borderRadius: 1, background: 'rgba(0,0,0,0.15)' }} />
       </div>
     )
   }
   if (type === 'metal') {
     return (
-      <div style={{ position: 'relative', width: 44, height: 14, borderRadius: 3, background: 'linear-gradient(180deg, #c4ccd0 0%, #9aa5ac 45%, #707b82 100%)', filter: PIECE_SHADOW }}>
-        <div style={{ position: 'absolute', top: 2, left: 3, right: 3, height: 2, background: 'rgba(255,255,255,0.85)', borderRadius: 1 }} />
+      <div style={{ position: 'relative', width: 44, height: 14, borderRadius: 3, overflow: 'hidden', background: 'linear-gradient(180deg, #c4ccd0 0%, #9aa5ac 45%, #707b82 100%)', filter: PIECE_SHADOW }}>
+        <div style={{ position: 'absolute', top: 2, left: 0, right: 0, height: 2, background: 'rgba(255,255,255,0.6)' }} />
       </div>
     )
   }
   if (type === 'wood') {
     return (
       <div style={{ position: 'relative', width: 42, height: 12, borderRadius: 2, background: 'linear-gradient(180deg, #c08654 0%, #a0653a 50%, #7d4a28 100%)', filter: PIECE_SHADOW }}>
-        <div style={{ position: 'absolute', top: 0, bottom: 0, left: 13, width: 1, background: 'rgba(0,0,0,0.22)' }} />
-        <div style={{ position: 'absolute', top: 0, bottom: 0, left: 28, width: 1, background: 'rgba(0,0,0,0.22)' }} />
+        <div style={{ position: 'absolute', top: 0, bottom: 0, left: 8, width: 1, background: 'rgba(0,0,0,0.2)' }} />
+        <div style={{ position: 'absolute', top: 0, bottom: 0, left: 22, width: 1, background: 'rgba(0,0,0,0.2)' }} />
       </div>
     )
   }
@@ -844,15 +844,22 @@ function Hills({ colors }: { colors: [string, string, string] }) {
 }
 
 function GrassTufts({ side }: { side: 'left' | 'right' }) {
-  const xs = side === 'left' ? [6, 15, 24, 33] : [6, 15, 24, 33]
+  // 5 tufts scattered along the bank edge — exact approved values
+  const tufts = [
+    { pct: 10, bottom: 155 },
+    { pct: 28, bottom: 147 },
+    { pct: 46, bottom: 139 },
+    { pct: 64, bottom: 131 },
+    { pct: 82, bottom: 123 },
+  ]
   return (
     <>
-      {xs.map((x, i) => (
+      {tufts.map((t, i) => (
         <div
           key={i}
           style={{
-            position: 'absolute', bottom: '62%', [side]: `${x}%`, width: 10, height: 12,
-            borderRadius: '50% 50% 0 0', background: i % 2 ? '#6f8f5f' : '#83a06d', opacity: 0.85,
+            position: 'absolute', bottom: t.bottom, [side]: `${t.pct}%`, width: 14, height: 20,
+            borderRadius: '50% 50% 0 0', background: '#6d9b78', opacity: 0.7,
           } as React.CSSProperties}
         />
       ))}
@@ -877,14 +884,14 @@ function SceneBackdrop({ theme }: { theme: Theme }) {
 
       {theme === 'bridge' && (
         <>
-          <Hills colors={['#7fa07a', '#6c8f6a', '#88a884']} />
+          <Hills colors={['#8bb896', '#6d9b78', '#8bb896']} />
           {/* Water */}
           <div style={{ position: 'absolute', bottom: 0, left: 0, right: 0, height: '35%', background: '#4a90a4' }}>
             <div style={{ position: 'absolute', inset: 0, background: 'radial-gradient(ellipse at 30% 40%, rgba(255,255,255,0.5) 0%, transparent 55%), radial-gradient(ellipse at 72% 66%, rgba(255,255,255,0.4) 0%, transparent 50%)', animation: 'btShimmer 4s ease-in-out infinite' }} />
           </div>
           {/* Riverbanks */}
-          <div style={{ position: 'absolute', bottom: 0, left: 0, width: '30%', height: '52%', background: 'linear-gradient(180deg, #c9a66b 0%, #a8874f 100%)', clipPath: 'polygon(0 22%, 62% 34%, 88% 62%, 100% 100%, 0 100%)' }} />
-          <div style={{ position: 'absolute', bottom: 0, right: 0, width: '30%', height: '52%', background: 'linear-gradient(180deg, #c9a66b 0%, #a8874f 100%)', clipPath: 'polygon(100% 22%, 38% 34%, 12% 62%, 0 100%, 100% 100%)' }} />
+          <div style={{ position: 'absolute', bottom: 0, left: 0, width: '30%', height: '52%', background: 'linear-gradient(180deg, #c9a66b 0%, #a8874f 100%)', clipPath: 'polygon(0 0, 100% 30%, 100% 100%, 0 100%)' }} />
+          <div style={{ position: 'absolute', bottom: 0, right: 0, width: '30%', height: '52%', background: 'linear-gradient(180deg, #c9a66b 0%, #a8874f 100%)', clipPath: 'polygon(0 30%, 100% 0, 100% 100%, 0 100%)' }} />
           <GrassTufts side="left" />
           <GrassTufts side="right" />
           {/* Grounding shadow under the gap */}
@@ -1212,9 +1219,9 @@ export default function BuildTogether({ sessionId, role, isLocked }: BuildTogeth
                 onDoubleClick={() => clearSlot(i)}
                 title={val ? 'Double-click to remove' : undefined}
                 style={{
-                  width: 44, height: 60, borderRadius: 8,
-                  border: `2px dashed ${isOver ? 'rgba(255,235,150,0.9)' : 'rgba(255,255,255,0.75)'}`,
-                  background: isOver ? 'rgba(255,235,150,0.15)' : 'rgba(255,255,255,0.28)',
+                  width: 44, height: 60, borderRadius: 6,
+                  border: `2px dashed ${isOver ? 'rgba(255,235,150,0.9)' : 'rgba(255,255,255,0.45)'}`,
+                  background: isOver ? 'rgba(255,235,150,0.15)' : 'rgba(255,255,255,0.08)',
                   boxShadow: isOver ? '0 0 16px rgba(255,220,120,0.4)' : 'none',
                   display: 'flex', alignItems: 'center', justifyContent: 'center',
                   transition: 'all 0.15s',
@@ -1307,8 +1314,8 @@ export default function BuildTogether({ sessionId, role, isLocked }: BuildTogeth
         <div
           style={{
             position: 'absolute', bottom: 0, left: 0, right: 0, height: 76, zIndex: 28,
-            background: 'linear-gradient(180deg, #f7ecd8 0%, #d9b98a 100%)',
-            borderTop: '3px solid #8a5a2a', boxShadow: '0 -8px 22px rgba(0,0,0,0.25)',
+            background: 'linear-gradient(180deg, rgba(255,251,240,0.96) 0%, rgba(245,235,215,0.98) 100%)',
+            borderTop: '3px solid rgba(139,90,43,0.25)', boxShadow: '0 -6px 20px rgba(0,0,0,0.12)',
             display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 12,
           }}
         >
@@ -1321,8 +1328,8 @@ export default function BuildTogether({ sessionId, role, isLocked }: BuildTogeth
                   draggable={!disabled}
                   onDragStart={(e) => { if (!disabled) e.dataTransfer.setData('text/plain', m.type) }}
                   style={{
-                    width: 60, height: 56, borderRadius: 10, background: 'rgba(160,101,58,0.14)',
-                    border: '1px solid rgba(138,90,42,0.25)',
+                    width: 60, height: 56, borderRadius: 10, background: 'rgba(139,90,43,0.06)',
+                    border: '1.5px solid rgba(139,90,43,0.15)',
                     display: 'flex', alignItems: 'center', justifyContent: 'center',
                     cursor: disabled ? 'not-allowed' : 'grab', opacity: disabled ? 0.4 : 1,
                   }}
@@ -1332,8 +1339,8 @@ export default function BuildTogether({ sessionId, role, isLocked }: BuildTogeth
                 <span
                   style={{
                     position: 'absolute', top: -5, right: -5, minWidth: 17, height: 17, borderRadius: '50%',
-                    background: '#e8873a', color: '#fff', fontSize: 9, fontWeight: 900,
-                    display: 'flex', alignItems: 'center', justifyContent: 'center', border: '1.5px solid #fff',
+                    background: '#c8602a', color: '#fff', fontSize: 9, fontWeight: 900,
+                    display: 'flex', alignItems: 'center', justifyContent: 'center', border: '2px solid #fffbf0',
                   }}
                 >
                   {left}
