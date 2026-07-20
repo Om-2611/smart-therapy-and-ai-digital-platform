@@ -4,6 +4,8 @@ import { resolveCurrent, serializeSubscription } from '@/lib/subscriptions';
 
 // GET /api/subscriptions?therapistId= — a therapist's current plan (or null for
 // free tier), any pending request, and their term history.
+export const dynamic = 'force-dynamic';
+
 export async function GET(request: Request) {
   try {
     const { searchParams } = new URL(request.url);
