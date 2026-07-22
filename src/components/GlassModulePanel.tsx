@@ -30,6 +30,10 @@ import ValuesCardSort from '@/components/modules/general/ValuesCardSort'
 import UrgeSurfing from '@/components/modules/general/UrgeSurfing'
 import WorryVault from '@/components/modules/general/WorryVault'
 import FactsVsFeelings from '@/components/modules/general/FactsVsFeelings'
+import StoryChoiceAdventure from '@/components/modules/skill/StoryChoiceAdventure'
+import EmotionDetective from '@/components/modules/skill/EmotionDetective'
+import BuildTogether from '@/components/modules/skill/BuildTogether'
+import TreasureQuest from '@/components/modules/skill/TreasureQuest'
 
 const MODULES = [
   { id: 'maze', name: 'Maze', icon: '🌀', label: 'Maze' },
@@ -59,6 +63,10 @@ const MODULES = [
   { id: 'urge-surfing', name: 'Urge Surfing', icon: '🏄', label: 'Urge' },
   { id: 'worry-vault', name: 'Worry Vault', icon: '🗄️', label: 'Vault' },
   { id: 'facts-vs-feelings', name: 'Facts vs Feelings', icon: '🔍', label: 'Facts' },
+  { id: 'story-choice-adventure', name: 'Story Choice Adventure', icon: '📖', label: 'Story' },
+  { id: 'emotion-detective', name: 'Emotion Detective', icon: '🔍', label: 'Emotion' },
+  { id: 'build-together', name: 'Build Together', icon: '🌉', label: 'Build' },
+  { id: 'treasure-quest', name: 'Treasure Quest', icon: '🗺️', label: 'Quest' },
 ]
 
 const MODULE_INFO: Record<string, { title: string; subtitle: string }> = {
@@ -90,6 +98,38 @@ const MODULE_INFO: Record<string, { title: string; subtitle: string }> = {
   'urge-surfing': { title: 'Urge Surfing', subtitle: 'DBT · urge tolerance · mindfulness' },
   'worry-vault': { title: 'Worry Vault', subtitle: 'Worry containment · scheduled worry time' },
   'facts-vs-feelings': { title: 'Facts vs Feelings', subtitle: 'Reality testing · emotion-fact distinction' },
+  'story-choice-adventure': { title: 'Story Choice Adventure', subtitle: 'Consequential thinking · emotional intelligence' },
+  'emotion-detective': { title: 'Emotion Detective', subtitle: 'Emotion identification · perspective taking' },
+  'build-together': { title: 'Build Together', subtitle: 'Shared problem solving · communication' },
+  'treasure-quest': { title: 'Treasure Quest', subtitle: 'Sequential clue chain · shared discovery' },
+}
+
+// Renders a Skill Development module on its own, for the full-canvas SkillDevLayout.
+// The normal panel path below still routes every module (including these) through
+// its own switch, so this is additive only.
+export function SkillModuleView({
+  moduleId,
+  sessionId,
+  role,
+  isLocked,
+}: {
+  moduleId: string | null
+  sessionId: string
+  role: 'therapist' | 'client'
+  isLocked: boolean
+}) {
+  switch (moduleId) {
+    case 'story-choice-adventure':
+      return <StoryChoiceAdventure sessionId={sessionId} role={role} isLocked={isLocked} />
+    case 'emotion-detective':
+      return <EmotionDetective sessionId={sessionId} role={role} isLocked={isLocked} />
+    case 'build-together':
+      return <BuildTogether sessionId={sessionId} role={role} isLocked={isLocked} />
+    case 'treasure-quest':
+      return <TreasureQuest sessionId={sessionId} role={role} isLocked={isLocked} />
+    default:
+      return null
+  }
 }
 
 interface GlassModulePanelProps {
@@ -194,6 +234,14 @@ export default function GlassModulePanel({
         return <WorryVault sessionId={sessionId} role={role} isLocked={isLocked} />
       case 'facts-vs-feelings':
         return <FactsVsFeelings sessionId={sessionId} role={role} isLocked={isLocked} />
+      case 'story-choice-adventure':
+        return <StoryChoiceAdventure sessionId={sessionId} role={role} isLocked={isLocked} />
+      case 'emotion-detective':
+        return <EmotionDetective sessionId={sessionId} role={role} isLocked={isLocked} />
+      case 'build-together':
+        return <BuildTogether sessionId={sessionId} role={role} isLocked={isLocked} />
+      case 'treasure-quest':
+        return <TreasureQuest sessionId={sessionId} role={role} isLocked={isLocked} />
       default:
         return (
           <div className="flex flex-col items-center justify-center h-full text-center px-4">

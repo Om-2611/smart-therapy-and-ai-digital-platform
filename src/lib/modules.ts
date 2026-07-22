@@ -95,7 +95,29 @@ export const MODULE_CATEGORIES: ModuleCategory[] = [
       { id: 'facts-vs-feelings', name: 'Facts vs Feelings', emoji: '🔍', desc: 'Reality testing · emotion-fact distinction' },
     ],
   },
+  {
+    id: 'skill',
+    name: 'Skill Development',
+    desc: 'Life skills for children aged 8–18',
+    emoji: '🌱',
+    iconBg: 'rgba(16,163,127,0.18)',
+    iconBorder: 'rgba(16,163,127,0.28)',
+    modules: [
+      { id: 'story-choice-adventure', name: 'Story Choice Adventure', emoji: '📖', desc: 'Learn consequences through interactive choices' },
+      { id: 'emotion-detective', name: 'Emotion Detective', emoji: '🔍', desc: 'Identify how others feel in real-life situations' },
+      { id: 'build-together', name: 'Build Together', emoji: '🌉', desc: 'Combine what you know to build something together' },
+      { id: 'treasure-quest', name: 'Treasure Quest', emoji: '🗺️', desc: 'Follow a chain of clues by sharing what you each know' },
+    ],
+  },
 ]
+
+// Skill Development modules render in the dedicated full-canvas SkillDevLayout
+// instead of the normal session room layout. Every other module is unaffected.
+export const SKILL_MODULE_IDS: string[] =
+  MODULE_CATEGORIES.find((c) => c.id === 'skill')?.modules.map((m) => m.id) ?? []
+
+export const isSkillModule = (id: string | null | undefined): boolean =>
+  !!id && SKILL_MODULE_IDS.includes(id)
 
 export const ALL_MODULES: ModuleItem[] = MODULE_CATEGORIES.flatMap((c) => c.modules)
 export const ALL_MODULE_IDS: string[] = ALL_MODULES.map((m) => m.id)

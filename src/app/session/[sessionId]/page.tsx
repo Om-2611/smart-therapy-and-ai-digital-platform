@@ -19,11 +19,12 @@ import { useLocalParticipant } from '@livekit/components-react';
 import StaadVideo, { useSessionRoom } from '@/components/StaadVideo';
 import RemoteVideoArea from '@/components/RemoteVideoArea';
 import LocalVideoPip from '@/components/LocalVideoPip';
-import GlassModulePanel from '@/components/GlassModulePanel';
+import GlassModulePanel, { SkillModuleView } from '@/components/GlassModulePanel';
+import SkillDevLayout from '@/components/session/SkillDevLayout';
 import NotesPanel from '@/components/NotesPanel';
 import ReactionOverlay from '@/components/ReactionOverlay';
 import ModuleSelectorPanel from '@/components/ModuleSelectorPanel';
-import { resolveAllowedModuleIds } from '@/lib/modules';
+import { resolveAllowedModuleIds, isSkillModule } from '@/lib/modules';
 
 interface SessionState {
   sessionId: string;
@@ -480,6 +481,34 @@ export default function SessionRoomPage({ params }: { params: { sessionId: strin
         userRole={userRole}
         onState={setTranscription}
       />
+      {/* Skill Development modules take over the whole room with their own
+          full-canvas layout. Every other module falls through to the normal
+          session room layout below, unchanged. */}
+      {isSkillModule(activeModule) ? (
+        <>
+          <SkillDevLayout
+            sessionId={sessionId}
+            userRole={userRole}
+            selfName={profile ? `${profile.firstName} ${profile.lastName}` : 'You'}
+            otherName={participantName}
+            onExit={handleModuleClose}
+            onEndCall={() => setShowConfirm(true)}
+          >
+            <SkillModuleView
+              moduleId={activeModule}
+              sessionId={sessionId}
+              role={userRole}
+              isLocked={isLocked}
+            />
+          </SkillDevLayout>
+          {showConfirm && (
+            <ConfirmEndDialog
+              onCancel={() => setShowConfirm(false)}
+              onConfirmed={handleLeaveSession}
+            />
+          )}
+        </>
+      ) : (
       <div style={{ width: '100vw', height: '100vh', background: RC.pageBg, overflow: 'hidden', position: 'relative', display: 'flex' }}>
         {/* ===== MAIN COLUMN (full width — no left rail) ===== */}
         <div style={{ flex: 1, minWidth: 0, display: 'flex', flexDirection: 'column', padding: '12px 16px', gap: 12 }}>
@@ -677,6 +706,7 @@ export default function SessionRoomPage({ params }: { params: { sessionId: strin
           />
         )}
       </div>
+      )}
 
       <style>{`
         @keyframes pulse {
