@@ -4,6 +4,7 @@ import { useState, useEffect, useRef, useCallback, useMemo } from 'react'
 import { doc, onSnapshot, updateDoc } from 'firebase/firestore'
 import { db } from '@/lib/firebase'
 import { logModuleEvent } from '@/lib/sessionEvents'
+import { staadSpeak, staadCancel } from '@/lib/voice/staadVoice'
 
 interface SocialStorySequencingProps {
   sessionId: string
@@ -183,7 +184,7 @@ export default function SocialStorySequencing({ sessionId, role, isLocked }: Soc
     if (toastT.current) clearTimeout(toastT.current)
     chain.current.forEach(t => clearTimeout(t))
     chain.current = []
-    window.speechSynthesis?.cancel()
+    staadCancel()
   }, [])
 
   const showToast = useCallback((msg: string) => {
@@ -252,10 +253,9 @@ export default function SocialStorySequencing({ sessionId, role, isLocked }: Soc
     if (readAloud && !completed) {
       const panel = panelMap.get(panelId)
       if (panel) {
-        window.speechSynthesis?.cancel()
-        const u = new SpeechSynthesisUtterance(panel.caption)
-        u.rate = 0.9
-        window.speechSynthesis.speak(u)
+        staadCancel()
+        // Captions are authored in English, so read them with the en-IN voice.
+        staadSpeak({ text: panel.caption, language: 'en-IN', type: 'instruction' })
       }
     }
   }, [canDrop, completed, placed, write, readAloud, panelMap])
@@ -299,10 +299,8 @@ export default function SocialStorySequencing({ sessionId, role, isLocked }: Soc
           const t = setTimeout(() => {
             setPlayIdx(i)
             if (readAloud) {
-              window.speechSynthesis?.cancel()
-              const u = new SpeechSynthesisUtterance(panel.caption)
-              u.rate = 0.9
-              window.speechSynthesis.speak(u)
+              staadCancel()
+              staadSpeak({ text: panel.caption, language: 'en-IN', type: 'instruction' })
             }
           }, i * (PLAY_DUR + TRANS_DUR))
           arr.push(t)

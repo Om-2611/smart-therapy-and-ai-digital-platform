@@ -39,6 +39,33 @@ export interface ReportInputs {
   therapistNotes: SessionNote[]
 }
 
+/**
+ * Save the computed statistics next to the session they describe.
+ *
+ * Stored in Firestore rather than Postgres deliberately: the source data lives
+ * here, the shape is evolving, and it needs no schema migration on a production
+ * database. Written at report-generation time because the transcript these are
+ * derived from is deleted after 24 hours.
+ */
+export async function saveReportStats(sessionId: string, stats: unknown): Promise<void> {
+  try {
+    await db.collection('sessions').doc(sessionId).set({ reportStats: stats }, { merge: true })
+  } catch (e) {
+    // A stats failure must never block the report itself.
+    console.warn('[report] Failed to save session stats:', e)
+  }
+}
+
+export async function getReportStats(sessionId: string): Promise<unknown | null> {
+  try {
+    const snap = await db.collection('sessions').doc(sessionId).get()
+    return snap.exists ? (snap.data()?.reportStats ?? null) : null
+  } catch (e) {
+    console.warn('[report] Failed to read session stats:', e)
+    return null
+  }
+}
+
 // Everything the report needs lives on the single persistent `sessions/{id}`
 // Firestore doc: the (English) transcript, the in-module activity timeline, and
 // the therapist's in-call notes.

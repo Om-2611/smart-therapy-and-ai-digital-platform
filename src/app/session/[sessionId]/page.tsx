@@ -7,11 +7,9 @@ import { useRouter } from 'next/navigation';
 import { doc, onSnapshot, setDoc, updateDoc, getDoc } from 'firebase/firestore';
 import { db } from '@/lib/firebase';
 import {
-  Mic, MicOff, Camera, CameraOff, PhoneOff, Lock, LockOpen,
-  StickyNote, Settings, Smile, BookOpen, Sparkles, Maximize2, Minimize2,
-  Blocks, NotebookPen, Lightbulb,
+  Mic, MicOff, Camera, CameraOff, PhoneOff, Settings, Smile,
+  Maximize2, Minimize2,
 } from 'lucide-react';
-import AIInsightBar from '@/components/session/AIInsightBar';
 import AIConsentBanner from '@/components/session/AIConsentBanner';
 import { AIErrorBoundary } from '@/components/session/AIErrorBoundary';
 import { useSessionTranscription } from '@/hooks/useSessionTranscription';
@@ -21,10 +19,19 @@ import RemoteVideoArea from '@/components/RemoteVideoArea';
 import LocalVideoPip from '@/components/LocalVideoPip';
 import GlassModulePanel, { SkillModuleView } from '@/components/GlassModulePanel';
 import SkillDevLayout from '@/components/session/SkillDevLayout';
-import NotesPanel from '@/components/NotesPanel';
 import ReactionOverlay from '@/components/ReactionOverlay';
-import ModuleSelectorPanel from '@/components/ModuleSelectorPanel';
 import { resolveAllowedModuleIds, isSkillModule } from '@/lib/modules';
+import { RC, SIDEBAR_WIDTH } from '@/components/session/roomTheme';
+import type { SidebarPanel } from '@/components/session/sessionPanels';
+import SessionTopBar from '@/components/session/SessionTopBar';
+import SessionBottomBar from '@/components/session/SessionBottomBar';
+import AIAssistantPanel from '@/components/session/AIAssistantPanel';
+import AINotesPanel from '@/components/session/AINotesPanel';
+import TherapyModulesPanel from '@/components/session/TherapyModulesPanel';
+import { ShareWhiteboardModal } from '@/components/session/WhiteboardStage';
+import StaadWhiteboard from '@/components/session/StaadWhiteboard';
+import ModuleStage from '@/components/session/ModuleStage';
+import { ModuleContent } from '@/components/GlassModulePanel';
 
 interface SessionState {
   sessionId: string;
@@ -33,23 +40,8 @@ interface SessionState {
   timestamps: { createdAt: string; updatedAt: string };
 }
 
-/* ===== Room colour palette (demo re-skin) — scoped to the session room only ===== */
-const RC = {
-  pageBg: '#eef1f4',
-  panel: '#ffffff',
-  green: '#3fae6a',
-  greenDark: '#2f9457',
-  greenSoft: 'rgba(63,174,106,0.12)',
-  greenGlow: 'rgba(63,174,106,0.30)',
-  border: '#e7eaef',
-  ink: '#2b2f33',
-  inkMuted: '#9aa0a6',
-  tile: '#f3f5f8',
-  tileActive: 'rgba(63,174,106,0.14)',
-  red: '#ff5a5f',
-  redSoft: 'rgba(255,90,95,0.12)',
-  videoBg: '#ffffff',
-};
+/* The room colour palette now lives in components/session/roomTheme.ts (same
+   values) so the top bar, bottom bar and the swappable panels share one source. */
 
 // Thin wrapper so the transcription hook runs INSIDE <StaadVideo>'s room
 // context (it reads the LiveKit room via useSessionRoom). Renders nothing;
@@ -84,20 +76,57 @@ export default function SessionRoomPage({ params }: { params: { sessionId: strin
   const [sessionState, setSessionState] = useState<SessionState | null>(null);
   const [activeModule, setActiveModule] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
-  const [notesOpen, setNotesOpen] = useState(false);
   const [reactionBarOpen, setReactionBarOpen] = useState(false);
   const [isLocked, setIsLocked] = useState(true);
   const [elapsed, setElapsed] = useState(0);
   const startTime = useRef(Date.now());
   const [showConfirm, setShowConfirm] = useState(false);
-  const [selectorOpen, setSelectorOpen] = useState(false);
   const [isModuleActive, setIsModuleActive] = useState(false);
+
+  /* ---- Swappable right sidebar: one of four panels, or none ---- */
+  const [activePanel, setActivePanel] = useState<SidebarPanel>(null);
+  const [screenSharing, setScreenSharing] = useState(false);
+  const [shareWhiteboardAsk, setShareWhiteboardAsk] = useState(false);
+  const whiteboardPromptedRef = useRef(false);
+  // Whiteboard collaboration state lives in liveSessions alongside
+  // activeModuleId/therapistControl, so the client can mirror the board the same
+  // way it mirrors a launched module. `shared` is the "Share Whiteboard?" answer.
+  const [whiteboardShared, setWhiteboardShared] = useState(false);
+  const [whiteboardOpenRemote, setWhiteboardOpenRemote] = useState(false);
+
+  const publishWhiteboardState = (active: boolean, shared: boolean) => {
+    if (!isTherapist) return;
+    updateDoc(doc(db, 'liveSessions', sessionId), {
+      whiteboard: { active, shared },
+      'timestamps.updatedAt': new Date().toISOString(),
+    }).catch(() => {});
+  };
+
+  // Clicking the bar button for the open panel closes it; clicking a different
+  // one swaps the content directly (no close-first step).
+  const selectPanel = (panel: Exclude<SidebarPanel, null>) => {
+    const next = activePanel === panel ? null : panel;
+    setActivePanel(next);
+    // First time the therapist opens the whiteboard, ask about collaboration.
+    if (next === 'whiteboard' && !whiteboardPromptedRef.current) {
+      whiteboardPromptedRef.current = true;
+      setShareWhiteboardAsk(true);
+    }
+    // Opening or leaving the board changes what the client should see.
+    const wasWhiteboard = activePanel === 'whiteboard';
+    const isWhiteboard = next === 'whiteboard';
+    if (isWhiteboard !== wasWhiteboard) publishWhiteboardState(isWhiteboard, whiteboardShared);
+  };
+
+  const closeWhiteboard = () => {
+    setActivePanel(null);
+    publishWhiteboardState(false, whiteboardShared);
+  };
   const [toast, setToast] = useState<string | null>(null);
   const [copied, setCopied] = useState(false);
   const toastTimer = useRef<ReturnType<typeof setTimeout>>();
 
   const [aiInsight, setAiInsight] = useState<any>(null);
-  const [insightVisible, setInsightVisible] = useState(false);
   const [analyseLoading, setAnalyseLoading] = useState(false);
   const [analyseCooldown, setAnalyseCooldown] = useState(false);
   const [showConsentBanner, setShowConsentBanner] = useState(true);
@@ -142,7 +171,9 @@ export default function SessionRoomPage({ params }: { params: { sessionId: strin
 
   const handleModuleLaunch = async (moduleId: string, moduleName: string) => {
     await handleModuleSwitch(moduleId);
-    setSelectorOpen(false);
+    // Keep the sidebar on the Therapy Modules view so the launched activity
+    // renders where the selector was — same behaviour as the old fixed panel.
+    setActivePanel('modules');
     showToast(`${moduleName} launched`);
     // Log module usage for the admin dashboard (best-effort).
     if (isTherapist && profile?.id) {
@@ -160,7 +191,6 @@ export default function SessionRoomPage({ params }: { params: { sessionId: strin
       activeModuleId: null,
       'timestamps.updatedAt': new Date().toISOString(),
     });
-    if (selectorOpen) setSelectorOpen(false);
   };
 
   useEffect(() => {
@@ -223,6 +253,9 @@ export default function SessionRoomPage({ params }: { params: { sessionId: strin
         if (typeof data.therapistControl === 'boolean') {
           setIsLocked(data.therapistControl);
         }
+        const wb = (data as { whiteboard?: { active?: boolean; shared?: boolean } }).whiteboard;
+        setWhiteboardShared(wb?.shared === true);
+        setWhiteboardOpenRemote(wb?.active === true);
         if (!isTherapist && data.participants) {
           const therapist = Object.values(data.participants).find(p => p.role === 'therapist');
           setTherapistControl(therapist?.isOnline || false);
@@ -288,7 +321,11 @@ export default function SessionRoomPage({ params }: { params: { sessionId: strin
 
         if (isTherapist && data?.aiInsight) {
           setAiInsight(data.aiInsight);
-          setInsightVisible(true);
+          // The floating insight bar used to pop itself open here; the AI
+          // Assistant panel now takes that role. Only surface it when nothing
+          // else is occupying the sidebar so it can't yank the therapist out of
+          // an open module or the whiteboard.
+          setActivePanel((current) => (current === null ? 'assistant' : current));
         }
       }
     });
@@ -357,6 +394,7 @@ export default function SessionRoomPage({ params }: { params: { sessionId: strin
 
   const handleLaunchModule = (moduleSlug: string) => {
     handleModuleSwitch(moduleSlug);
+    setActivePanel('modules');
     showToast(`Launching ${moduleSlug}`);
   };
 
@@ -446,7 +484,13 @@ export default function SessionRoomPage({ params }: { params: { sessionId: strin
   const bothConsented = therapistConsented && clientConsented;
   // Dev test mode: let transcription run with just the therapist present+consented
   // so the pipeline can be verified solo (no second participant needed).
-  const sttTestMode = process.env.NEXT_PUBLIC_STT_TEST_MODE === 'true';
+  // Solo-testing escape hatch: lets transcription run with only the therapist
+  // present. It BYPASSES CLIENT CONSENT, so it is hard-gated to non-production
+  // builds — leaving the flag set to true in a production environment must never
+  // be able to start recording a child who has not consented.
+  const sttTestMode =
+    process.env.NEXT_PUBLIC_STT_TEST_MODE === 'true' &&
+    process.env.NODE_ENV !== 'production';
   const transcriptionEnabled = sttTestMode ? therapistConsented : bothConsented;
   // The transcription hook needs the LiveKit room from <StaadVideo>'s context,
   // so it must run INSIDE that provider — see <TranscriptionBridge> rendered in
@@ -455,6 +499,29 @@ export default function SessionRoomPage({ params }: { params: { sessionId: strin
     isRecording: false,
     chunkCount: 0,
   });
+
+  // The therapist drives the sidebar from the bottom bar. The client has no
+  // panel controls, so — exactly as before — the client's sidebar simply mirrors
+  // whatever module the therapist has launched.
+  // A SHARED board opens on the client too; a private one never does — that is
+  // what "Keep Private" enforces, alongside StaadWhiteboard not syncing at all.
+  const sidebarPanel: SidebarPanel = isTherapist
+    ? activePanel
+    : whiteboardOpenRemote && whiteboardShared
+      ? 'whiteboard'
+      : isModuleActive
+        ? 'modules'
+        : null;
+  const whiteboardMode = sidebarPanel === 'whiteboard';
+  // An active module now takes the wide canvas instead of the 420px sidebar, so
+  // the therapist keeps the top bar, bottom bar and the other panels while it
+  // runs. Skill Development modules are deliberately excluded — they use
+  // SkillDevLayout's chrome-free full-screen space by design (handled above).
+  const moduleMode = isModuleActive && !isSkillModule(activeModule) && !whiteboardMode;
+  // Both canvas takeovers hide the thumbnail strip; the feeds move inside them.
+  const canvasTakeover = whiteboardMode || moduleMode;
+  const sidebarOpen = sidebarPanel !== null && !whiteboardMode;
+  const selfName = profile ? `${profile.firstName} ${profile.lastName}` : 'You';
 
   if (loading) {
     return (
@@ -510,43 +577,50 @@ export default function SessionRoomPage({ params }: { params: { sessionId: strin
         </>
       ) : (
       <div style={{ width: '100vw', height: '100vh', background: RC.pageBg, overflow: 'hidden', position: 'relative', display: 'flex' }}>
-        {/* ===== MAIN COLUMN (full width — no left rail) ===== */}
+        {/* ===== MAIN COLUMN ===== */}
         <div style={{ flex: 1, minWidth: 0, display: 'flex', flexDirection: 'column', padding: '12px 16px', gap: 12 }}>
-          {/* ---- Top strip: participant thumbnails + meta ---- */}
-          <div style={{ display: 'flex', alignItems: 'center', gap: 12, flexShrink: 0, position: 'relative' }}>
-            <div style={{ display: 'flex', gap: 10, flex: 1, minWidth: 0, overflowX: 'auto', paddingBottom: 2 }}>
-              {Object.values(participants).map((p) =>
-                p.uid === uid ? (
-                  <LocalVideoPip key={p.uid} docked />
-                ) : (
-                  <ParticipantThumb key={p.uid} name={p.name} online={p.isOnline} self={false} />
-                )
-              )}
-            </div>
+          {/* ---- STEP 1: top bar — logo · E2E badge · spacer · timer · session info ---- */}
+          <SessionTopBar
+            timerStr={timerStr}
+            startedAt={startTime.current}
+            sessionId={sessionId}
+            onlineCount={onlineCount}
+            transcriptLine={
+              isTherapist && transcriptionEnabled ? (
+                <div
+                  style={{
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: 6,
+                    fontSize: 12,
+                    fontWeight: 600,
+                    color: transcription.isRecording ? RC.greenDark : RC.inkMuted,
+                  }}
+                >
+                  <div style={{ width: 7, height: 7, borderRadius: '50%', background: transcription.isRecording ? RC.green : RC.border, animation: transcription.isRecording ? 'pulse 1.4s ease infinite' : 'none' }} />
+                  {transcription.isRecording ? `${transcription.chunkCount} lines` : 'transcript off'}
+                </div>
+              ) : null
+            }
+          />
 
-            {/* Transcription status — Live / online / timer were moved onto the
-                video timer pill. Centred when a tool occupies the right column. */}
-            {isTherapist && transcriptionEnabled && (
-              <div
-                style={{
-                  display: 'flex',
-                  alignItems: 'center',
-                  gap: 6,
-                  flexShrink: 0,
-                  fontSize: 14,
-                  fontWeight: 600,
-                  color: transcription.isRecording ? RC.greenDark : RC.inkMuted,
-                  ...(isModuleActive
-                    ? { position: 'absolute', left: '50%', top: '50%', transform: 'translate(-50%,-50%)' }
-                    : {}),
-                }}
-              >
-                <div style={{ width: 7, height: 7, borderRadius: '50%', background: transcription.isRecording ? RC.green : RC.border, animation: transcription.isRecording ? 'pulse 1.4s ease infinite' : 'none' }} />
-                {transcription.isRecording ? `${transcription.chunkCount} lines` : 'transcript off'}
+          {/* ---- Participant thumbnails. Hidden in whiteboard mode: both feeds
+               move into the board itself as small side-by-side tiles. ---- */}
+          <div style={{ display: 'flex', alignItems: 'center', gap: 12, flexShrink: 0 }}>
+            {!canvasTakeover && (
+              <div style={{ display: 'flex', gap: 10, flex: 1, minWidth: 0, overflowX: 'auto', paddingBottom: 2 }}>
+                {Object.values(participants).map((p) =>
+                  p.uid === uid ? (
+                    <LocalVideoPip key={p.uid} docked />
+                  ) : (
+                    <ParticipantThumb key={p.uid} name={p.name} online={p.isOnline} self={false} />
+                  )
+                )}
               </div>
             )}
+            {canvasTakeover && <div style={{ flex: 1 }} />}
 
-            {/* Full-screen toggle — stays at the far right regardless of tool state */}
+            {/* Full-screen toggle — stays at the far right regardless of mode */}
             <button
               onClick={toggleFullscreen}
               title={isFullscreen ? 'Exit full screen' : 'Full screen'}
@@ -556,12 +630,44 @@ export default function SessionRoomPage({ params }: { params: { sessionId: strin
             </button>
           </div>
 
-          {/* ---- Main row: video stage + right module panel ---- */}
-          <div style={{ flex: 1, minHeight: 0, display: 'flex', gap: 12 }}>
-            {/* Video stage (relative — overlays float above the rounded card, un-clipped) */}
-            <div style={{ flex: 1, minWidth: 0, position: 'relative', display: 'flex', flexDirection: 'column', gap: 12 }}>
-              <div style={{ flex: 1, minHeight: 0, position: 'relative' }}>
-                {/* Rounded green video card */}
+          {/* ---- Main canvas: patient video, or the whiteboard taking it over ---- */}
+          <div style={{ flex: 1, minWidth: 0, minHeight: 0, position: 'relative', display: 'flex', flexDirection: 'column', gap: 12 }}>
+            <div style={{ flex: 1, minHeight: 0, position: 'relative' }}>
+              {whiteboardMode ? (
+                /* Excalidraw inside the whiteboard shell. Only the therapist can
+                   close it; the client's view follows the therapist. */
+                <StaadWhiteboard
+                  sessionId={sessionId}
+                  role={userRole}
+                  isShared={whiteboardShared}
+                  isLocked={isLocked}
+                  selfName={selfName}
+                  otherName={participantName}
+                  onClose={isTherapist ? closeWhiteboard : () => {}}
+                  onFullscreen={toggleFullscreen}
+                />
+              ) : moduleMode ? (
+                <ModuleStage
+                  activeModule={activeModule}
+                  selfName={selfName}
+                  otherName={participantName}
+                  timerStr={timerStr}
+                  onlineCount={onlineCount}
+                  isTherapist={isTherapist}
+                  isLocked={isLocked}
+                  onLockToggle={handleLockToggle}
+                  onClose={handleModuleClose}
+                >
+                  <ModuleContent
+                    activeModule={activeModule}
+                    sessionId={sessionId}
+                    role={userRole}
+                    isLocked={isLocked}
+                    isTherapist={isTherapist}
+                  />
+                </ModuleStage>
+              ) : (
+                /* Rounded green video card */
                 <div style={{ position: 'absolute', inset: 0, borderRadius: 24, overflow: 'hidden', background: RC.videoBg, border: `2px solid ${RC.green}`, boxShadow: `0 0 0 5px ${RC.greenSoft}, 0 18px 44px rgba(20,40,30,0.18)` }}>
                   <div style={{ position: 'absolute', inset: 0, display: 'flex', alignItems: 'center', justifyContent: 'center', overflow: 'hidden' }}>
                     <RemoteVideoArea participantName={participantName} />
@@ -579,7 +685,7 @@ export default function SessionRoomPage({ params }: { params: { sessionId: strin
                   </div>
 
                   {/* Floating pill control bar — patient only. The therapist's
-                      controls live inline in the bottom toolbar line (below). */}
+                      controls live in the restructured bottom bar (below). */}
                   {!isTherapist && (
                     <PillControls
                       onEndClick={() => setShowConfirm(true)}
@@ -588,102 +694,121 @@ export default function SessionRoomPage({ params }: { params: { sessionId: strin
                     />
                   )}
                 </div>
+              )}
 
-                {/* ---- Overlays (kept as dark widgets, float above the card) ---- */}
-                {isTherapist && (
-                  <ModuleSelectorPanel
-                    open={selectorOpen}
-                    onClose={() => setSelectorOpen(false)}
-                    onLaunch={handleModuleLaunch}
-                    allowedModuleIds={resolveAllowedModuleIds(profile)}
-                  />
-                )}
+              <ReactionOverlay sessionId={sessionId} />
 
-                {isTherapist && (
-                  <NotesPanel open={notesOpen} onClose={() => setNotesOpen(false)} sessionId={sessionId} />
-                )}
-
-                <ReactionOverlay sessionId={sessionId} />
-
-                {isTherapist && (
-                  <AIErrorBoundary>
-                    <AIInsightBar
-                      insight={aiInsight}
-                      visible={insightVisible}
-                      onDismiss={() => setInsightVisible(false)}
-                      onLaunchModule={handleLaunchModule}
-                    />
-                  </AIErrorBoundary>
-                )}
-
-                {/* Toast notification */}
-                {toast && (
-                  <div
-                    key={toast}
-                    style={{ position: 'absolute', bottom: 84, left: '50%', zIndex: 50, pointerEvents: 'none', animation: 'toastInOut 2.2s ease forwards' }}
-                  >
-                    <div style={{ background: RC.green, color: '#fff', padding: '7px 16px', borderRadius: 10, fontSize: 11, fontWeight: 600, whiteSpace: 'nowrap', transform: 'translateX(-50%)', boxShadow: '0 6px 18px rgba(63,174,106,0.35)' }}>
-                      ✓ {toast}
-                    </div>
+              {/* Toast notification */}
+              {toast && (
+                <div
+                  key={toast}
+                  style={{ position: 'absolute', bottom: 84, left: '50%', zIndex: 50, pointerEvents: 'none', animation: 'toastInOut 2.2s ease forwards' }}
+                >
+                  <div style={{ background: RC.green, color: '#fff', padding: '7px 16px', borderRadius: 10, fontSize: 11, fontWeight: 600, whiteSpace: 'nowrap', transform: 'translateX(-50%)', boxShadow: '0 6px 18px rgba(63,174,106,0.35)' }}>
+                    ✓ {toast}
                   </div>
-                )}
-              </div>
-
-              {/* ---- Bottom toolbar: call controls pinned left, feature tiles centered ---- */}
-              {isTherapist && (
-                <div style={{ flexShrink: 0, position: 'relative', display: 'flex', alignItems: 'center', justifyContent: 'center', minHeight: 66 }}>
-                  <div style={{ position: 'absolute', left: 0, top: '50%', transform: 'translateY(-50%)' }}>
-                    <PillControls
-                      inline
-                      onEndClick={() => setShowConfirm(true)}
-                      reactionBarOpen={reactionBarOpen}
-                      onToggleReactions={() => setReactionBarOpen((o) => !o)}
-                    />
-                  </div>
-                  <FeatureToolbar
-                    isTherapist={isTherapist}
-                    selectorOpen={selectorOpen}
-                    onToggleTherapy={() => setSelectorOpen((o) => !o)}
-                    notesOpen={notesOpen}
-                    onToggleNotes={() => setNotesOpen((o) => !o)}
-                    isLocked={isLocked}
-                    onToggleLock={handleLockToggle}
-                    analyseLoading={analyseLoading}
-                    analyseCooldown={analyseCooldown}
-                    consentGiven={bothConsented}
-                    onAnalyse={handleAnalyse}
-                  />
                 </div>
               )}
             </div>
 
+            {/* ---- STEP 7: restructured bottom bar (therapist) ---- */}
+            {isTherapist && (
+              <SessionBottomBar
+                activePanel={activePanel}
+                onSelectPanel={selectPanel}
+                onEndCall={() => setShowConfirm(true)}
+                participantCount={onlineCount}
+                reactionBarOpen={reactionBarOpen}
+                onToggleReactions={() => setReactionBarOpen((o) => !o)}
+                isLocked={isLocked}
+                onToggleLock={handleLockToggle}
+                screenSharing={screenSharing}
+                onToggleScreenShare={() => setScreenSharing((s) => !s)}
+              />
+            )}
           </div>
         </div>
 
-        {/* ---- Full-height tool panel — a launched module uses the entire right
-             column, top to bottom of the screen ---- */}
+        {/* ---- STEP 2: swappable right sidebar — one of four panels, full height.
+             Same 420px width for every panel type, so the Therapy Modules view
+             needs no internal resizing. ---- */}
         <div style={{
-          width: isModuleActive ? 420 : 0,
-          minWidth: isModuleActive ? 420 : 0,
+          width: sidebarOpen ? SIDEBAR_WIDTH : 0,
+          minWidth: sidebarOpen ? SIDEBAR_WIDTH : 0,
           flexShrink: 0,
           overflow: 'hidden',
           transition: 'width 0.3s cubic-bezier(0.4,0,0.2,1)',
           display: 'flex',
           justifyContent: 'flex-end',
-          padding: isModuleActive ? '12px 16px 12px 0' : 0,
+          padding: sidebarOpen ? '12px 16px 12px 0' : 0,
         }}>
-          <GlassModulePanel
-            sessionId={sessionId}
-            activeModule={activeModule}
-            isTherapist={isTherapist}
-            isLocked={isLocked}
-            onModuleSwitch={handleModuleSwitch}
-            onLockToggle={handleLockToggle}
-            onClose={handleModuleClose}
-          />
+          {sidebarPanel === 'assistant' && (
+            <AIErrorBoundary>
+              <AIAssistantPanel
+                insight={aiInsight}
+                live={transcription.isRecording}
+                analyseLoading={analyseLoading}
+                analyseDisabled={!bothConsented || analyseCooldown || analyseLoading}
+                onAnalyse={handleAnalyse}
+                onLaunchModule={handleLaunchModule}
+                onClose={() => setActivePanel(null)}
+              />
+            </AIErrorBoundary>
+          )}
+
+          {sidebarPanel === 'notes' && (
+            <AINotesPanel
+              sessionId={sessionId}
+              sessionStartedAt={startTime.current}
+              insight={aiInsight}
+              onClose={() => setActivePanel(null)}
+            />
+          )}
+
+          {/* Therapy Modules: the selector until something is launched, then the
+              existing module panel — unchanged component, unchanged launch path. */}
+          {/* With the live module on the canvas, the sidebar shows the selector so
+              the therapist can switch activity without closing the current one.
+              The old GlassModulePanel path still serves Skill Development and the
+              client mirror. */}
+          {sidebarPanel === 'modules' && (
+            isModuleActive && !moduleMode ? (
+              <GlassModulePanel
+                sessionId={sessionId}
+                activeModule={activeModule}
+                isTherapist={isTherapist}
+                isLocked={isLocked}
+                onModuleSwitch={handleModuleSwitch}
+                onLockToggle={handleLockToggle}
+                onClose={handleModuleClose}
+              />
+            ) : isTherapist ? (
+              <TherapyModulesPanel
+                allowedModuleIds={resolveAllowedModuleIds(profile)}
+                onLaunch={handleModuleLaunch}
+                onClose={() => setActivePanel(null)}
+              />
+            ) : null
+          )}
         </div>
 
-        {/* ===== AI CONSENT BANNER ===== */}
+        {/* Share Whiteboard? — first whiteboard activation */}
+        {shareWhiteboardAsk && (
+          <ShareWhiteboardModal
+            onKeepPrivate={() => {
+              setShareWhiteboardAsk(false);
+              setWhiteboardShared(false);
+              publishWhiteboardState(true, false);
+            }}
+            onShare={() => {
+              setShareWhiteboardAsk(false);
+              setWhiteboardShared(true);
+              publishWhiteboardState(true, true);
+            }}
+          />
+        )}
+
+        {/* ===== AI CONSENT MODAL ===== */}
         <AIErrorBoundary>
           {showConsentBanner && (
             <AIConsentBanner
@@ -719,19 +844,16 @@ export default function SessionRoomPage({ params }: { params: { sessionId: strin
 }
 
 /* ===== PILL CONTROLS — mic / camera / end / react / settings =====
-   `inline` renders the cluster without absolute positioning so it can sit in the
-   bottom toolbar line (therapist). Default (floating) overlays the video for the
-   patient. */
+   The patient's floating control cluster over the video. The therapist's
+   controls now live in <SessionBottomBar>. */
 function PillControls({
   onEndClick,
   reactionBarOpen,
   onToggleReactions,
-  inline = false,
 }: {
   onEndClick: () => void;
   reactionBarOpen: boolean;
   onToggleReactions: () => void;
-  inline?: boolean;
 }) {
   const { localParticipant, isMicrophoneEnabled, isCameraEnabled } = useLocalParticipant();
 
@@ -759,9 +881,7 @@ function PillControls({
     transition: 'all 0.15s',
   });
 
-  const containerStyle: React.CSSProperties = inline
-    ? { flexShrink: 0, display: 'flex', alignItems: 'center', gap: 10, padding: '8px 12px', borderRadius: 999, background: RC.panel, border: `1px solid ${RC.border}`, boxShadow: '0 6px 18px rgba(20,30,40,0.05)' }
-    : { position: 'absolute', bottom: 18, left: '50%', transform: 'translateX(-50%)', zIndex: 20, display: 'flex', alignItems: 'center', gap: 10, padding: '8px 12px', borderRadius: 999, background: 'rgba(255,255,255,0.95)', backdropFilter: 'blur(12px)', boxShadow: '0 10px 30px rgba(0,0,0,0.22)' };
+  const containerStyle: React.CSSProperties = { position: 'absolute', bottom: 18, left: '50%', transform: 'translateX(-50%)', zIndex: 20, display: 'flex', alignItems: 'center', gap: 10, padding: '8px 12px', borderRadius: 999, background: 'rgba(255,255,255,0.95)', backdropFilter: 'blur(12px)', boxShadow: '0 10px 30px rgba(0,0,0,0.22)' };
 
   return (
     <div style={containerStyle}>
@@ -785,83 +905,8 @@ function PillControls({
       <button title="End call" onClick={onEndClick} style={{ ...circle(), width: 54, height: 54, background: RC.red, color: '#fff', boxShadow: '0 6px 16px rgba(255,90,95,0.4)' }}>
         <PhoneOff size={21} />
       </button>
-      {!inline && (
-        <button title="Settings" style={circle(false)}>
-          <Settings size={19} />
-        </button>
-      )}
-    </div>
-  );
-}
-
-/* ===== BOTTOM FEATURE TOOLBAR — Module / Note / AI Copilot / Control + invite ===== */
-function FeatureToolbar({
-  isTherapist,
-  selectorOpen,
-  onToggleTherapy,
-  notesOpen,
-  onToggleNotes,
-  isLocked,
-  onToggleLock,
-  analyseLoading,
-  analyseCooldown,
-  consentGiven,
-  onAnalyse,
-}: {
-  isTherapist: boolean;
-  selectorOpen: boolean;
-  onToggleTherapy: () => void;
-  notesOpen: boolean;
-  onToggleNotes: () => void;
-  isLocked: boolean;
-  onToggleLock: () => void;
-  analyseLoading: boolean;
-  analyseCooldown: boolean;
-  consentGiven: boolean;
-  onAnalyse: () => void;
-}) {
-  if (!isTherapist) return null;
-
-  // Each tile gets its own bright accent. Inactive = soft tint + coloured icon,
-  // active = solid fill + white — clear, colourful, non-greyscale.
-  const tile = (accent: string, active: boolean, disabled = false): React.CSSProperties => ({
-    display: 'flex',
-    flexDirection: 'column',
-    alignItems: 'center',
-    gap: 6,
-    minWidth: 76,
-    padding: '10px 10px',
-    borderRadius: 16,
-    border: `1.5px solid ${active ? accent : accent + '4D'}`,
-    background: active ? accent : accent + '16',
-    color: active ? '#ffffff' : accent,
-    cursor: disabled ? 'not-allowed' : 'pointer',
-    opacity: disabled ? 0.45 : 1,
-    fontSize: 11,
-    fontWeight: 600,
-    boxShadow: active ? `0 4px 14px ${accent}55` : 'none',
-    transition: 'all 0.15s',
-  });
-
-  const C = { module: '#2f80ed', notes: '#f2994a', copilot: '#9b51e0', control: '#27ae60' };
-
-  return (
-    <div style={{ flexShrink: 0, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 12, padding: '10px 14px', borderRadius: 18, background: RC.panel, border: `1px solid ${RC.border}`, boxShadow: '0 6px 18px rgba(20,30,40,0.05)' }}>
-      <button onClick={onToggleTherapy} style={tile(C.module, selectorOpen)}>
-        <Blocks size={19} /> Module
-      </button>
-      <button onClick={onToggleNotes} style={tile(C.notes, notesOpen)}>
-        <NotebookPen size={19} /> Note
-      </button>
-      <button onClick={onAnalyse} disabled={!consentGiven || analyseCooldown} style={tile(C.copilot, analyseLoading, !consentGiven || analyseCooldown)} title={consentGiven ? 'Analyse session' : 'Both must consent first'}>
-        <span className={analyseLoading ? 'animate-spin' : ''} style={{ display: 'inline-flex' }}>
-          <Lightbulb size={19} />
-        </span>
-        AI Copilot
-      </button>
-      <button onClick={onToggleLock} style={tile(C.control, isLocked)}>
-        {isLocked ? <Lock size={19} /> : <LockOpen size={19} />}
-        Control
+      <button title="Settings" style={circle(false)}>
+        <Settings size={19} />
       </button>
     </div>
   );

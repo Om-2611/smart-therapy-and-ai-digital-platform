@@ -9,6 +9,7 @@ import { Select, SelectTrigger, SelectValue, SelectContent, SelectItem } from '@
 import { Play, ArrowRight, FileText, X, Send, Loader2, Sparkles, RefreshCw, Pencil, Save } from 'lucide-react';
 import DashboardLayout from '@/components/layout/DashboardLayout';
 import SessionReportView from '@/components/report/SessionReportView';
+import type { ReportStats } from '@/lib/report/stats';
 
 interface SessionData {
   id: string;
@@ -72,6 +73,9 @@ export default function SessionsPage() {
   const [reportDrawerOpen, setReportDrawerOpen] = useState(false);
   const [reportSessionId, setReportSessionId] = useState<string | null>(null);
   const [report, setReport] = useState<ReportData | null>(null);
+  // Measured session figures shown above the narrative. Older reports predate
+  // stats and simply return null, in which case the section is not rendered.
+  const [reportStats, setReportStats] = useState<ReportStats | null>(null);
   const [reportLoading, setReportLoading] = useState(false);
   const [generating, setGenerating] = useState(false);
   const [editingReport, setEditingReport] = useState(false);
@@ -140,7 +144,12 @@ export default function SessionsPage() {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ sessionId }),
       });
-      if (res.ok) { const d = await res.json(); setReport(d.report); setEditingReport(false); }
+      if (res.ok) {
+        const d = await res.json();
+        setReport(d.report);
+        setReportStats(d.stats ?? null);
+        setEditingReport(false);
+      }
     } catch (err) { console.error(err); }
     setGenerating(false);
   };
@@ -150,13 +159,18 @@ export default function SessionsPage() {
     setReportDrawerOpen(true);
     setEditingReport(false);
     setReport(null);
+    setReportStats(null);
     setReportLoading(true);
     try {
       const res = await fetch(`/api/session-report?sessionId=${sessionId}`);
       if (res.ok) {
         const d = await res.json();
-        if (d.report) setReport(d.report);
-        else await generateReport(sessionId); // none yet → generate on first view
+        if (d.report) {
+          setReport(d.report);
+          setReportStats((d.stats as ReportStats) ?? null);
+        } else {
+          await generateReport(sessionId); // none yet → generate on first view
+        }
       }
     } catch (err) { console.error(err); }
     setReportLoading(false);
@@ -471,6 +485,7 @@ export default function SessionsPage() {
                     <div className="rounded-xl p-5" style={{ background: '#ffffff', border: '1px solid var(--glass-border)' }}>
                       <SessionReportView
                         content={report.content}
+                        stats={reportStats}
                         meta={{
                           clientName,
                           dateLabel,

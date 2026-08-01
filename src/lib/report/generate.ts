@@ -1,5 +1,6 @@
 import { generateReportText, REPORT_MODEL } from './openrouter-client'
-import { getReportInputs, type ReportInputs } from './session-data'
+import { getReportInputs, saveReportStats, type ReportInputs } from './session-data'
+import { computeReportStats, type ReportStats } from './stats'
 
 export interface ReportClient {
   name: string
@@ -80,6 +81,7 @@ function formatInputs(inputs: ReportInputs, client: ReportClient): string {
 export interface GeneratedReport {
   content: string
   model: string
+  stats: ReportStats
 }
 
 export async function generateSessionReport(
@@ -87,7 +89,13 @@ export async function generateSessionReport(
   client: ReportClient
 ): Promise<GeneratedReport> {
   const inputs = await getReportInputs(sessionId)
+
+  // Computed from the same inputs the narrative uses, and saved now because the
+  // transcript behind them is purged 24h after the session.
+  const stats = computeReportStats(inputs)
+  await saveReportStats(sessionId, stats)
+
   const userPrompt = formatInputs(inputs, client)
   const content = await generateReportText(REPORT_SYSTEM_PROMPT, userPrompt)
-  return { content: content.trim(), model: REPORT_MODEL }
+  return { content: content.trim(), model: REPORT_MODEL, stats }
 }

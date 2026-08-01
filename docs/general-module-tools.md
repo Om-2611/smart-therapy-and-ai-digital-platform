@@ -8,9 +8,6 @@ Interactive, therapist-guided tools for emotional regulation and everyday mental
 Helps clients name what they feel by drilling from broad emotions down to precise, granular ones.
 Builds emotional awareness and vocabulary — the first step toward regulating difficult feelings.
 
-### 🏠 Safe Space Builder
-Clients design a personalized calming environment with soothing scenes, colors, and ambient settings.
-A grounding tool they can return to anytime to feel safe, centered, and at ease.
 
 ### 🌊 Defusion River
 Guides clients to watch their thoughts float by like leaves on a river instead of getting swept up.
@@ -28,9 +25,6 @@ A behavioral-activation tool that fights avoidance and low motivation one micro-
 Clients sort cards to discover what truly matters most to them in life.
 An ACT exercise that clarifies personal values and inspires committed, meaningful action.
 
-### 🏄 Urge Surfing
-A timed, guided practice for riding out cravings and intense urges without acting on them.
-A DBT mindfulness skill that proves urges peak and pass on their own.
 
 ### 🗄️ Worry Vault
 Lets clients "lock away" worries and assign them a dedicated time to revisit later.

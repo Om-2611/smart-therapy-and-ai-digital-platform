@@ -4,6 +4,9 @@ import { useState, useEffect, useRef, useCallback, useMemo } from 'react'
 import { doc, onSnapshot, updateDoc } from 'firebase/firestore'
 import { db } from '@/lib/firebase'
 import { logModuleEvent } from '@/lib/sessionEvents'
+import { staadSpeak, randomPraise } from '@/lib/voice/staadVoice'
+import { useVoiceLanguage } from '@/lib/voice/useVoiceLanguage'
+import VoiceLanguageToggle from '@/components/modules/VoiceLanguageToggle'
 
 interface DragDropSortingProps {
   sessionId: string
@@ -129,6 +132,12 @@ export default function DragDropSorting({ sessionId, role, isLocked }: DragDropS
   const [checkItems, setCheckItems] = useState<Set<string>>(new Set())
   const [toast, setToast] = useState<{ msg: string } | null>(null)
 
+  const voiceLanguage = useVoiceLanguage(sessionId)
+  // Ref so drop handlers can read the current language without gaining a new
+  // dependency (their identity feeds the drag/drop logic).
+  const voiceLangRef = useRef(voiceLanguage)
+  voiceLangRef.current = voiceLanguage
+
   const cRef = useRef<HTMLDivElement>(null)
   const isDragging = useRef(false)
   const dragId = useRef<string | null>(null)
@@ -216,12 +225,9 @@ export default function DragDropSorting({ sessionId, role, isLocked }: DragDropS
       if (sortedCount + 1 >= totalItems) {
         setTimeout(() => write({ 'moduleState.ddCompleted': true }), 300)
       }
-      if ('speechSynthesis' in window) {
-        const voices = speechSynthesis.getVoices()
-        const u = new SpeechSynthesisUtterance(item.label)
-        u.rate = 0.9; u.pitch = 1.1
-        speechSynthesis.speak(u)
-      }
+      // Names the item just sorted. Labels are English nouns, so this stays
+      // 'en-IN' — only the praise below follows the therapist's language choice.
+      staadSpeak({ text: item.label, language: 'en-IN', type: 'feedback' })
     } else {
       setAnimShake(prev => new Set(prev).add(itemId))
       setFlashWrong(prev => new Set(prev).add(binId))
@@ -247,11 +253,8 @@ export default function DragDropSorting({ sessionId, role, isLocked }: DragDropS
       const wc = wrong
       const star = wc === 0 ? '⭐⭐⭐ Perfect!' : wc <= 3 ? '⭐⭐ Great job!' : '⭐ Keep practising!'
       showToast(`All sorted! ${star}`)
-      if ('speechSynthesis' in window) {
-        const u = new SpeechSynthesisUtterance(wc === 0 ? 'Wonderful! You sorted everything perfectly!' : 'Great sorting!')
-        u.rate = 0.85
-        speechSynthesis.speak(u)
-      }
+      // Appreciation voice — shared phrase bank, therapist's chosen language.
+      staadSpeak({ text: randomPraise(voiceLangRef.current), language: voiceLangRef.current, type: 'praise' })
     }
     if (!allDone) loggedDoneRef.current = false
   }, [allDone, completed, wrong, correct, showToast, isT, sessionId, currentSet.name])
@@ -418,6 +421,7 @@ export default function DragDropSorting({ sessionId, role, isLocked }: DragDropS
             >{displayMode === 'emoji+label' ? 'Emoji+Label' : 'Emoji'}</button>
             <button onClick={handleShuffle} style={{ marginLeft: 'auto', padding: '2px 8px', borderRadius: 4, cursor: 'pointer', fontSize: 10, border: '1px solid rgba(255,255,255,0.1)', background: 'transparent', color: 'rgba(255,255,255,0.5)' }}>🔀 Shuffle</button>
             <button onClick={handleReset} style={{ padding: '2px 8px', borderRadius: 4, cursor: 'pointer', fontSize: 10, border: '1px solid rgba(200,60,60,0.3)', background: 'transparent', color: 'rgba(200,80,80,0.7)' }}>↺ Reset</button>
+            <VoiceLanguageToggle sessionId={sessionId} language={voiceLanguage} />
           </div>
         </div>
       )}

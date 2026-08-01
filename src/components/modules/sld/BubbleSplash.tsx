@@ -1,8 +1,9 @@
 'use client'
 import { useState, useEffect, useRef, useCallback } from 'react'
-import { doc, onSnapshot, updateDoc } from 'firebase/firestore'
+import { doc, onSnapshot } from 'firebase/firestore'
 import { db } from '@/lib/firebase'
 import { logModuleEvent } from '@/lib/sessionEvents'
+import { writeModuleState } from '@/lib/modules/writeModuleState'
 
 interface BubbleSplashProps {
   sessionId: string
@@ -186,21 +187,24 @@ export default function BubbleSplash({ sessionId, role, isLocked }: BubbleSplash
   const [particles, setParticles] = useState<Particle[]>([])
   const [floatingStars, setFloatingStars] = useState<{ id: number; x: number; y: number }[]>([])
   const [waitingForTap, setWaitingForTap] = useState(true)
+  // The word list for the CURRENT round, kept so the correct bubble can be
+  // respawned without generating a different word.
+  const [roundWords, setRoundWords] = useState<string[]>([])
 
   const spawnTimerRef = useRef<ReturnType<typeof setInterval>>()
-  const gameRef = useRef({ isPlaying, wordSet, difficulty, speed, customWords, customPrompt, bubbles, correctWord, score, streak })
-  gameRef.current = { isPlaying, wordSet, difficulty, speed, customWords, customPrompt, bubbles, correctWord, score, streak }
+  const gameRef = useRef({ isPlaying, wordSet, difficulty, speed, customWords, customPrompt, bubbles, correctWord, score, streak, roundWords, waitingForTap })
+  gameRef.current = { isPlaying, wordSet, difficulty, speed, customWords, customPrompt, bubbles, correctWord, score, streak, roundWords, waitingForTap }
+  // Guards the respawn so a round cannot be refilled twice while the delay runs.
+  const respawnPendingRef = useRef(false)
   const starIdRef = useRef(0)
   const particleIdRef = useRef(0)
 
-  const writeToFirestore = useCallback(async (data: Record<string, unknown>) => {
-    try {
-      await updateDoc(doc(db, 'liveSessions', sessionId), {
-        ...data,
-        'timestamps.updatedAt': new Date().toISOString(),
-      })
-    } catch {}
-  }, [sessionId])
+  // Shared helper: same liveSessions write as before, but a failure is reported
+  // instead of vanishing into an empty catch.
+  const writeToFirestore = useCallback(
+    (data: Record<string, unknown>) => writeModuleState(sessionId, data, { label: 'BubbleSplash' }),
+    [sessionId]
+  )
 
   useEffect(() => {
     const unsub = onSnapshot(doc(db, 'liveSessions', sessionId), (snap) => {
@@ -214,6 +218,7 @@ export default function BubbleSplash({ sessionId, role, isLocked }: BubbleSplash
       if (typeof s.bsPrompt === 'string') setPrompt(s.bsPrompt)
       if (typeof s.bsCorrectWord === 'string') setCorrectWord(s.bsCorrectWord)
       if (Array.isArray(s.bsBubbles)) setBubbles(s.bsBubbles as BubbleData[])
+      if (Array.isArray(s.bsRoundWords)) setRoundWords(s.bsRoundWords as string[])
       if (typeof s.bsScore === 'number') setScore(s.bsScore)
       if (typeof s.bsStreak === 'number') setStreak(s.bsStreak)
       if (typeof s.bsCustomWords === 'string') setCustomWords(s.bsCustomWords)
@@ -222,34 +227,98 @@ export default function BubbleSplash({ sessionId, role, isLocked }: BubbleSplash
     return () => unsub()
   }, [sessionId])
 
+  /**
+   * Begin a NEW round: a fresh prompt, a new target word, and one fixed batch of
+   * bubbles (target + distractors, sized by difficulty).
+   *
+   * Only called when a round genuinely ends — on Start and after a correct tap.
+   * It used to be driven by the spawn timer as well, which regenerated the
+   * prompt and target roughly once a second: the word the child was being asked
+   * to find kept changing mid-read, and every bubble was reset to below the
+   * canvas, so the activity was effectively unplayable.
+   */
   const startNewRound = useCallback(() => {
     const { wordSet, difficulty, customWords, customPrompt } = gameRef.current
     const { prompt: p, correctWord: cw, allWords } = generateRound(wordSet, difficulty, customWords.split(',').map(s => s.trim()).filter(Boolean), customPrompt)
     setPrompt(p)
     setCorrectWord(cw)
+    setRoundWords(allWords)
     const now = Date.now()
     const newBubbles = spawnBubbles(allWords, cw, difficulty, now)
     setBubbles(newBubbles)
     setWaitingForTap(true)
+    respawnPendingRef.current = false
     writeToFirestore({
       'moduleState.bsPrompt': p,
       'moduleState.bsCorrectWord': cw,
+      'moduleState.bsRoundWords': allWords,
       'moduleState.bsBubbles': newBubbles.map(b => ({ ...b, spawnedAt: now })),
     })
   }, [writeToFirestore])
 
-  const spawnTimerCallback = useCallback(() => {
-    const { isPlaying, bubbles, difficulty } = gameRef.current
-    if (!isPlaying) return
-    const max = DIFFICULTY_CONFIG[difficulty].maxBubbles
-    const active = bubbles.filter((b) => b.state === 'floating').length
-    if (active < max) {
-      startNewRound()
+  /**
+   * Refill the SAME round: identical prompt and target word, a fresh batch of
+   * bubbles. Used when the target floated off before the child reached it, so a
+   * missed bubble costs a little time rather than the answer, matching the
+   * non-punishing approach used elsewhere in the app.
+   */
+  const respawnRound = useCallback(() => {
+    const { correctWord: cw, roundWords, difficulty } = gameRef.current
+    if (!cw || roundWords.length === 0) return
+    const now = Date.now()
+    const refreshed = spawnBubbles(roundWords, cw, difficulty, now)
+    setBubbles(refreshed)
+    setWaitingForTap(true)
+    respawnPendingRef.current = false
+    writeToFirestore({
+      'moduleState.bsBubbles': refreshed.map(b => ({ ...b, spawnedAt: now })),
+    })
+  }, [writeToFirestore])
+
+  /**
+   * Keeps the current round alive. Deliberately does NOT top up bubbles
+   * continuously: each round is a fixed, readable set (target + distractors) so
+   * a child who needs longer to decode a word is not facing an endless stream.
+   *
+   * Therapist-driven, like every other timed module here — otherwise both
+   * browsers would refill the round independently and fight over Firestore.
+   */
+  const maintainRound = useCallback(() => {
+    const { isPlaying, bubbles, correctWord, waitingForTap, roundWords } = gameRef.current
+    if (!isPlaying || respawnPendingRef.current) return
+
+    // Play state can be restored from Firestore with no usable round attached —
+    // e.g. a session left running, or state written before the round word list
+    // was persisted. Start a fresh round rather than sitting on a blank canvas.
+    if (!correctWord || roundWords.length === 0) {
+      respawnPendingRef.current = true
+      setTimeout(() => {
+        respawnPendingRef.current = false
+        if (gameRef.current.isPlaying) startNewRound()
+      }, 150)
+      return
     }
-  }, [startNewRound])
+
+    if (!waitingForTap) return
+
+    // The batch is recycled as a WHOLE. Bubbles float off the top and are swept
+    // as they expire; refreshing only the target would leave the child staring
+    // at a single correct answer with no distractors, and refreshing nothing
+    // would dead-end the round. Keeping the set intact means the choice stays
+    // the same size and equally readable every time it comes round again.
+    const expected = Math.min(roundWords.length, DIFFICULTY_CONFIG[gameRef.current.difficulty].maxBubbles)
+    const floating = bubbles.filter((b) => b.state === 'floating').length
+    if (floating >= expected) return
+
+    respawnPendingRef.current = true
+    setTimeout(() => {
+      respawnPendingRef.current = false
+      if (gameRef.current.isPlaying && gameRef.current.waitingForTap) respawnRound()
+    }, 700)
+  }, [respawnRound, startNewRound])
 
   useEffect(() => {
-    if (!isPlaying) {
+    if (!isPlaying || !isTherapist) {
       if (spawnTimerRef.current) {
         clearInterval(spawnTimerRef.current)
         spawnTimerRef.current = undefined
@@ -257,13 +326,12 @@ export default function BubbleSplash({ sessionId, role, isLocked }: BubbleSplash
       return
     }
 
-    const interval = SPEED_CONFIG[speed].spawnInterval
-    spawnTimerRef.current = setInterval(spawnTimerCallback, interval)
+    spawnTimerRef.current = setInterval(maintainRound, 400)
 
     return () => {
       if (spawnTimerRef.current) clearInterval(spawnTimerRef.current)
     }
-  }, [isPlaying, speed, spawnTimerCallback])
+  }, [isPlaying, isTherapist, maintainRound])
 
   const removeExpiredBubbles = useCallback(() => {
     setBubbles((prev) => {
@@ -369,29 +437,35 @@ export default function BubbleSplash({ sessionId, role, isLocked }: BubbleSplash
     setIsPlaying(next)
     writeToFirestore({ 'moduleState.bsIsPlaying': next })
 
+    if (!next) {
+      // Stopping clears the round. A leftover prompt in Firestore used to keep
+      // rendering "Pop a sight word!" over an empty canvas next to a Start
+      // button, implying an activity was live when it was not.
+      setPrompt('')
+      setCorrectWord('')
+      setRoundWords([])
+      setBubbles([])
+      setWaitingForTap(true)
+      respawnPendingRef.current = false
+      writeToFirestore({
+        'moduleState.bsPrompt': '',
+        'moduleState.bsCorrectWord': '',
+        'moduleState.bsRoundWords': [],
+        'moduleState.bsBubbles': [],
+      })
+    }
+
     if (!next && score > 0 && isTherapist) {
       logModuleEvent(sessionId, {
-        module: 'bubble-splash-sld',
+        module: 'bubble-splash',
         type: 'practice_summary',
         detail: `Reading Bubbles practice (${wordSet}): ${score} bubble${score === 1 ? '' : 's'} popped correctly`,
       })
     }
 
     if (next) {
-      if (!prompt) {
-        const { prompt: p, correctWord: cw, allWords } = generateRound(wordSet, difficulty, customWords.split(',').map(s => s.trim()).filter(Boolean), customPrompt)
-        setPrompt(p)
-        setCorrectWord(cw)
-        const now = Date.now()
-        const newBubbles = spawnBubbles(allWords, cw, difficulty, now)
-        setBubbles(newBubbles)
-        setWaitingForTap(true)
-        writeToFirestore({
-          'moduleState.bsPrompt': p,
-          'moduleState.bsCorrectWord': cw,
-          'moduleState.bsBubbles': newBubbles.map(b => ({ ...b, spawnedAt: now })),
-        })
-      }
+      // Stopping always clears the round, so starting always begins a fresh one.
+      startNewRound()
     }
   }
 
@@ -399,11 +473,14 @@ export default function BubbleSplash({ sessionId, role, isLocked }: BubbleSplash
     setWordSet(ws)
     setPrompt('')
     setCorrectWord('')
+    setRoundWords([])
     setBubbles([])
+    respawnPendingRef.current = false
     writeToFirestore({
       'moduleState.bsWordSet': ws,
       'moduleState.bsPrompt': '',
       'moduleState.bsCorrectWord': '',
+      'moduleState.bsRoundWords': [],
       'moduleState.bsBubbles': [],
     })
   }
@@ -483,9 +560,21 @@ export default function BubbleSplash({ sessionId, role, isLocked }: BubbleSplash
       >
         {/* TOP — Therapist Controls */}
         {isTherapist && (
-          <div style={{ flexShrink: 0, paddingBottom: 6, borderBottom: '1px solid rgba(255,255,255,0.06)', marginBottom: 6 }}>
+          <div style={{
+            flexShrink: 0,
+            paddingBottom: 8,
+            marginBottom: 8,
+            borderBottom: '1px solid rgba(0,0,0,0.05)',
+            width: '100%',
+            maxWidth: 1000,
+            alignSelf: 'center',
+            display: 'flex',
+            alignItems: 'center',
+            flexWrap: 'wrap',
+            gap: 12,
+          }}>
             {/* Word set selector */}
-            <div className="flex items-center" style={{ gap: 3, marginBottom: 5 }}>
+            <div className="flex items-center" style={{ gap: 6, flex: '2 1 280px' }}>
               {[
                 { key: 'sight-words' as WordSet, label: 'Sight' },
                 { key: 'phonics' as WordSet, label: 'Phonics' },
@@ -498,14 +587,14 @@ export default function BubbleSplash({ sessionId, role, isLocked }: BubbleSplash
                   onClick={() => handleWordSetChange(ws.key)}
                   style={{
                     flex: 1,
-                    padding: '3px 0',
+                    padding: '6px 0',
                     borderRadius: 12,
                     border: 'none',
-                    fontSize: 7,
+                    fontSize: 11,
                     fontWeight: 500,
                     cursor: 'pointer',
-                    background: wordSet === ws.key ? 'rgba(74,124,111,0.3)' : 'rgba(255,255,255,0.07)',
-                    color: wordSet === ws.key ? '#b8d4ce' : 'rgba(255,255,255,0.5)',
+                    background: wordSet === ws.key ? 'rgba(74,124,111,0.18)' : 'rgba(0,0,0,0.05)',
+                    color: wordSet === ws.key ? '#2f6d5e' : '#6b7280',
                     transition: 'all 0.15s',
                   }}
                 >
@@ -516,7 +605,7 @@ export default function BubbleSplash({ sessionId, role, isLocked }: BubbleSplash
 
             {/* Custom words input */}
             {wordSet === 'custom' && (
-              <div style={{ marginBottom: 5 }}>
+              <div style={{ flex: '1 1 220px' }}>
                 <input
                   value={customWords}
                   onChange={(e) => handleCustomWordsChange(e.target.value)}
@@ -525,9 +614,9 @@ export default function BubbleSplash({ sessionId, role, isLocked }: BubbleSplash
                     width: '100%',
                     padding: '4px 8px',
                     borderRadius: 6,
-                    border: '1px solid rgba(255,255,255,0.15)',
-                    background: 'rgba(255,255,255,0.06)',
-                    color: '#fff',
+                    border: '1px solid rgba(0,0,0,0.10)',
+                    background: 'rgba(0,0,0,0.05)',
+                    color: '#2b2f33',
                     fontSize: 8,
                     outline: 'none',
                     marginBottom: 4,
@@ -542,9 +631,9 @@ export default function BubbleSplash({ sessionId, role, isLocked }: BubbleSplash
                     width: '100%',
                     padding: '4px 8px',
                     borderRadius: 6,
-                    border: '1px solid rgba(255,255,255,0.15)',
-                    background: 'rgba(255,255,255,0.06)',
-                    color: '#fff',
+                    border: '1px solid rgba(0,0,0,0.10)',
+                    background: 'rgba(0,0,0,0.05)',
+                    color: '#2b2f33',
                     fontSize: 8,
                     outline: 'none',
                     boxSizing: 'border-box',
@@ -554,7 +643,7 @@ export default function BubbleSplash({ sessionId, role, isLocked }: BubbleSplash
             )}
 
             {/* Difficulty */}
-            <div className="flex items-center" style={{ gap: 3, marginBottom: 5 }}>
+            <div className="flex items-center" style={{ gap: 6, flex: '2 1 280px' }}>
               {[
                 { key: 'easy' as Difficulty, label: 'Easy' },
                 { key: 'medium' as Difficulty, label: 'Medium' },
@@ -568,11 +657,11 @@ export default function BubbleSplash({ sessionId, role, isLocked }: BubbleSplash
                     padding: '3px 0',
                     borderRadius: 12,
                     border: 'none',
-                    fontSize: 8,
+                    fontSize: 11,
                     fontWeight: 500,
                     cursor: 'pointer',
-                    background: difficulty === d.key ? 'rgba(74,124,111,0.3)' : 'rgba(255,255,255,0.07)',
-                    color: difficulty === d.key ? '#b8d4ce' : 'rgba(255,255,255,0.5)',
+                    background: difficulty === d.key ? 'rgba(74,124,111,0.18)' : 'rgba(0,0,0,0.05)',
+                    color: difficulty === d.key ? '#2f6d5e' : '#6b7280',
                     transition: 'all 0.15s',
                   }}
                 >
@@ -582,7 +671,7 @@ export default function BubbleSplash({ sessionId, role, isLocked }: BubbleSplash
             </div>
 
             {/* Speed */}
-            <div className="flex items-center" style={{ gap: 3, marginBottom: 5 }}>
+            <div className="flex items-center" style={{ gap: 6, flex: '2 1 280px' }}>
               {[
                 { key: 'slow' as Speed, label: 'Slow' },
                 { key: 'normal' as Speed, label: 'Normal' },
@@ -596,11 +685,11 @@ export default function BubbleSplash({ sessionId, role, isLocked }: BubbleSplash
                     padding: '3px 0',
                     borderRadius: 12,
                     border: 'none',
-                    fontSize: 8,
+                    fontSize: 11,
                     fontWeight: 500,
                     cursor: 'pointer',
-                    background: speed === s.key ? 'rgba(74,124,111,0.3)' : 'rgba(255,255,255,0.07)',
-                    color: speed === s.key ? '#b8d4ce' : 'rgba(255,255,255,0.5)',
+                    background: speed === s.key ? 'rgba(74,124,111,0.18)' : 'rgba(0,0,0,0.05)',
+                    color: speed === s.key ? '#2f6d5e' : '#6b7280',
                     transition: 'all 0.15s',
                   }}
                 >
@@ -613,15 +702,15 @@ export default function BubbleSplash({ sessionId, role, isLocked }: BubbleSplash
             <button
               onClick={handleTogglePlaying}
               style={{
-                width: '100%',
-                padding: '5px 0',
-                borderRadius: 8,
+                flex: '0 0 auto',
+                padding: '6px 18px',
+                borderRadius: 12,
                 border: 'none',
-                fontSize: 10,
+                fontSize: 12,
                 fontWeight: 600,
                 cursor: 'pointer',
-                background: isPlaying ? 'rgba(200,96,42,0.25)' : 'rgba(74,124,111,0.3)',
-                color: isPlaying ? '#c8602a' : '#b8d4ce',
+                background: isPlaying ? 'rgba(200,96,42,0.16)' : 'rgba(74,124,111,0.18)',
+                color: isPlaying ? '#c8602a' : '#2f6d5e',
                 transition: 'all 0.15s',
               }}
             >
@@ -632,23 +721,23 @@ export default function BubbleSplash({ sessionId, role, isLocked }: BubbleSplash
 
         {/* Locked notice */}
         {!canInteract && (
-          <div style={{ flexShrink: 0, fontSize: 9, color: 'rgba(255,255,255,0.4)', textAlign: 'center', paddingBottom: 4 }}>
+          <div style={{ flexShrink: 0, fontSize: 9, color: '#8b9096', textAlign: 'center', paddingBottom: 4 }}>
             Therapist is controlling
           </div>
         )}
 
         {/* Prompt display */}
-        {prompt && (
+        {isPlaying && prompt && (
           <div
             style={{
               flexShrink: 0,
-              background: 'rgba(255,255,255,0.07)',
-              border: '1px solid rgba(255,255,255,0.1)',
+              background: 'rgba(0,0,0,0.05)',
+              border: '1px solid rgba(0,0,0,0.08)',
               borderRadius: 10,
               padding: '10px 14px',
               fontSize: 13,
               fontWeight: 500,
-              color: '#fff',
+              color: '#2b2f33',
               textAlign: 'center',
               marginBottom: 6,
               animation: 'bsFadeUp 0.3s ease',
@@ -659,20 +748,27 @@ export default function BubbleSplash({ sessionId, role, isLocked }: BubbleSplash
         )}
 
         {/* Waiting state */}
-        {!isPlaying && !prompt && (
+        {!isPlaying && (
           <div style={{ flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-            <span style={{ fontSize: 11, color: 'rgba(255,255,255,0.4)' }}>
+            <span style={{ fontSize: 11, color: '#8b9096' }}>
               {isTherapist ? 'Press Start to begin' : 'Waiting for therapist to start...'}
             </span>
           </div>
         )}
 
         {/* MIDDLE — Bubble Canvas */}
-        {(isPlaying || prompt) && (
+        {isPlaying && (
           <div
             style={{
               flex: 1,
-              minHeight: 0,
+              // Every bubble is absolutely positioned, so this box has no
+              // intrinsic height, and `flex: 1` does nothing because the real
+              // parent (GlassModulePanel's .gm-canvas) is a block box, not a flex
+              // column. With minHeight: 0 it collapsed to 0px and overflow:hidden
+              // clipped every bubble — the module rendered completely empty.
+              // Bubbles start at bottom:-80 and rise 400px, so the canvas needs
+              // enough height for that travel to be visible.
+              minHeight: 340,
               position: 'relative',
               overflow: 'hidden',
             }}
@@ -716,11 +812,11 @@ export default function BubbleSplash({ sessionId, role, isLocked }: BubbleSplash
                     height: bubble.size,
                     borderRadius: '50%',
                     background: bgColor,
-                    border: '1.5px solid rgba(255,255,255,0.25)',
+                    border: '1.5px solid rgba(0,0,0,0.18)',
                     display: 'flex',
                     alignItems: 'center',
                     justifyContent: 'center',
-                    boxShadow: 'inset 0 -4px 8px rgba(0,0,0,0.15), inset 0 4px 8px rgba(255,255,255,0.2)',
+                    boxShadow: 'inset 0 -4px 8px rgba(0,0,0,0.15), inset 0 4px 8px rgba(0,0,0,0.16)',
                     animation: `${animName} ${animDuration} ease-in-out ${animFill}`,
                     animationDelay: bubble.state === 'floating' ? `${animDelay}s` : '0s',
                     cursor: canInteract && isPlaying && bubble.state === 'floating' && waitingForTap ? 'pointer' : 'default',
@@ -738,7 +834,7 @@ export default function BubbleSplash({ sessionId, role, isLocked }: BubbleSplash
                       width: '35%',
                       height: '25%',
                       borderRadius: '50%',
-                      background: 'rgba(255,255,255,0.35)',
+                      background: 'rgba(0,0,0,0.24)',
                       pointerEvents: 'none',
                     }}
                   />
@@ -747,7 +843,7 @@ export default function BubbleSplash({ sessionId, role, isLocked }: BubbleSplash
                     style={{
                       fontSize: bubble.size >= 64 ? 13 : 11,
                       fontWeight: 500,
-                      color: '#fff',
+                      color: '#2b2f33',
                       textShadow: '0 1px 3px rgba(0,0,0,0.4)',
                       textAlign: 'center',
                       padding: 4,
@@ -769,7 +865,7 @@ export default function BubbleSplash({ sessionId, role, isLocked }: BubbleSplash
                         width: 6,
                         height: 6,
                         borderRadius: '50%',
-                        background: '#b8d4ce',
+                        background: '#2f6d5e',
                         left: '50%',
                         top: '50%',
                         animation: 'bsSplash 0.5s ease forwards',
@@ -810,15 +906,15 @@ export default function BubbleSplash({ sessionId, role, isLocked }: BubbleSplash
             alignItems: 'center',
             justifyContent: 'space-between',
             paddingTop: 6,
-            borderTop: '1px solid rgba(255,255,255,0.06)',
+            borderTop: '1px solid rgba(0,0,0,0.05)',
             marginTop: 6,
             position: 'relative',
           }}
         >
-          <span style={{ fontSize: 11, color: 'rgba(255,255,255,0.55)' }}>
+          <span style={{ fontSize: 11, color: '#646a72' }}>
             💧 {score} bubbles popped
           </span>
-          <span style={{ fontSize: 11, color: 'rgba(255,255,255,0.55)' }}>
+          <span style={{ fontSize: 11, color: '#646a72' }}>
             ⚡ {streak} in a row
           </span>
 
@@ -832,7 +928,7 @@ export default function BubbleSplash({ sessionId, role, isLocked }: BubbleSplash
                 transform: 'translateX(-50%)',
                 fontSize: 9,
                 fontWeight: 600,
-                color: '#fff',
+                color: '#2b2f33',
                 background: 'rgba(74,124,111,0.85)',
                 padding: '2px 10px',
                 borderRadius: 8,

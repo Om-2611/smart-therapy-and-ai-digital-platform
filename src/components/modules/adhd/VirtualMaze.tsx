@@ -4,6 +4,8 @@ import { useState, useEffect, useRef, useCallback } from 'react'
 import { doc, onSnapshot, updateDoc } from 'firebase/firestore'
 import { db } from '@/lib/firebase'
 import { logModuleEvent } from '@/lib/sessionEvents'
+import { staadPraise } from '@/lib/voice/staadVoice'
+import { useVoiceLanguage } from '@/lib/voice/useVoiceLanguage'
 
 interface VirtualMazeProps {
   sessionId: string
@@ -51,10 +53,10 @@ const THEME_COLORS: Record<ThemeName, {
 }> = {
   calm: {
     wall: '#2d4a42',
-    path: 'rgba(255,255,255,0.04)',
+    path: 'rgba(0,0,0,0.04)',
     player: '#4a7c6f',
-    playerBorder: '#b8d4ce',
-    goal: 'rgba(200,96,42,0.3)',
+    playerBorder: '#2f6d5e',
+    goal: 'rgba(200,96,42,0.18)',
     goalBorder: 'rgba(200,96,42,0.6)',
     visited: 'rgba(74,124,111,0.12)',
     playerEmoji: '🧩',
@@ -150,6 +152,10 @@ function formatTime(seconds: number): string {
 export default function VirtualMaze({ sessionId, role, isLocked }: VirtualMazeProps) {
   const isTherapist = role === 'therapist'
   const canInteract = isTherapist || !isLocked
+
+  const voiceLanguage = useVoiceLanguage(sessionId)
+  const voiceLangRef = useRef(voiceLanguage)
+  voiceLangRef.current = voiceLanguage
 
   const [difficulty, setDifficulty] = useState<Difficulty>('easy')
   const [themeName, setThemeName] = useState<ThemeName>('calm')
@@ -325,11 +331,7 @@ export default function VirtualMaze({ sessionId, role, isLocked }: VirtualMazePr
       setCompletionTime(elapsedSeconds)
       setBumpCell('')
 
-      if ('speechSynthesis' in window) {
-        const utterance = new SpeechSynthesisUtterance('Amazing! You found the way out!')
-        utterance.rate = 1.1
-        window.speechSynthesis.speak(utterance)
-      }
+      staadPraise(voiceLangRef.current, 'Amazing! You found the way out!')
 
       writeToFirestore({
         'moduleState.vmPlayerPos': newPos,
@@ -457,19 +459,20 @@ export default function VirtualMaze({ sessionId, role, isLocked }: VirtualMazePr
   }, [])
 
   const pillStyle = (active: boolean) => ({
-    padding: '5px 10px',
+    padding: '6px 12px',
     borderRadius: 20,
     border: `1px solid ${active ? 'var(--sage)' : 'var(--glass-border)'}`,
     background: active ? 'var(--sage-light)' : 'transparent',
     color: active ? 'var(--sage-mid)' : 'var(--ink-muted)',
-    fontSize: 10,
+    fontSize: 11,
     fontWeight: 500,
     cursor: 'pointer',
+    whiteSpace: 'nowrap',
     transition: 'all 0.15s',
   } as React.CSSProperties)
 
   const statsRow = (
-    <div style={{ fontSize: 10, color: 'rgba(255,255,255,0.45)', display: 'flex', gap: 16, justifyContent: 'center', padding: '6px 0' }}>
+    <div style={{ fontSize: 10, color: '#7c8188', display: 'flex', gap: 16, justifyContent: 'center', padding: '6px 0' }}>
       <span>⏱️ {formatTime(elapsed)}</span>
       <span>🚫 {wrongMoves} wrong</span>
       <span>📍 {visited.length} cells</span>
@@ -518,7 +521,7 @@ export default function VirtualMaze({ sessionId, role, isLocked }: VirtualMazePr
         key={idx}
         style={{
           width: '100%',
-          aspectRatio: '1',
+          height: '100%',
           background: bg,
           border,
           display: 'flex',
@@ -554,9 +557,19 @@ export default function VirtualMaze({ sessionId, role, isLocked }: VirtualMazePr
 
       {/* Therapist controls */}
       {isTherapist && (
-        <div style={{ flexShrink: 0, padding: '0 0 6px 0' }}>
+        <div style={{
+          flexShrink: 0,
+          padding: '0 0 8px 0',
+          width: '100%',
+          maxWidth: 1000,
+          alignSelf: 'center',
+          display: 'flex',
+          alignItems: 'center',
+          flexWrap: 'wrap',
+          gap: 12,
+        }}>
           {/* Difficulty */}
-          <div style={{ display: 'flex', gap: 4, marginBottom: 6, flexWrap: 'wrap' }}>
+          <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
             {DIFFICULTY_LABELS.map((d) => (
               <button key={d.key} onClick={() => handleDifficultyChange(d.key)} style={pillStyle(difficulty === d.key)}>
                 {d.label}
@@ -565,7 +578,7 @@ export default function VirtualMaze({ sessionId, role, isLocked }: VirtualMazePr
           </div>
 
           {/* Theme */}
-          <div style={{ display: 'flex', gap: 4, marginBottom: 6, flexWrap: 'wrap' }}>
+          <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
             {THEME_LIST.map((t) => (
               <button key={t.key} onClick={() => handleThemeChange(t.key)} style={pillStyle(themeName === t.key)}>
                 {t.label}
@@ -574,7 +587,7 @@ export default function VirtualMaze({ sessionId, role, isLocked }: VirtualMazePr
           </div>
 
           {/* Timer */}
-          <div style={{ display: 'flex', gap: 6, marginBottom: 6, alignItems: 'center', flexWrap: 'wrap' }}>
+          <div style={{ display: 'flex', gap: 6, alignItems: 'center', flexWrap: 'wrap' }}>
             <button onClick={() => {
               const next = !timerMode
               setTimerMode(next)
@@ -594,7 +607,7 @@ export default function VirtualMaze({ sessionId, role, isLocked }: VirtualMazePr
           </div>
 
           {/* New Maze */}
-          <div style={{ display: 'flex', gap: 4, marginBottom: 4 }}>
+          <div style={{ display: 'flex', gap: 6 }}>
             <button onClick={handleNewMaze} style={{
               ...pillStyle(false),
               background: 'var(--sage-light)',
@@ -605,9 +618,12 @@ export default function VirtualMaze({ sessionId, role, isLocked }: VirtualMazePr
             </button>
           </div>
 
-          {/* Stats bar */}
-          {mazeReady && !completed && statsRow}
         </div>
+      )}
+
+      {/* Stats bar — its own row, below the control band. */}
+      {isTherapist && mazeReady && !completed && (
+        <div style={{ flexShrink: 0 }}>{statsRow}</div>
       )}
 
       {/* No maze yet */}
@@ -644,7 +660,7 @@ export default function VirtualMaze({ sessionId, role, isLocked }: VirtualMazePr
               padding: '4px 0',
               fontFamily: "'DM Serif Display', serif",
               fontSize: 20,
-              color: timeRemaining <= 10 ? '#c8602a' : 'rgba(255,255,255,0.8)',
+              color: timeRemaining <= 10 ? '#c8602a' : '#3d4348',
               animation: timeRemaining <= 10 ? 'vmTimerPulse 1s ease infinite' : 'none',
               flexShrink: 0,
             }}>
@@ -652,9 +668,20 @@ export default function VirtualMaze({ sessionId, role, isLocked }: VirtualMazePr
             </div>
           )}
 
-          {/* Maze grid area */}
+          {/* Play row: maze on the left, D-pad beside it. The wide canvas has
+              horizontal room to spare and very little vertical room, so putting
+              the controls alongside gives the maze the full remaining height. */}
           <div style={{
             flex: 1,
+            minHeight: 0,
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            gap: 24,
+          }}>
+          {/* Maze grid area */}
+          <div style={{
+            height: '100%',
             display: 'flex',
             alignItems: 'center',
             justifyContent: 'center',
@@ -674,16 +701,16 @@ export default function VirtualMaze({ sessionId, role, isLocked }: VirtualMazePr
                 padding: 20,
               }}>
                 <div style={{ textAlign: 'center' }}>
-                  <div style={{ fontFamily: "'DM Serif Display', serif", fontSize: 20, color: '#fff', marginBottom: 12 }}>
+                  <div style={{ fontFamily: "'DM Serif Display', serif", fontSize: 20, color: '#2b2f33', marginBottom: 12 }}>
                     🎉 Maze Complete!
                   </div>
-                  <div style={{ fontSize: 11, color: 'rgba(255,255,255,0.6)', marginBottom: 4 }}>
+                  <div style={{ fontSize: 11, color: '#5b6169', marginBottom: 4 }}>
                     Time: {formatTime(completionTime)}
                   </div>
-                  <div style={{ fontSize: 11, color: 'rgba(255,255,255,0.6)', marginBottom: 8 }}>
+                  <div style={{ fontSize: 11, color: '#5b6169', marginBottom: 8 }}>
                     Wrong moves: {wrongMoves}
                   </div>
-                  <div style={{ fontSize: 14, color: '#fff', marginBottom: 16 }}>
+                  <div style={{ fontSize: 14, color: '#2b2f33', marginBottom: 16 }}>
                     {getRating(wrongMoves).stars} {getRating(wrongMoves).text}
                   </div>
                   {isTherapist && (
@@ -705,8 +732,8 @@ export default function VirtualMaze({ sessionId, role, isLocked }: VirtualMazePr
                           padding: '8px 16px',
                           borderRadius: 8,
                           border: '1px solid var(--glass-border)',
-                          background: 'rgba(255,255,255,0.08)',
-                          color: '#fff',
+                          background: 'rgba(0,0,0,0.06)',
+                          color: '#2b2f33',
                           fontSize: 11,
                           fontWeight: 600,
                           cursor: 'pointer',
@@ -736,10 +763,10 @@ export default function VirtualMaze({ sessionId, role, isLocked }: VirtualMazePr
                   <div style={{ fontFamily: "'DM Serif Display', serif", fontSize: 20, color: '#c8602a', marginBottom: 12 }}>
                     ⏰ Time's Up!
                   </div>
-                  <div style={{ fontSize: 11, color: 'rgba(255,255,255,0.6)', marginBottom: 4 }}>
+                  <div style={{ fontSize: 11, color: '#5b6169', marginBottom: 4 }}>
                     Wrong moves: {wrongMoves}
                   </div>
-                  <div style={{ fontSize: 11, color: 'rgba(255,255,255,0.6)', marginBottom: 16 }}>
+                  <div style={{ fontSize: 11, color: '#5b6169', marginBottom: 16 }}>
                     Cells visited: {visited.length}
                   </div>
                   <button onClick={() => {
@@ -766,10 +793,15 @@ export default function VirtualMaze({ sessionId, role, isLocked }: VirtualMazePr
               style={{
                 display: 'grid',
                 gridTemplateColumns: `repeat(${gridSize}, 1fr)`,
-                width: '100%',
-                maxWidth: 380,
+                gridTemplateRows: `repeat(${gridSize}, 1fr)`,
+                // Square sized from AVAILABLE HEIGHT, not width. Driving it from
+                // width (maxWidth: 380) made the grid taller than the canvas, and
+                // the parent's overflow:hidden clipped every row but the first.
+                height: '100%',
+                aspectRatio: '1',
+                maxWidth: '100%',
                 gap: 0,
-                border: '1px solid rgba(255,255,255,0.06)',
+                border: '1px solid rgba(0,0,0,0.05)',
                 borderRadius: 4,
                 overflow: 'hidden',
                 position: 'relative',
@@ -780,7 +812,7 @@ export default function VirtualMaze({ sessionId, role, isLocked }: VirtualMazePr
           </div>
 
           {/* Direction buttons + lock overlay */}
-          <div style={{ flexShrink: 0, padding: '6px 0 0 0', position: 'relative' }}>
+          <div style={{ flexShrink: 0, position: 'relative' }}>
             {!canInteract && mazeReady && !completed && !timeUp && (
               <div style={{
                 position: 'absolute',
@@ -799,8 +831,8 @@ export default function VirtualMaze({ sessionId, role, isLocked }: VirtualMazePr
             )}
             <div style={{
               display: 'grid',
-              gridTemplateColumns: 'repeat(3, 44px)',
-              gridTemplateRows: 'repeat(3, 44px)',
+              gridTemplateColumns: 'repeat(3, 38px)',
+              gridTemplateRows: 'repeat(3, 38px)',
               gap: 4,
               justifyContent: 'center',
               padding: '4px 0',
@@ -817,9 +849,9 @@ export default function VirtualMaze({ sessionId, role, isLocked }: VirtualMazePr
                       width: 44,
                       height: 44,
                       borderRadius: 10,
-                      background: 'rgba(255,255,255,0.07)',
-                      border: '1px solid rgba(255,255,255,0.12)',
-                      color: '#fff',
+                      background: 'rgba(0,0,0,0.05)',
+                      border: '1px solid rgba(0,0,0,0.07)',
+                      color: '#2b2f33',
                       fontSize: 18,
                       cursor: canInteract ? 'pointer' : 'not-allowed',
                       transition: 'all 0.15s',
@@ -838,6 +870,7 @@ export default function VirtualMaze({ sessionId, role, isLocked }: VirtualMazePr
                 )
               })}
             </div>
+          </div>
           </div>
         </div>
       )}

@@ -4,6 +4,7 @@ import React, { useState, useEffect } from 'react';
 import { useAuthStore } from '@/store/useAuthStore';
 import { updateModuleState, subscribeToModuleState } from '@/services/sessionSync';
 import { logModuleEvent } from '@/lib/sessionEvents';
+import { staadSpeak, staadCancel } from '@/lib/voice/staadVoice';
 
 interface CalcState {
   display: string;
@@ -63,12 +64,9 @@ export default function TalkingCalculatorModule({ sessionId, isLocked }: Talking
     updateModuleState(sessionId, 'talking_calculator', nextState, uid || 'anonymous');
 
     // Synthesis speech browser compatibility support
-    if (typeof window !== 'undefined' && 'speechSynthesis' in window) {
-      window.speechSynthesis.cancel();
-      const utterance = new SpeechSynthesisUtterance(nextSpeech);
-      utterance.rate = 0.9;
-      window.speechSynthesis.speak(utterance);
-    }
+    // Numbers and operators are read out in English.
+    staadCancel();
+    staadSpeak({ text: nextSpeech, language: 'en-IN', type: 'feedback' });
   };
 
   return (

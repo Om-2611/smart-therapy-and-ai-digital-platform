@@ -28,25 +28,41 @@ function rowColor(row: number, a: number): string {
   return `rgba(${r},${g},${b},${a})`
 }
 
+/**
+ * Position the balloons and report how tall the canvas must be to show them all.
+ *
+ * The canvas is `position: relative` and every balloon is absolutely positioned,
+ * so the canvas contributes NO content height. It relied on `flex: 1`, which does
+ * nothing because the real parent (GlassModulePanel's .gm-canvas) is a block box,
+ * not a flex column. The canvas therefore collapsed to 0px and `overflow: hidden`
+ * clipped every balloon — the launch worked, the balloons existed, and nothing was
+ * ever visible. Returning `height` lets the canvas claim the space it needs.
+ */
 function balloonLayout(worries: string[], w: number, h: number) {
-  if (w < 60 || h < 60 || worries.length === 0) return []
+  if (worries.length === 0) return { items: [], height: 0 }
+  const width = Math.max(240, w)
   const n = worries.length
-  const cols = Math.max(1, Math.ceil(Math.sqrt(n * 1.4)))
-  const gap = Math.max(90, Math.floor(w / (cols + 1)))
-  return worries.map((worry, i) => {
+  const cols = Math.max(1, Math.min(4, Math.ceil(Math.sqrt(n * 1.4))))
+  const gap = Math.max(84, Math.floor(width / (cols + 1)))
+  const rowH = 118
+  const items = worries.map((worry, i) => {
     const col = i % cols
     const row = Math.floor(i / cols)
     return {
       id: `b${i}`,
       worry,
-      x: Math.max(4, Math.min(w - 80, gap * (col + 1) - 35 + (row % 2) * 12)),
-      y: Math.max(4, Math.min(h - 100, 20 + row * 100 + (i % 3) * 8)),
+      x: Math.max(4, Math.min(width - 84, gap * (col + 1) - 40 + (row % 2) * 12)),
+      y: 14 + row * rowH + (i % 3) * 6,
       color: WORRY_COLORS[i % WORRY_COLORS.length],
       size: 70 + (i % 4) * 4,
       dur: 3.5 + (i % 5) * 0.3,
       del: (i % 6) * 0.5,
     }
   })
+  const rows = Math.ceil(n / cols)
+  // Tallest balloon + its string, plus the row offsets.
+  const height = Math.max(h, 14 + rows * rowH + 40)
+  return { items, height }
 }
 
 export default function BoxPopping({ sessionId, role, isLocked }: BoxPoppingProps) {
@@ -58,6 +74,7 @@ export default function BoxPopping({ sessionId, role, isLocked }: BoxPoppingProp
   const [intensity, setIntensity] = useState('normal')
   const [worries, setWorries] = useState<string[]>([])
   const [launched, setLaunched] = useState(false)
+  const [canvasW, setCanvasW] = useState(0)
   const [popped, setPopped] = useState<string[]>([])
   const [endMood, setEndMood] = useState('')
 
@@ -78,7 +95,11 @@ export default function BoxPopping({ sessionId, role, isLocked }: BoxPoppingProp
   const pk = useRef(0)
 
   const write = useCallback(async (d: Record<string, unknown>) => {
-    try { await updateDoc(doc(db, 'liveSessions', sessionId), { ...d, 'timestamps.updatedAt': new Date().toISOString() }) } catch {}
+    try {
+      await updateDoc(doc(db, 'liveSessions', sessionId), { ...d, 'timestamps.updatedAt': new Date().toISOString() })
+    } catch (err) {
+      console.warn('[BoxPopping] Firestore write failed', err)
+    }
   }, [sessionId])
 
   useEffect(() => {
@@ -96,11 +117,14 @@ export default function BoxPopping({ sessionId, role, isLocked }: BoxPoppingProp
     return () => unsub()
   }, [sessionId])
 
+  // This observer previously destructured width/height and threw them away, so
+  // the layout never reflowed and never knew the real canvas width.
   useEffect(() => {
     const el = cRef.current
     if (!el) return
     const ro = new ResizeObserver((entries) => {
-      const { width, height } = entries[0].contentRect
+      const { width } = entries[0].contentRect
+      setCanvasW((prev) => (Math.abs(prev - width) < 2 ? prev : width))
     })
     ro.observe(el)
     return () => ro.disconnect()
@@ -185,7 +209,9 @@ export default function BoxPopping({ sessionId, role, isLocked }: BoxPoppingProp
     setFloaters(prev => [...prev, ft])
     setTimeout(() => setFloaters(prev => prev.filter(f => f.id !== ft.id)), 1600)
 
-    setTimeout(() => setAnimating(prev => { const n = new Set(prev); n.delete(id); return n }), 450)
+    // Must outlast the 1.6s release animation, or the balloon is unmounted
+    // mid-flight and appears to vanish instead of floating away.
+    setTimeout(() => setAnimating(prev => { const n = new Set(prev); n.delete(id); return n }), 1650)
     write({ 'moduleState.bpPopped': arrayUnion(id) })
   }, [canInteract, poppedSet, write])
 
@@ -236,12 +262,11 @@ export default function BoxPopping({ sessionId, role, isLocked }: BoxPoppingProp
   const gc = GRID_MAP[gridSize] || GRID_MAP.medium
   const iA = intensity === 'gentle' ? 0.3 : intensity === 'satisfying' ? 0.5 : 0.4
 
-  const balloons = useMemo(() => {
-    if (mode !== 'balloon' || !launched) return []
-    const w = cRef.current?.clientWidth || 380
-    const h = cRef.current?.clientHeight || 400
-    return balloonLayout(worries, w, h)
-  }, [worries, launched, mode])
+  const balloonView = useMemo(() => {
+    if (mode !== 'balloon' || !launched) return { items: [], height: 0 }
+    return balloonLayout(worries, canvasW || 380, 0)
+  }, [worries, launched, mode, canvasW])
+  const balloons = balloonView.items
 
   return (
     <>
@@ -249,12 +274,20 @@ export default function BoxPopping({ sessionId, role, isLocked }: BoxPoppingProp
         .cp {animation:cp .3s ease forwards}
         @keyframes cp {0%{transform:scale(1)}30%{transform:scale(.75)}55%{transform:scale(.88)}75%{transform:scale(.82)}100%{transform:scale(1)}}
         @keyframes pb {0%{opacity:1;transform:translate(0,0)scale(1)}100%{opacity:0;transform:translate(var(--dx),var(--dy))scale(0)}}
-        @keyframes bb {0%,100%{transform:translateY(0)rotate(-2deg)}50%{transform:translateY(-10px)rotate(2deg)}}
-        @keyframes bp {0%{transform:scale(1);opacity:1}20%{transform:scale(1.3);opacity:1}40%{transform:scale(.1);opacity:.5}100%{transform:scale(0);opacity:0}}
+        @keyframes bb {0%,100%{transform:translate(-4px,0)rotate(-2deg)}50%{transform:translate(4px,-10px)rotate(2deg)}}
+        /* Release, not just a pop: the balloon swells, lifts, drifts sideways and
+           fades as it floats off — the "letting go of a worry" metaphor. */
+        @keyframes bp {
+          0%{transform:translate(0,0)scale(1);opacity:1}
+          12%{transform:translate(0,-4px)scale(1.12);opacity:1}
+          45%{transform:translate(14px,-90px)scale(.95)rotate(6deg);opacity:.85}
+          75%{transform:translate(-10px,-190px)scale(.85)rotate(-5deg);opacity:.45}
+          100%{transform:translate(6px,-280px)scale(.7)rotate(3deg);opacity:0}
+        }
         @keyframes cb {0%{transform:translate(0,0)scale(1);opacity:1}100%{transform:translate(var(--cdx),var(--cdy))scale(0);opacity:0}}
         @keyframes fu {0%{transform:translateY(0);opacity:1}100%{transform:translateY(-40px);opacity:0}}
         .bb-a {animation:bb ease-in-out infinite}
-        .bp-a {animation:bp .4s ease forwards !important}
+        .bp-a {animation:bp 1.6s cubic-bezier(.33,.0,.55,1) forwards !important}
       `}</style>
 
       {/* Therapist controls */}
@@ -384,7 +417,15 @@ export default function BoxPopping({ sessionId, role, isLocked }: BoxPoppingProp
       )}
 
       {/* Canvas */}
-      <div ref={cRef} style={{ flex: 1, position: 'relative', overflow: 'hidden', minHeight: 0, touchAction: mode === 'wrap' ? 'none' : 'auto' }}
+      <div ref={cRef} style={{
+        flex: 1,
+        position: 'relative',
+        overflow: 'hidden',
+        // Absolutely-positioned balloons give the box no intrinsic height, and
+        // `flex: 1` does nothing in a block parent — so ask for the height.
+        minHeight: mode === 'balloon' && launched ? balloonView.height : 0,
+        touchAction: mode === 'wrap' ? 'none' : 'auto',
+      }}
         onPointerDown={pd} onPointerMove={pm} onPointerUp={pu} onPointerLeave={pu}>
 
         {mode === 'wrap' && (
@@ -423,7 +464,7 @@ export default function BoxPopping({ sessionId, role, isLocked }: BoxPoppingProp
                   className={isA ? 'bp-a' : 'bb-a'}
                   style={{
                     position: 'absolute', left: b.x, top: b.y, display: 'flex', flexDirection: 'column', alignItems: 'center',
-                    cursor: canInteract && !isP ? 'pointer' : 'default', animationDuration: isA ? '.4s' : `${b.dur}s`,
+                    cursor: canInteract && !isP ? 'pointer' : 'default', animationDuration: isA ? '1.6s' : `${b.dur}s`,
                     animationDelay: isA ? '0s' : `${b.del}s`, pointerEvents: isP ? 'none' : 'auto', zIndex: isA ? 10 : 2,
                     animationFillMode: isA ? 'forwards' : undefined,
                   }}

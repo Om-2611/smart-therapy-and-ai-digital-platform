@@ -51,7 +51,14 @@ export async function POST(request: Request) {
 
     // Dev test mode bypasses the both-consent gate so the copilot can be verified
     // solo (matches NEXT_PUBLIC_STT_TEST_MODE used for transcription).
-    const sttTestMode = process.env.NEXT_PUBLIC_STT_TEST_MODE === 'true'
+    //
+    // Hard-gated to non-production for the same reason as the transcription gate:
+    // this path sends session audio transcripts to a third-party LLM, and must
+    // not run on a real deployment without both parties having consented,
+    // whatever the environment file happens to say.
+    const sttTestMode =
+      process.env.NEXT_PUBLIC_STT_TEST_MODE === 'true' &&
+      process.env.NODE_ENV !== 'production'
     const consent = await checkAIConsent(sessionId)
     if (!consent && !sttTestMode) {
       return NextResponse.json(
