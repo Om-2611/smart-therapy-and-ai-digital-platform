@@ -5,6 +5,8 @@ import { doc, onSnapshot, updateDoc, arrayUnion, increment } from 'firebase/fire
 import { db } from '@/lib/firebase'
 import { logModuleEvent } from '@/lib/sessionEvents'
 import { AnimatePresence, motion } from 'motion/react'
+import { AnimatedScene } from './shared/animationVerbs'
+import type { SceneMeta } from './shared/sceneTypes'
 
 interface StoryChoiceAdventureProps {
   sessionId: string
@@ -940,6 +942,46 @@ const DEVANAGARI = "'Noto Sans Devanagari', 'DM Sans', sans-serif"
 
 const scenariosFor = (level: Level) => SCENARIOS.filter((s) => s.level === level)
 
+/* ══════════════════════════════════════════════════════════════════════
+   ILLUSTRATED SCENE SYSTEM  —  reusable, built once, applied to all 30
+   scenarios via SCENE_META tags. No scenario text/data is touched.
+   ══════════════════════════════════════════════════════════════════════ */
+
+/* Per-scenario scene tags — text data lives untouched in SCENARIOS above.
+   Each of the 30 ids maps to one of the 5 animation verbs + a setting. */
+const SCENE_META: Record<string, SceneMeta> = {
+  easy_1: { verb: 'waiting', setting: 'home', pose: 'sad', shirt: '#4a7c6f', bubble: 'HMM...' },
+  easy_2: { verb: 'waiting', setting: 'classroom', pose: 'worried', shirt: '#e08a3c', bubble: 'HMM...' },
+  easy_3: { verb: 'spill', setting: 'classroom', pose: 'worried', shirt: '#4a7c6f', bubble: 'OOPS!!', object: 'cup' },
+  easy_4: { verb: 'social', setting: 'home', pose: 'happy', shirt: '#4a7c6f', friendShirt: '#d95c7a', bubble: 'HI!' },
+  easy_5: { verb: 'social', setting: 'playground', pose: 'surprised', shirt: '#3d84c6', friendShirt: '#f0b400', bubble: 'YAY!' },
+  easy_6: { verb: 'waiting', setting: 'classroom', pose: 'worried', shirt: '#6b5ce7', bubble: 'HMM...' },
+  easy_7: { verb: 'accident', setting: 'playground', pose: 'worried', shirt: '#4a7c6f', bubble: 'OH NO...' },
+  easy_8: { verb: 'achievement', setting: 'home', pose: 'happy', shirt: '#4a7c6f', bubble: 'YAY!!' },
+  easy_9: { verb: 'achievement', setting: 'classroom', pose: 'happy', shirt: '#3d84c6', bubble: 'WOOHOO!' },
+  easy_10: { verb: 'social', setting: 'canteen', pose: 'happy', shirt: '#4a7c6f', friendShirt: '#e08a3c', bubble: 'YAY!' },
+  mod_11: { verb: 'waiting', setting: 'classroom', pose: 'worried', shirt: '#4a7c6f', bubble: 'HMM...' },
+  mod_12: { verb: 'accident', setting: 'classroom', pose: 'worried', shirt: '#4a7c6f', bubble: 'UH OH...' },
+  mod_13: { verb: 'accident', setting: 'playground', pose: 'sad', shirt: '#c0504a', bubble: 'OH NO...' },
+  mod_14: { verb: 'waiting', setting: 'classroom', pose: 'sad', shirt: '#4a7c6f', bubble: 'HMM...' },
+  mod_15: { verb: 'waiting', setting: 'classroom', pose: 'worried', shirt: '#4a7c6f', bubble: 'HMM...' },
+  mod_16: { verb: 'waiting', setting: 'hallway', pose: 'sad', shirt: '#4a7c6f', bubble: 'HMM...' },
+  mod_17: { verb: 'accident', setting: 'classroom', pose: 'sad', shirt: '#4a7c6f', bubble: 'OH NO...', object: 'book' },
+  mod_18: { verb: 'accident', setting: 'home', pose: 'worried', shirt: '#4a7c6f', bubble: 'UH OH...', object: 'shoe' },
+  mod_19: { verb: 'waiting', setting: 'classroom', pose: 'worried', shirt: '#4a7c6f', bubble: 'HMM...' },
+  mod_20: { verb: 'waiting', setting: 'park', pose: 'worried', shirt: '#4a7c6f', bubble: 'HMM...' },
+  adv_21: { verb: 'waiting', setting: 'playground', pose: 'worried', shirt: '#4a7c6f', bubble: 'HMM...' },
+  adv_22: { verb: 'waiting', setting: 'park', pose: 'worried', shirt: '#4a7c6f', bubble: 'HMM...' },
+  adv_23: { verb: 'waiting', setting: 'classroom', pose: 'worried', shirt: '#4a7c6f', bubble: 'HMM...' },
+  adv_24: { verb: 'waiting', setting: 'classroom', pose: 'worried', shirt: '#4a7c6f', bubble: 'HMM...' },
+  adv_25: { verb: 'waiting', setting: 'playground', pose: 'surprised', shirt: '#4a7c6f', bubble: 'HMM...' },
+  adv_26: { verb: 'waiting', setting: 'canteen', pose: 'sad', shirt: '#4a7c6f', bubble: 'HMM...' },
+  adv_27: { verb: 'waiting', setting: 'playground', pose: 'worried', shirt: '#4a7c6f', bubble: 'HMM...' },
+  adv_28: { verb: 'accident', setting: 'home', pose: 'worried', shirt: '#4a7c6f', bubble: 'UH OH...', object: 'phone' },
+  adv_29: { verb: 'social', setting: 'hallway', pose: 'worried', shirt: '#4a7c6f', friendShirt: '#f0b400', bubble: 'HMM...' },
+  adv_30: { verb: 'waiting', setting: 'hallway', pose: 'worried', shirt: '#4a7c6f', bubble: 'HMM...' },
+}
+
 export default function StoryChoiceAdventure({ sessionId, role, isLocked }: StoryChoiceAdventureProps) {
   const isT = role === 'therapist'
   const canInteract = isT || !isLocked
@@ -950,6 +992,9 @@ export default function StoryChoiceAdventure({ sessionId, role, isLocked }: Stor
   const [level, setLevel] = useState<Level>('easy')
   const [language, setLanguage] = useState<Lang>('both')
   const [levelComplete, setLevelComplete] = useState(false)
+  // Therapist-only, private UI toggle for the facilitator questions popover.
+  // Local state only — intentionally NOT synced to Firestore.
+  const [facOpen, setFacOpen] = useState(false)
 
   const write = useCallback(async (d: Record<string, unknown>) => {
     try { await updateDoc(doc(db, 'liveSessions', sessionId), { ...d, 'timestamps.updatedAt': new Date().toISOString() }) } catch {}
@@ -1041,7 +1086,13 @@ export default function StoryChoiceAdventure({ sessionId, role, isLocked }: Stor
   const badge = LEVEL_BADGE[level]
 
   return (
-    <div style={{ display: 'flex', flexDirection: 'column', gap: 8, width: '100%', maxWidth: 420, color: '#fff' }}>
+    <div
+      style={{
+        display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'safe center',
+        minHeight: '100%', width: '100%', overflowY: 'auto', color: '#fff', padding: '12px 0',
+      }}
+    >
+      <div style={{ display: 'flex', flexDirection: 'column', gap: 20, width: '100%', maxWidth: 760, padding: 24 }}>
       {/* 1 — Header */}
       <div style={{ display: 'flex', alignItems: 'center', gap: 8, minHeight: 40 }}>
         <span style={{ flexShrink: 0, background: badge.bg, color: badge.color, fontSize: 10, fontWeight: 700, padding: '3px 9px', borderRadius: 999 }}>
@@ -1186,7 +1237,7 @@ export default function StoryChoiceAdventure({ sessionId, role, isLocked }: Stor
             )}
           </motion.div>
         ) : (
-          <motion.div key="play" style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+          <motion.div key="play" style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
             {/* 3 — Scenario card */}
             <AnimatePresence mode="wait">
               <motion.div
@@ -1197,85 +1248,98 @@ export default function StoryChoiceAdventure({ sessionId, role, isLocked }: Stor
                 transition={{ duration: 0.32, ease: 'easeOut' }}
                 style={{
                   background: 'rgba(255,255,255,0.06)', border: '1px solid rgba(255,255,255,0.10)',
-                  borderRadius: 14, padding: 16, position: 'relative',
+                  borderRadius: 14, position: 'relative', overflow: 'hidden',
                 }}
               >
-                <div style={{ position: 'absolute', top: 10, right: 14, fontSize: 10, color: 'rgba(255,255,255,0.35)' }}>
+                <div style={{ position: 'absolute', top: 10, right: 12, fontSize: 10, fontWeight: 600, color: '#5a4632', background: 'rgba(255,255,255,0.72)', padding: '1px 8px', borderRadius: 999, zIndex: 8 }}>
                   Scenario {idx + 1}
                 </div>
-                {showEn && (
-                  <div style={{ fontSize: bodySize, color: 'rgba(255,255,255,0.9)', lineHeight: 1.45, paddingRight: 62 }}>
-                    {scenario.en}
-                  </div>
-                )}
-                {language === 'both' && (
-                  <div style={{ height: 1, background: 'rgba(255,255,255,0.10)', margin: '8px 0' }} />
-                )}
-                {showHi && (
-                  <div style={{ fontSize: bodySize, color: language === 'both' ? 'rgba(255,255,255,0.65)' : 'rgba(255,255,255,0.9)', lineHeight: 1.5, fontFamily: DEVANAGARI, paddingRight: showEn ? 0 : 62 }}>
-                    {scenario.hi}
-                  </div>
-                )}
+                {/* Illustrated animated scene — shows the moment before any text */}
+                <AnimatedScene meta={SCENE_META[scenario.id] ?? { verb: 'waiting', setting: 'classroom', pose: 'worried', shirt: '#4a7c6f', bubble: 'HMM...' }} />
+                <div style={{ padding: 14 }}>
+                  {showEn && (
+                    <div style={{ fontSize: bodySize, color: 'rgba(255,255,255,0.9)', lineHeight: 1.45 }}>
+                      {scenario.en}
+                    </div>
+                  )}
+                  {language === 'both' && (
+                    <div style={{ height: 1, background: 'rgba(255,255,255,0.10)', margin: '8px 0' }} />
+                  )}
+                  {showHi && (
+                    <div style={{ fontSize: bodySize, color: language === 'both' ? 'rgba(255,255,255,0.65)' : 'rgba(255,255,255,0.9)', lineHeight: 1.5, fontFamily: DEVANAGARI }}>
+                      {scenario.hi}
+                    </div>
+                  )}
+                </div>
               </motion.div>
             </AnimatePresence>
 
-            {/* 4 — Choice buttons */}
-            <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+            {/* 4 — Choice cards (visual-fork style: icon-ring + letter badge) */}
+            <div style={{ display: 'flex', gap: 14, width: '100%' }}>
               {scenario.choices.map((choice, i) => {
                 const isSel = selected === choice.label
                 const dimmed = selected !== null && !isSel
                 const sel = isSel ? SELECTED_STYLE[choice.quality] : null
                 return (
-                  <motion.div
+                  <motion.button
                     key={`${scenario.id}-${choice.label}`}
-                    initial={{ opacity: 0, x: -12 }}
-                    animate={{ opacity: dimmed ? 0.45 : 1, x: 0 }}
+                    initial={{ opacity: 0, y: 12 }}
+                    animate={{ opacity: dimmed ? 0.45 : 1, y: 0 }}
                     transition={{ delay: selected ? 0 : i * 0.1, duration: 0.28, ease: 'easeOut' }}
+                    onClick={() => handleSelect(choice)}
+                    disabled={!canInteract || selected !== null}
+                    style={{
+                      flex: 1, minWidth: 0, borderRadius: 18, padding: '20px 14px 16px', minHeight: 140,
+                      display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', gap: 12,
+                      position: 'relative', textAlign: 'center',
+                      background: sel ? sel.background : 'rgba(255,255,255,0.05)',
+                      border: sel ? sel.border : '1px solid rgba(255,255,255,0.10)',
+                      cursor: !canInteract || selected ? 'default' : 'pointer',
+                      pointerEvents: !canInteract || dimmed ? 'none' : 'auto',
+                      transition: 'all 0.18s ease',
+                      color: '#fff',
+                    }}
+                    onMouseEnter={(e) => {
+                      if (!canInteract || selected) return
+                      e.currentTarget.style.background = 'rgba(74,124,111,0.15)'
+                      e.currentTarget.style.borderColor = 'rgba(74,124,111,0.35)'
+                    }}
+                    onMouseLeave={(e) => {
+                      if (!canInteract || selected) return
+                      e.currentTarget.style.background = 'rgba(255,255,255,0.05)'
+                      e.currentTarget.style.borderColor = 'rgba(255,255,255,0.10)'
+                    }}
                   >
-                    <button
-                      onClick={() => handleSelect(choice)}
-                      disabled={!canInteract || selected !== null}
+                    {/* letter badge */}
+                    <span
                       style={{
-                        width: '100%', borderRadius: 10, padding: '11px 14px', textAlign: 'left',
-                        display: 'flex', alignItems: 'center', gap: 10,
-                        background: sel ? sel.background : 'rgba(255,255,255,0.05)',
-                        border: sel ? sel.border : '1px solid rgba(255,255,255,0.10)',
-                        cursor: !canInteract || selected ? 'default' : 'pointer',
-                        pointerEvents: !canInteract || dimmed ? 'none' : 'auto',
-                        transition: 'all 0.18s ease',
-                        color: '#fff',
-                      }}
-                      onMouseEnter={(e) => {
-                        if (!canInteract || selected) return
-                        e.currentTarget.style.background = 'rgba(74,124,111,0.15)'
-                        e.currentTarget.style.borderColor = 'rgba(74,124,111,0.35)'
-                      }}
-                      onMouseLeave={(e) => {
-                        if (!canInteract || selected) return
-                        e.currentTarget.style.background = 'rgba(255,255,255,0.05)'
-                        e.currentTarget.style.borderColor = 'rgba(255,255,255,0.10)'
+                        position: 'absolute', top: 10, left: 10, width: 22, height: 22, borderRadius: '50%',
+                        background: 'rgba(255,255,255,0.12)', display: 'flex', alignItems: 'center', justifyContent: 'center',
+                        fontSize: 11, fontWeight: 700, color: '#fff',
                       }}
                     >
-                      <span
-                        style={{
-                          flexShrink: 0, width: 24, height: 24, borderRadius: '50%', background: 'rgba(255,255,255,0.12)',
-                          display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 11, fontWeight: 600, color: '#fff',
-                        }}
-                      >
-                        {choice.label}
-                      </span>
-                      <span style={{ flexShrink: 0, fontSize: 13 }}>{choice.icon}</span>
-                      <span style={{ flex: 1, minWidth: 0, fontSize: 12, lineHeight: 1.4 }}>
-                        {showEn && <span style={{ display: 'block', color: 'rgba(255,255,255,0.9)' }}>{choice.en}</span>}
-                        {showHi && (
-                          <span style={{ display: 'block', fontFamily: DEVANAGARI, color: showEn ? 'rgba(255,255,255,0.6)' : 'rgba(255,255,255,0.9)', marginTop: showEn ? 3 : 0 }}>
-                            {choice.hi}
-                          </span>
-                        )}
-                      </span>
-                      {isSel && <span style={{ flexShrink: 0, fontSize: 13 }}>{QUALITY_ICON[choice.quality]}</span>}
-                    </button>
-                  </motion.div>
+                      {choice.label}
+                    </span>
+                    {isSel && <span style={{ position: 'absolute', top: 10, right: 10, fontSize: 15 }}>{QUALITY_ICON[choice.quality]}</span>}
+                    {/* icon ring */}
+                    <span
+                      style={{
+                        flexShrink: 0, width: 64, height: 64, borderRadius: '50%', background: 'rgba(255,255,255,0.10)',
+                        display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 30,
+                      }}
+                    >
+                      {choice.icon}
+                    </span>
+                    {/* text */}
+                    <span style={{ minWidth: 0 }}>
+                      {showEn && <span style={{ display: 'block', fontSize: 13, lineHeight: 1.35, color: 'rgba(255,255,255,0.92)' }}>{choice.en}</span>}
+                      {showHi && (
+                        <span style={{ display: 'block', fontSize: 11.5, fontFamily: DEVANAGARI, color: showEn ? 'rgba(255,255,255,0.6)' : 'rgba(255,255,255,0.9)', marginTop: showEn ? 4 : 0, lineHeight: 1.4 }}>
+                          {choice.hi}
+                        </span>
+                      )}
+                    </span>
+                  </motion.button>
                 )
               })}
             </div>
@@ -1302,17 +1366,17 @@ export default function StoryChoiceAdventure({ sessionId, role, isLocked }: Stor
                     style={{
                       background: 'rgba(255,255,255,0.04)',
                       borderLeft: `3px solid ${QUALITY_ACCENT[selectedChoice.quality]}`,
-                      borderRadius: '0 8px 8px 0', padding: '10px 14px', marginTop: 10,
+                      borderRadius: '0 8px 8px 0', padding: '16px 20px', marginTop: 10,
                     }}
                   >
-                    <div style={{ fontSize: 10, color: 'rgba(255,255,255,0.4)', marginBottom: 4 }}>What happens next:</div>
+                    <div style={{ fontSize: 11, color: 'rgba(255,255,255,0.4)', marginBottom: 5 }}>What happens next:</div>
                     {showEn && (
-                      <div style={{ fontSize: 12, color: 'rgba(255,255,255,0.85)', lineHeight: 1.45 }}>
+                      <div style={{ fontSize: 13, color: 'rgba(255,255,255,0.85)', lineHeight: 1.45 }}>
                         {selectedChoice.consequence_en}
                       </div>
                     )}
                     {showHi && (
-                      <div style={{ fontSize: 12, fontFamily: DEVANAGARI, color: showEn ? 'rgba(255,255,255,0.6)' : 'rgba(255,255,255,0.85)', lineHeight: 1.5, marginTop: showEn ? 4 : 0 }}>
+                      <div style={{ fontSize: 13, fontFamily: DEVANAGARI, color: showEn ? 'rgba(255,255,255,0.6)' : 'rgba(255,255,255,0.85)', lineHeight: 1.5, marginTop: showEn ? 4 : 0 }}>
                         {selectedChoice.consequence_hi}
                       </div>
                     )}
@@ -1321,12 +1385,44 @@ export default function StoryChoiceAdventure({ sessionId, role, isLocked }: Stor
               )}
             </AnimatePresence>
 
-            {/* 6 — Facilitator panel */}
-            {isT && (
-              <div
+            {/* 7 — Next button */}
+            {isT && selected && (
+              <button
+                onClick={handleNext}
                 style={{
-                  background: 'rgba(107,92,231,0.08)', border: '1px solid rgba(107,92,231,0.2)',
-                  borderRadius: 10, padding: '12px 14px',
+                  width: '100%', padding: '12px 0', borderRadius: 999, cursor: 'pointer', fontSize: 13, fontWeight: 600,
+                  background: 'rgba(74,124,111,0.3)', border: '1px solid rgba(74,124,111,0.45)', color: '#cfe6df',
+                  transition: 'all 0.15s',
+                }}
+              >
+                {isLast ? 'Finish level →' : 'Next scenario →'}
+              </button>
+            )}
+          </motion.div>
+        )}
+      </AnimatePresence>
+      </div>
+
+      {/* Facilitator questions — therapist-only collapsible popover.
+          Never rendered in the DOM for the client role. */}
+      {isT && (
+        <>
+          {facOpen && (
+            <>
+              {/* outside-click catcher */}
+              <div
+                onClick={() => setFacOpen(false)}
+                style={{ position: 'fixed', inset: 0, zIndex: 48 }}
+              />
+              <motion.div
+                initial={{ opacity: 0, y: 8, scale: 0.96 }}
+                animate={{ opacity: 1, y: 0, scale: 1 }}
+                transition={{ duration: 0.18, ease: 'easeOut' }}
+                style={{
+                  position: 'fixed', bottom: 70, right: 8, width: 260,
+                  background: 'rgba(30,25,50,0.97)', borderRadius: 14,
+                  border: '1px solid rgba(107,92,231,0.3)', padding: '12px 14px',
+                  zIndex: 49, boxShadow: '0 12px 32px rgba(0,0,0,0.4)',
                 }}
               >
                 <div style={{ fontSize: 11, fontWeight: 600, color: '#a99cf0', marginBottom: 6 }}>💬 Facilitator questions</div>
@@ -1338,25 +1434,22 @@ export default function StoryChoiceAdventure({ sessionId, role, isLocked }: Stor
                     </li>
                   ))}
                 </ol>
-              </div>
-            )}
-
-            {/* 7 — Next button */}
-            {isT && selected && (
-              <button
-                onClick={handleNext}
-                style={{
-                  width: '100%', padding: '8px 0', borderRadius: 999, cursor: 'pointer', fontSize: 12, fontWeight: 600,
-                  background: 'rgba(74,124,111,0.3)', border: '1px solid rgba(74,124,111,0.45)', color: '#cfe6df',
-                  transition: 'all 0.15s',
-                }}
-              >
-                {isLast ? 'Finish level →' : 'Next scenario →'}
-              </button>
-            )}
-          </motion.div>
-        )}
-      </AnimatePresence>
+              </motion.div>
+            </>
+          )}
+          <button
+            onClick={() => setFacOpen((o) => !o)}
+            title="Facilitator questions"
+            style={{
+              position: 'fixed', bottom: 20, right: 20, width: 44, height: 44, borderRadius: '50%',
+              background: 'rgba(107,92,231,0.9)', display: 'flex', alignItems: 'center', justifyContent: 'center',
+              fontSize: 18, cursor: 'pointer', zIndex: 50, boxShadow: '0 6px 20px rgba(107,92,231,0.4)', border: 'none',
+            }}
+          >
+            💬
+          </button>
+        </>
+      )}
     </div>
   )
 }
