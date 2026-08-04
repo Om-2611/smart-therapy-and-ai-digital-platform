@@ -10,6 +10,8 @@ function ageFrom(dob: Date | null | undefined): number | undefined {
 }
 
 // Fetch the stored report for a session.
+export const dynamic = 'force-dynamic';
+
 export async function GET(req: NextRequest) {
   const sessionId = new URL(req.url).searchParams.get('sessionId')
   if (!sessionId) {

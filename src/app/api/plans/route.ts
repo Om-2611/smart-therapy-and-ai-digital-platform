@@ -3,6 +3,8 @@ import { prisma } from '@/lib/db';
 
 // GET /api/plans — list active subscription plans (therapist + admin facing).
 // Pass ?all=1 to include inactive plans (admin catalog management).
+export const dynamic = 'force-dynamic';
+
 export async function GET(request: Request) {
   try {
     const { searchParams } = new URL(request.url);

@@ -4,6 +4,8 @@ import { prisma } from '@/lib/db';
 
 // POST /api/invites — therapist creates a patient invite (name + diagnosis only).
 // Returns the generated token so the client can build a shareable link.
+export const dynamic = 'force-dynamic';
+
 export async function POST(request: Request) {
   try {
     const { therapistId, firstName, lastName, diagnosis, scheduledAt } = await request.json();
