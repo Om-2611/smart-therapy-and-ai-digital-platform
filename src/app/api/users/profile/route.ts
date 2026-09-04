@@ -1,5 +1,6 @@
 import { NextResponse } from 'next/server';
 import { prisma } from '@/lib/db';
+import { adminAuth } from '@/lib/firebaseAdmin';
 
 export const dynamic = 'force-dynamic';
 
@@ -68,6 +69,22 @@ export async function POST(request: Request) {
 
       return { user: u, profile, session };
     });
+
+    // Mirror the role onto the Firebase ID token as a custom claim. Firestore
+    // rules cannot read Postgres, so this is the only way `patients/{uid}` can
+    // distinguish a therapist from any other signed-in account.
+    //
+    // Deliberately AFTER the transaction and non-fatal: a claim failure must
+    // not roll back a created account. The backfill script
+    // (scripts/backfill-role-claims.mjs) repairs anyone who slips through.
+    //
+    // The claim only appears once the client refreshes its ID token — new
+    // signups get it on their next token refresh, within the hour.
+    try {
+      await adminAuth().setCustomUserClaims(uid, { role: roleEnum });
+    } catch (e) {
+      console.error('Failed to set role claim for', uid, e);
+    }
 
     return NextResponse.json({ success: true, user: result.user, profile: result.profile, session: result.session });
   } catch (error: any) {

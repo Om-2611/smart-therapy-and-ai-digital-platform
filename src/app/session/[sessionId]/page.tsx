@@ -4,7 +4,7 @@ import React, { useState, useEffect, useRef } from 'react';
 import { useAuthStore } from '@/store/useAuthStore';
 import { useSessionStore } from '@/store/useSessionStore';
 import { useRouter } from 'next/navigation';
-import { doc, onSnapshot, setDoc, updateDoc, getDoc } from 'firebase/firestore';
+import { doc, onSnapshot, updateDoc, getDoc } from 'firebase/firestore';
 import { db } from '@/lib/firebase';
 import {
   Mic, MicOff, Camera, CameraOff, PhoneOff, Settings, Smile,
@@ -13,6 +13,7 @@ import {
 import AIConsentBanner from '@/components/session/AIConsentBanner';
 import { AIErrorBoundary } from '@/components/session/AIErrorBoundary';
 import { useSessionTranscription } from '@/hooks/useSessionTranscription';
+import { useAttentionScoring, type AttentionState } from '@/hooks/useAttentionScoring';
 import { useLocalParticipant } from '@livekit/components-react';
 import StaadVideo, { useSessionRoom } from '@/components/StaadVideo';
 import RemoteVideoArea from '@/components/RemoteVideoArea';
@@ -61,6 +62,31 @@ function TranscriptionBridge({
   useEffect(() => {
     onState({ isRecording, chunkCount });
   }, [isRecording, chunkCount, onState]);
+  return null;
+}
+
+// Attention scoring, alongside transcription and gated by the SAME consent
+// signal. Like <TranscriptionBridge> it must live inside <StaadVideo> to reach
+// the LiveKit room, and renders nothing.
+//
+// The hook itself enforces therapist-only + client-track-only; passing
+// userRole through keeps that decision in one place rather than duplicating the
+// gate at the call site.
+function AttentionBridge({
+  sessionId,
+  enabled,
+  userRole,
+  onState,
+}: {
+  sessionId: string;
+  enabled: boolean;
+  userRole: 'therapist' | 'client';
+  onState: (s: AttentionState) => void;
+}) {
+  const attention = useAttentionScoring({ sessionId, enabled, userRole });
+  useEffect(() => {
+    onState(attention);
+  }, [attention, onState]);
   return null;
 }
 
@@ -208,41 +234,42 @@ export default function SessionRoomPage({ params }: { params: { sessionId: strin
 
     setActiveSessionId(sessionId);
 
-    const ensureSessionExists = async () => {
-      const liveRef = doc(db, 'liveSessions', sessionId);
-      const liveSnap = await getDoc(liveRef);
-      if (!liveSnap.exists()) {
-        await setDoc(liveRef, {
-          sessionId,
-          activeModuleId: null,
-          therapistControl: false,
-          participants: {
-            [uid]: {
-              uid,
-              name: profile ? `${profile.firstName} ${profile.lastName}` : 'User',
-              role: isTherapist ? 'therapist' : 'client',
-              isOnline: true,
-              lastSeen: new Date().toISOString(),
-            },
-          },
-          timestamps: {
-            createdAt: new Date().toISOString(),
-            updatedAt: new Date().toISOString(),
-          },
+    // The room documents are provisioned SERVER-SIDE (see
+    // src/lib/session-provisioning.ts, called from PATCH /api/sessions/{id}).
+    //
+    // They used to be created here, in the browser. They no longer can be:
+    // security rules authorise every session read/write against
+    // `liveSessions/{id}.allowedUids`, which is derived from Postgres and may
+    // only be written by the server. A client that could create the document
+    // could mint its own entitlement, so `allow create` is `false` for both
+    // collections.
+    //
+    // Joining therefore means: ask the server to provision, THEN register
+    // ourselves as a participant. The onSnapshot below is attached first and
+    // simply fires once the documents appear.
+    const joinSession = async () => {
+      try {
+        await fetch(`/api/sessions/${sessionId}`, {
+          method: 'PATCH',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ action: 'start' }),
         });
+      } catch {
+        // Provisioning failure is surfaced by the participant write below
+        // failing; the room simply stays in its loading state.
       }
 
-      const sessionDocRef = doc(db, 'sessions', sessionId);
-      const sessionSnap = await getDoc(sessionDocRef);
-      if (!sessionSnap.exists()) {
-        await setDoc(sessionDocRef, {
-          sessionId,
-          aiConsent: {},
-          createdAt: new Date().toISOString(),
-        });
-      }
+      // Only after provisioning, so the document exists and we are entitled.
+      await updateDoc(doc(db, 'liveSessions', sessionId), {
+        [`participants.${uid}`]: {
+          uid,
+          name: profile ? `${profile.firstName} ${profile.lastName}` : 'User',
+          role: isTherapist ? 'therapist' : 'client',
+          isOnline: true,
+          lastSeen: new Date().toISOString(),
+        },
+      }).catch(() => {});
     };
-    ensureSessionExists();
 
     const sessionRef = doc(db, 'liveSessions', sessionId);
     const unsubscribe = onSnapshot(sessionRef, (snapshot) => {
@@ -264,29 +291,14 @@ export default function SessionRoomPage({ params }: { params: { sessionId: strin
       setLoading(false);
     });
 
-    updateDoc(doc(db, 'liveSessions', sessionId), {
-      [`participants.${uid}`]: {
-        uid,
-        name: `${profile?.firstName} ${profile?.lastName}`,
-        role: isTherapist ? 'therapist' : 'client',
-        isOnline: true,
-        lastSeen: new Date().toISOString(),
-      },
-    }).catch(() => {});
+    // Provision server-side, then register as a participant. This also
+    // promotes the Prisma session SCHEDULED -> ACTIVE, which is why the
+    // separate 'start' effect that used to live below is gone: it is the same
+    // call, and firing it twice raced with provisioning.
+    joinSession();
 
     return () => unsubscribe();
   }, [sessionId, uid, role, profile, router, setActiveSessionId, setTherapistControl, isTherapist]);
-
-  // Promote the scheduled session to ACTIVE once someone joins the room.
-  // Idempotent on the server: only a SCHEDULED session is transitioned.
-  useEffect(() => {
-    if (!uid || !sessionId) return;
-    fetch(`/api/sessions/${sessionId}`, {
-      method: 'PATCH',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ action: 'start' }),
-    }).catch(() => {});
-  }, [uid, sessionId]);
 
   useEffect(() => {
     setIsModuleActive(activeModule !== null);
@@ -499,6 +511,31 @@ export default function SessionRoomPage({ params }: { params: { sessionId: strin
     isRecording: false,
     chunkCount: 0,
   });
+  // Attention scoring shares the transcription consent gate. NOTE: it does NOT
+  // honour sttTestMode — that escape hatch bypasses client consent, and running
+  // face tracking on someone who hasn't consented is not an acceptable
+  // dev-convenience trade. Attention scoring therefore requires real consent
+  // from both sides, in every environment.
+  const attentionEnabled = bothConsented;
+  const [attention, setAttention] = useState<AttentionState>({
+    status: 'idle',
+    score: null,
+    faceDetected: false,
+    analyzedIdentity: null,
+    error: null,
+  });
+
+  // Observability for the attention feature. No UI surface is introduced here
+  // (the session layout is deliberately untouched) — this just makes the score
+  // and, crucially, WHICH feed produced it, visible while verifying.
+  useEffect(() => {
+    if (attention.status === 'idle') return;
+    console.log(
+      `[Attention] status=${attention.status} score=${attention.score ?? '—'} ` +
+        `face=${attention.faceDetected} source=${attention.analyzedIdentity ?? 'none'}` +
+        (attention.error ? ` error=${attention.error}` : '')
+    );
+  }, [attention]);
 
   // The therapist drives the sidebar from the bottom bar. The client has no
   // panel controls, so — exactly as before — the client's sidebar simply mirrors
@@ -547,6 +584,14 @@ export default function SessionRoomPage({ params }: { params: { sessionId: strin
         enabled={transcriptionEnabled}
         userRole={userRole}
         onState={setTranscription}
+      />
+      {/* Observes the CLIENT's incoming camera track only, in the therapist's
+          browser only, and writes the score to sessions/{id}/rawSessionLog. */}
+      <AttentionBridge
+        sessionId={sessionId}
+        enabled={attentionEnabled}
+        userRole={userRole}
+        onState={setAttention}
       />
       {/* Skill Development modules take over the whole room with their own
           full-canvas layout. Every other module falls through to the normal
