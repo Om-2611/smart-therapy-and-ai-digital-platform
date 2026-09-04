@@ -24,7 +24,6 @@ const CATEGORIES = [
 
 const MODULES: ModuleData[] = [
   // SLD (5)
-  { id: 'digital-sand-tray', name: 'Digital Sand Tray', emoji: '🎨', category: 'SLD', description: 'Expressive sand play in a digital environment', approach: 'Sensory Integration' },
   { id: 'word-building', name: 'Word Building', emoji: '🔤', category: 'SLD', description: 'Construct words from letters and sounds', approach: 'Phonics-based' },
   { id: 'whack-a-mole-math', name: 'Whack-a-Mole Math', emoji: '🔨', category: 'SLD', description: 'Math facts practice through whack-a-mole gameplay', approach: 'Gamified Learning' },
   { id: 'pixel-art-coding', name: 'Pixel Art Coding', emoji: '🎮', category: 'SLD', description: 'Learn coding basics through pixel art creation', approach: 'Computational Thinking' },
@@ -47,10 +46,8 @@ const MODULES: ModuleData[] = [
   { id: 'facts-vs-feelings', name: 'Facts vs Feelings', emoji: '⚖️', category: 'General Therapy', description: 'Distinguish between factual and emotional responses', approach: 'CBT' },
   { id: 'worry-vault', name: 'Worry Vault', emoji: '🔒', category: 'General Therapy', description: 'Lock away worries in a secure vault', approach: 'ACT' },
   { id: 'defusion-river', name: 'Defusion River', emoji: '🌊', category: 'General Therapy', description: 'Watch thoughts float by like leaves on a river', approach: 'ACT' },
-  { id: 'urge-surfing-wave', name: 'Urge Surfing Wave', emoji: '🏄', category: 'General Therapy', description: 'Ride the wave of urges without acting on them', approach: 'ACT' },
   { id: 'values-card-sort', name: 'Values Card Sort', emoji: '🃏', category: 'General Therapy', description: 'Sort and prioritize personal values', approach: 'ACT' },
   { id: 'emotion-wheel', name: 'Emotion Wheel', emoji: '🎡', category: 'General Therapy', description: 'Explore and name the full spectrum of emotions', approach: 'Emotion-Focused' },
-  { id: 'safe-space-builder', name: 'Safe Space Builder', emoji: '🏠', category: 'General Therapy', description: 'Create a personalized safe space visualization', approach: 'Positive Psych' },
   { id: 'micro-quest-board', name: 'Micro-Quest Board', emoji: '📋', category: 'General Therapy', description: 'Complete small therapeutic quests and missions', approach: 'Gamified Therapy' },
   { id: 'distortion-boss-fights', name: 'Distortion Boss Fights', emoji: '👾', category: 'General Therapy', description: 'Battle cognitive distortions in a boss fight format', approach: 'CBT' },
   { id: 'problem-solving-ladder', name: 'Problem-Solving Ladder', emoji: '🪜', category: 'General Therapy', description: 'Climb the ladder from problem to solution step by step', approach: 'CBT' },

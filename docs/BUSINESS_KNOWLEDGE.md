@@ -75,16 +75,15 @@ ADHD, Anxiety & Depression, Intellectual Disability (ID), plus general emotional
 
 Canonical registry: `src/lib/modules.ts`. **5 categories, ~24 tools:**
 
-- **SLD (Specific Learning Disorder):** Digital Sand Tray, Word Building, Whack-a-Mole Math,
+- **SLD (Specific Learning Disorder):** Word Building, Whack-a-Mole Math,
   Pixel Art Coding, Bubble Splash.
 - **ADHD:** N-Back Challenge (working memory), Virtual Maze, Simon Says (executive function).
 - **Anxiety & Depression:** 5-4-3-2-1 Grounding, Emotional Charades, Virtual Box Popping,
   Worry Box.
 - **ID (Intellectual Disability):** Drag & Drop Sorting, Social Story Sequencing, Virtual Shop
   (daily-living/money skills).
-- **General (regulation / CBT / ACT / DBT):** Emotion Wheel, Safe Space Builder, Defusion
-  River, Thought Challenger, Micro Quest Board, Values Card Sort, Urge Surfing, Worry Vault,
-  Facts vs Feelings.
+- **General (regulation / CBT / ACT / DBT):** Emotion Wheel, Defusion River, Thought
+  Challenger, Micro Quest Board, Values Card Sort, Worry Vault, Facts vs Feelings.
 
 Each tool maps to a clinical purpose (e.g. working memory, sustained attention, grounding,
 cognitive defusion, behavioral activation, values clarification). The library is the lever

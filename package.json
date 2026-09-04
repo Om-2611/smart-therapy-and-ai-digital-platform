@@ -19,13 +19,21 @@
     "test:analysis": "tsx scripts/test-analysis.ts",
     "test:e2e": "tsx scripts/test-e2e-rag.ts",
     "seed:admin": "node --env-file=.env scripts/seed-admin.cjs",
-    "seed:plans": "node --env-file=.env scripts/seed-plans.cjs"
+    "seed:plans": "node --env-file=.env scripts/seed-plans.cjs",
+    "prebuild": "node scripts/fetch-mediapipe-assets.mjs",
+    "setup:mediapipe": "node scripts/fetch-mediapipe-assets.mjs",
+    "test:rules": "firebase emulators:exec --only firestore --project staad-rules-test \"vitest run --config vitest.rules.config.ts\"",
+    "emulators": "firebase emulators:start --only firestore --project staad-rules-test",
+    "rules:backfill-claims": "node --env-file=.env scripts/backfill-role-claims.mjs",
+    "rules:deploy": "firebase deploy --only firestore:rules"
   },
   "dependencies": {
     "@base-ui/react": "^1.4.1",
     "@deepgram/sdk": "^3.0.0",
+    "@excalidraw/excalidraw": "^0.18.1",
     "@livekit/components-react": "^2.9.21",
     "@livekit/components-styles": "^1.2.0",
+    "@mediapipe/tasks-vision": "^1.0.1",
     "@neondatabase/serverless": "^1.1.0",
     "@prisma/client": "^6.19.3",
     "@tanstack/react-query": "^5.100.11",
@@ -36,7 +44,9 @@
     "framer-motion": "^12.39.0",
     "livekit-client": "^2.19.0",
     "livekit-server-sdk": "^2.15.3",
+    "lottie-web": "^5.13.0",
     "lucide-react": "^1.16.0",
+    "motion": "^12.42.2",
     "next": "^14.2.35",
     "nodemailer": "^8.0.11",
     "openai": "^6.41.0",
@@ -50,6 +60,7 @@
     "zustand": "^5.0.13"
   },
   "devDependencies": {
+    "@firebase/rules-unit-testing": "^5.0.2",
     "@types/node": "^20.19.41",
     "@types/nodemailer": "^8.0.1",
     "@types/pdf-parse": "^1.1.5",
@@ -59,6 +70,7 @@
     "@types/ws": "^8.18.1",
     "eslint": "^8",
     "eslint-config-next": "^14.2.35",
+    "firebase-tools": "^15.28.1",
     "marked": "^18.0.4",
     "postcss": "^8",
     "prisma": "^6.19.3",

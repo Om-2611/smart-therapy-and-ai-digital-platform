@@ -46,7 +46,11 @@ export default function AuthProvider({ children }: { children: React.ReactNode }
         }
       } else {
         clearAuth();
-        if (pathname !== '/auth' && pathname !== '/onboarding') {
+        // /session/preview is a dev-only layout harness with no data of its own,
+        // so it must not be bounced to /auth. It 404s in production anyway.
+        const devPreview =
+          process.env.NODE_ENV !== 'production' && pathname === '/session/preview';
+        if (pathname !== '/auth' && pathname !== '/onboarding' && !devPreview) {
           router.push('/auth');
         }
       }

@@ -4,6 +4,7 @@ import { useState, useEffect, useRef, useCallback, useMemo } from 'react'
 import { doc, onSnapshot, updateDoc } from 'firebase/firestore'
 import { db } from '@/lib/firebase'
 import { logModuleEvent } from '@/lib/sessionEvents'
+import { staadCancel } from '@/lib/voice/staadVoice'
 
 interface SimonSaysProps {
   sessionId: string
@@ -74,6 +75,9 @@ export default function SimonSays({ sessionId, role, isLocked }: SimonSaysProps)
   const [childIn, setChildIn] = useState<string[]>([])
   const [isPlaySeq, setIsPlaySeq] = useState(false)
   const [litIdx, setLitIdx] = useState(-1)
+  // The pad the player just pressed, so their own taps flash back at them.
+  const [tapFlash, setTapFlash] = useState<string | null>(null)
+  const tapT = useRef<ReturnType<typeof setTimeout>>()
   const [cmdIdx, setCmdIdx] = useState(-1)
   const [cmdList, setCmdList] = useState<Command[]>([])
   const [trapsAv, setTrapsAv] = useState(0)
@@ -93,7 +97,11 @@ export default function SimonSays({ sessionId, role, isLocked }: SimonSaysProps)
   const playedRef = useRef(false)
 
   const write = useCallback(async (d: Record<string, unknown>) => {
-    try { await updateDoc(doc(db, 'liveSessions', sessionId), { ...d, 'timestamps.updatedAt': new Date().toISOString() }) } catch {}
+    try {
+      await updateDoc(doc(db, 'liveSessions', sessionId), { ...d, 'timestamps.updatedAt': new Date().toISOString() })
+    } catch (err) {
+      console.warn('[SimonSays] Firestore write failed', err)
+    }
   }, [sessionId])
 
   useEffect(() => {
@@ -107,7 +115,10 @@ export default function SimonSays({ sessionId, role, isLocked }: SimonSaysProps)
       if (typeof s.ssCommandSpeed === 'number') setCmdSpeed(s.ssCommandSpeed)
       if (typeof s.ssTrapRatio === 'string') setTrapRatio(s.ssTrapRatio)
       if (typeof s.ssLivesTotal === 'number') setLivesTotal(s.ssLivesTotal)
-      if (typeof s.ssLivesRemaining === 'number') setLivesRem(s.ssLivesRem)
+      // Was reading s.ssLivesRem (never written), so livesRem became undefined
+      // after the first wrong tap: every heart rendered black and the game could
+      // never reach 0 lives.
+      if (typeof s.ssLivesRemaining === 'number') setLivesRem(s.ssLivesRemaining)
       if (typeof s.ssIsPlaying === 'boolean') setIsPlaying(s.ssIsPlaying)
       if (typeof s.ssScore === 'number') setScore(s.ssScore)
       if (Array.isArray(s.ssSequence)) setSeq(s.ssSequence)
@@ -130,7 +141,8 @@ export default function SimonSays({ sessionId, role, isLocked }: SimonSaysProps)
     if (tmr.current) clearInterval(tmr.current)
     if (toastT.current) clearTimeout(toastT.current)
     if (fbT.current) clearTimeout(fbT.current)
-    window.speechSynthesis?.cancel()
+    if (tapT.current) clearTimeout(tapT.current)
+    staadCancel()
   }, [])
 
   const showFeedback = useCallback((type: 'correct' | 'wrong' | 'gold', msg: string) => {
@@ -182,7 +194,17 @@ export default function SimonSays({ sessionId, role, isLocked }: SimonSaysProps)
   }, [isT, startLen, livesTotal, newRound])
 
   const handleClassicTap = useCallback((color: string) => {
-    if (isT || !canInteract || isPlaySeq || gameOver || !isPlaying) return
+    // The therapist was previously blocked outright, which made the module look
+    // completely unresponsive whenever it was driven from a single window.
+    // canInteract already encodes the lock rule for the client.
+    if (!canInteract || isPlaySeq || gameOver || !isPlaying) return
+
+    // Immediate acknowledgement of the press, independent of whether the tap
+    // turns out to be right or wrong.
+    setTapFlash(color)
+    if (tapT.current) clearTimeout(tapT.current)
+    tapT.current = setTimeout(() => setTapFlash(null), 180)
+
     const next = [...childIn, color]
     const idx = next.length - 1
     const isCorrect = next[idx] === seq[idx]
@@ -263,7 +285,8 @@ export default function SimonSays({ sessionId, role, isLocked }: SimonSaysProps)
   }, [cmdIdx, mode, isPlaying, gameOver, lastCmdIdx])
 
   const handleSimonRespond = useCallback((doIt: boolean) => {
-    if (isT || !canInteract || !currentCmd || gameOver || !isPlaying) return
+    // Therapist lockout removed for the same reason as handleClassicTap.
+    if (!canInteract || !currentCmd || gameOver || !isPlaying) return
     const shouldDoIt = currentCmd.hasSimonSays
     if (doIt === shouldDoIt) {
       const ns = score + 1
@@ -296,13 +319,13 @@ export default function SimonSays({ sessionId, role, isLocked }: SimonSaysProps)
   // Keyboard handlers
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
-      if (mode !== 'simon-says' || !isPlaying || gameOver || isT) return
+      if (mode !== 'simon-says' || !isPlaying || gameOver) return
       if (e.code === 'Space') { e.preventDefault(); handleSimonRespond(true) }
       else if (e.code === 'Backspace' || e.code === 'Escape') { e.preventDefault(); handleSimonRespond(false) }
     }
     window.addEventListener('keydown', onKey)
     return () => window.removeEventListener('keydown', onKey)
-  }, [mode, isPlaying, gameOver, isT, handleSimonRespond])
+  }, [mode, isPlaying, gameOver, handleSimonRespond])
 
   // Log the sequencing result once when a game ends (therapist browser only).
   const loggedOverRef = useRef(false)
@@ -375,27 +398,40 @@ export default function SimonSays({ sessionId, role, isLocked }: SimonSaysProps)
 
       {/* Therapist controls */}
       {isT && (
-        <div style={{ flexShrink: 0, padding: '6px 10px', borderBottom: '1px solid var(--glass-border)', display: 'flex', flexDirection: 'column', gap: 4, fontSize: 10 }}>
-          <div style={{ display: 'flex', gap: 6 }}>
+        <div style={{
+          flexShrink: 0,
+          padding: '0 0 8px',
+          marginBottom: 8,
+          borderBottom: '1px solid var(--glass-border)',
+          width: '100%',
+          maxWidth: 1000,
+          alignSelf: 'center',
+          display: 'flex',
+          alignItems: 'center',
+          flexWrap: 'wrap',
+          gap: 12,
+          fontSize: 11,
+        }}>
+          <div style={{ display: 'flex', gap: 6, flex: '1 1 240px' }}>
             <button onClick={() => write({ 'moduleState.ssMode': 'classic' })}
               style={{
-                flex: 1, padding: '4px 0', borderRadius: 6, cursor: 'pointer', fontSize: 10,
-                border: mode === 'classic' ? '1px solid rgba(74,124,111,0.6)' : '1px solid rgba(255,255,255,0.1)',
-                background: mode === 'classic' ? 'rgba(74,124,111,0.15)' : 'rgba(255,255,255,0.04)',
-                color: mode === 'classic' ? 'rgba(255,255,255,0.9)' : 'rgba(255,255,255,0.4)',
+                flex: 1, padding: '6px 12px', borderRadius: 10, cursor: 'pointer', fontSize: 11,
+                border: mode === 'classic' ? '1px solid rgba(74,124,111,0.6)' : '1px solid rgba(0,0,0,0.08)',
+                background: mode === 'classic' ? 'rgba(74,124,111,0.15)' : 'rgba(0,0,0,0.04)',
+                color: mode === 'classic' ? '#2f3439' : '#8b9096',
               }}
             >🎨 Classic Simon</button>
             <button onClick={() => write({ 'moduleState.ssMode': 'simon-says' })}
               style={{
-                flex: 1, padding: '4px 0', borderRadius: 6, cursor: 'pointer', fontSize: 10,
-                border: mode === 'simon-says' ? '1px solid rgba(74,124,111,0.6)' : '1px solid rgba(255,255,255,0.1)',
-                background: mode === 'simon-says' ? 'rgba(74,124,111,0.15)' : 'rgba(255,255,255,0.04)',
-                color: mode === 'simon-says' ? 'rgba(255,255,255,0.9)' : 'rgba(255,255,255,0.4)',
+                flex: 1, padding: '6px 12px', borderRadius: 10, cursor: 'pointer', fontSize: 11,
+                border: mode === 'simon-says' ? '1px solid rgba(74,124,111,0.6)' : '1px solid rgba(0,0,0,0.08)',
+                background: mode === 'simon-says' ? 'rgba(74,124,111,0.15)' : 'rgba(0,0,0,0.04)',
+                color: mode === 'simon-says' ? '#2f3439' : '#8b9096',
               }}
             >🗣️ Simon Says</button>
           </div>
-          <div style={{ display: 'flex', gap: 4, flexWrap: 'wrap', alignItems: 'center' }}>
-            <span style={{ color: 'rgba(255,255,255,0.4)' }}>Difficulty:</span>
+          <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap', alignItems: 'center', flex: '1 1 300px' }}>
+            <span style={{ color: '#8b9096' }}>Difficulty:</span>
             {['easy', 'medium', 'hard'].map(d => (
               <button key={d} onClick={() => {
                 const sp = d === 'easy' ? 1200 : d === 'hard' ? 500 : 800
@@ -405,42 +441,42 @@ export default function SimonSays({ sessionId, role, isLocked }: SimonSaysProps)
               }}
                 style={{
                   padding: '2px 8px', borderRadius: 4, cursor: 'pointer', fontSize: 9, textTransform: 'capitalize',
-                  border: difficulty === d ? '1px solid rgba(74,124,111,0.6)' : '1px solid rgba(255,255,255,0.08)',
+                  border: difficulty === d ? '1px solid rgba(74,124,111,0.6)' : '1px solid rgba(0,0,0,0.06)',
                   background: difficulty === d ? 'rgba(74,124,111,0.15)' : 'transparent',
-                  color: difficulty === d ? 'rgba(255,255,255,0.8)' : 'rgba(255,255,255,0.35)',
+                  color: difficulty === d ? '#3d4348' : 'rgba(0,0,0,0.24)',
                 }}
               >{d}</button>
             ))}
             {mode === 'classic' && (
               <>
-                <span style={{ color: 'rgba(255,255,255,0.3)', marginLeft: 4 }}>Speed:</span>
+                <span style={{ color: 'rgba(0,0,0,0.22)', marginLeft: 4 }}>Speed:</span>
                 {['Slow', 'Normal', 'Fast'].map((l, i) => {
                   const v = [1200, 800, 500][i]
                   return <button key={l} onClick={() => write({ 'moduleState.ssSpeed': v })}
-                    style={{ padding: '2px 6px', borderRadius: 4, cursor: 'pointer', fontSize: 9, border: speed === v ? '1px solid rgba(74,124,111,0.5)' : '1px solid rgba(255,255,255,0.08)', background: speed === v ? 'rgba(74,124,111,0.15)' : 'transparent', color: speed === v ? 'rgba(255,255,255,0.8)' : 'rgba(255,255,255,0.35)' }}
+                    style={{ padding: '2px 6px', borderRadius: 4, cursor: 'pointer', fontSize: 9, border: speed === v ? '1px solid rgba(74,124,111,0.25)' : '1px solid rgba(0,0,0,0.06)', background: speed === v ? 'rgba(74,124,111,0.15)' : 'transparent', color: speed === v ? '#3d4348' : 'rgba(0,0,0,0.24)' }}
                   >{l}</button>
                 })}
               </>
             )}
             {mode === 'simon-says' && (
               <>
-                <span style={{ color: 'rgba(255,255,255,0.3)', marginLeft: 4 }}>Traps:</span>
+                <span style={{ color: 'rgba(0,0,0,0.22)', marginLeft: 4 }}>Traps:</span>
                 {['low', 'medium', 'high'].map(r => (
                   <button key={r} onClick={() => write({ 'moduleState.ssTrapRatio': r })}
-                    style={{ padding: '2px 6px', borderRadius: 4, cursor: 'pointer', fontSize: 9, textTransform: 'capitalize', border: trapRatio === r ? '1px solid rgba(74,124,111,0.5)' : '1px solid rgba(255,255,255,0.08)', background: trapRatio === r ? 'rgba(74,124,111,0.15)' : 'transparent', color: trapRatio === r ? 'rgba(255,255,255,0.8)' : 'rgba(255,255,255,0.35)' }}
+                    style={{ padding: '2px 6px', borderRadius: 4, cursor: 'pointer', fontSize: 9, textTransform: 'capitalize', border: trapRatio === r ? '1px solid rgba(74,124,111,0.25)' : '1px solid rgba(0,0,0,0.06)', background: trapRatio === r ? 'rgba(74,124,111,0.15)' : 'transparent', color: trapRatio === r ? '#3d4348' : 'rgba(0,0,0,0.24)' }}
                   >{r}</button>
                 ))}
               </>
             )}
           </div>
-          <div style={{ display: 'flex', gap: 6 }}>
+          <div style={{ display: 'flex', gap: 6, flex: '0 0 auto' }}>
             {!isPlaying ? (
               <button onClick={handleStart}
-                style={{ flex: 1, padding: '5px 0', borderRadius: 6, border: '1px solid rgba(74,124,111,0.5)', background: 'rgba(74,124,111,0.2)', color: '#b8d4ce', cursor: 'pointer', fontSize: 11 }}
+                style={{ flex: 1, padding: '5px 0', borderRadius: 6, border: '1px solid rgba(74,124,111,0.25)', background: 'rgba(74,124,111,0.2)', color: '#2f6d5e', cursor: 'pointer', fontSize: 11 }}
               >▶ Start</button>
             ) : (
               <button onClick={handlePause}
-                style={{ flex: 1, padding: '5px 0', borderRadius: 6, border: '1px solid rgba(255,255,255,0.12)', background: 'rgba(255,255,255,0.06)', color: 'rgba(255,255,255,0.6)', cursor: 'pointer', fontSize: 11 }}
+                style={{ flex: 1, padding: '5px 0', borderRadius: 6, border: '1px solid rgba(0,0,0,0.07)', background: 'rgba(0,0,0,0.05)', color: '#5b6169', cursor: 'pointer', fontSize: 11 }}
               >⏸ Pause</button>
             )}
             <button onClick={handleReset}
@@ -452,7 +488,7 @@ export default function SimonSays({ sessionId, role, isLocked }: SimonSaysProps)
 
       {/* Waiting */}
       {!isPlaying && !gameOver && (
-        <div style={{ flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center', color: 'rgba(255,255,255,0.3)', fontSize: 13 }}>
+        <div style={{ flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center', color: 'rgba(0,0,0,0.22)', fontSize: 13 }}>
           {isT ? 'Press Start to begin' : 'Get ready! Your therapist is starting...'}
         </div>
       )}
@@ -461,21 +497,41 @@ export default function SimonSays({ sessionId, role, isLocked }: SimonSaysProps)
       {isPlaying && mode === 'classic' && !gameOver && (
         <div style={{ flex: 1, display: 'flex', flexDirection: 'column', padding: 12, gap: 8 }}>
           {/* 2x2 grid */}
-          <div style={{ flex: 1, display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8, position: 'relative' }}>
+          <div style={{
+            flex: 1,
+            minHeight: 0,
+            display: 'grid',
+            gridTemplateColumns: '1fr 1fr',
+            gridTemplateRows: '1fr 1fr',
+            gap: 10,
+            position: 'relative',
+            // Square and centred: sized from the height the canvas leaves so the
+            // four pads stay square instead of stretching into wide bands.
+            height: '100%',
+            aspectRatio: '1',
+            maxWidth: '100%',
+            margin: '0 auto',
+          }}>
             {BUTTONS.map((color, i) => {
               const st = BUTTON_STYLES[color]
-              const isLit = litIdx === i
+              // litIdx is a position in the SEQUENCE, not a pad index. Comparing
+              // it against the pad index lit red/blue/green/yellow in fixed order
+              // regardless of the actual sequence, so the pattern the child saw
+              // was never the pattern being validated.
+              const isLit = isPlaySeq && litIdx >= 0 && seq[litIdx] === color
+              const isTapped = tapFlash === color
+              const isHot = isLit || isTapped
               return (
                 <div key={color} onClick={() => handleClassicTap(color)}
                   style={{
                     borderRadius: 18,
-                    background: isLit ? st.active : st.bg,
+                    background: isHot ? st.active : st.bg,
                     border: `2px solid ${st.border}`,
                     cursor: canInteract && !isPlaySeq ? 'pointer' : 'default',
                     transition: 'all 0.1s',
                     display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 28,
-                    boxShadow: isLit ? `0 0 20px ${st.border}` : 'none',
-                    transform: isLit ? 'scale(1.04)' : 'scale(1)',
+                    boxShadow: isHot ? `0 0 20px ${st.border}` : 'none',
+                    transform: isLit ? 'scale(1.04)' : isTapped ? 'scale(0.96)' : 'scale(1)',
                     pointerEvents: isPlaySeq ? 'none' : 'auto',
                     userSelect: 'none', WebkitUserSelect: 'none',
                   }}
@@ -487,18 +543,20 @@ export default function SimonSays({ sessionId, role, isLocked }: SimonSaysProps)
             {/* Center score */}
             <div style={{
               position: 'absolute', top: '50%', left: '50%', transform: 'translate(-50%,-50%)',
-              width: 56, height: 56, borderRadius: '50%', background: 'rgba(255,255,255,0.06)',
-              border: '1px solid rgba(255,255,255,0.12)',
+              width: 56, height: 56, borderRadius: '50%', background: 'rgba(0,0,0,0.05)',
+              border: '1px solid rgba(0,0,0,0.07)',
               display: 'flex', alignItems: 'center', justifyContent: 'center',
-              fontSize: 16, fontWeight: 600, color: '#fff', zIndex: 5,
+              fontSize: 16, fontWeight: 600, color: '#2b2f33', zIndex: 5,
               backdropFilter: 'blur(4px)',
             }}>
               {round}
             </div>
           </div>
           {/* Turn indicator */}
-          <div style={{ textAlign: 'center', fontSize: 11, color: isPlaySeq ? 'rgba(255,255,255,0.3)' : '#b8d4ce' }}>
-            {isPlaySeq ? 'Watch the sequence...' : 'Your turn! Repeat the pattern'}
+          <div style={{ textAlign: 'center', fontSize: 11, color: isPlaySeq ? 'rgba(0,0,0,0.22)' : '#2f6d5e' }}>
+            {isPlaySeq
+              ? 'Watch the sequence...'
+              : `Your turn! Repeat the pattern — ${childIn.length} of ${seq.length}`}
           </div>
           {/* Score + Lives */}
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
@@ -512,7 +570,7 @@ export default function SimonSays({ sessionId, role, isLocked }: SimonSaysProps)
                 >{i < livesRem ? '❤️' : '🖤'}</span>
               ))}
             </div>
-            <div style={{ fontSize: 10, color: 'rgba(255,255,255,0.5)' }}>
+            <div style={{ fontSize: 10, color: '#6b7280' }}>
               Round {round} · {score} correct
             </div>
           </div>
@@ -525,20 +583,20 @@ export default function SimonSays({ sessionId, role, isLocked }: SimonSaysProps)
           {currentCmd && (
             <div key={animateKey} className="ci-a" style={{
               width: '100%', minHeight: 130, borderRadius: 16,
-              background: 'rgba(255,255,255,0.06)', border: '1.5px solid rgba(255,255,255,0.12)',
+              background: 'rgba(0,0,0,0.05)', border: '1.5px solid rgba(0,0,0,0.07)',
               display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center',
               gap: 6, padding: 16, flex: 1,
             }}>
               {currentCmd.hasSimonSays ? (
-                <div style={{ fontSize: 12, fontWeight: 500, color: '#b8d4ce' }}>Simon says...</div>
+                <div style={{ fontSize: 12, fontWeight: 500, color: '#2f6d5e' }}>Simon says...</div>
               ) : (
-                <div style={{ fontSize: 12, color: 'rgba(255,255,255,0.2)' }}>&nbsp;</div>
+                <div style={{ fontSize: 12, color: 'rgba(0,0,0,0.16)' }}>&nbsp;</div>
               )}
-              <div style={{ fontSize: 22, fontFamily: '"DM Serif Display", serif', color: '#fff', textAlign: 'center', lineHeight: 1.3 }}>
+              <div style={{ fontSize: 22, fontFamily: '"DM Serif Display", serif', color: '#2b2f33', textAlign: 'center', lineHeight: 1.3 }}>
                 {currentCmd.text} {currentCmd.emoji}
               </div>
               {/* Countdown bar */}
-              <div style={{ width: '100%', height: 4, borderRadius: 2, background: 'rgba(255,255,255,0.1)', marginTop: 4 }}>
+              <div style={{ width: '100%', height: 4, borderRadius: 2, background: 'rgba(0,0,0,0.08)', marginTop: 4 }}>
                 <div style={{
                   width: `${countPct}%`, height: '100%', borderRadius: 2,
                   background: cmdBarColor,
@@ -573,7 +631,7 @@ export default function SimonSays({ sessionId, role, isLocked }: SimonSaysProps)
                 >{i < livesRem ? '❤️' : '🖤'}</span>
               ))}
             </div>
-            <div style={{ fontSize: 10, color: 'rgba(255,255,255,0.5)' }}>
+            <div style={{ fontSize: 10, color: '#6b7280' }}>
               ✓ {score} · 🪤 {trapsAv} traps dodged
             </div>
           </div>
@@ -598,10 +656,10 @@ export default function SimonSays({ sessionId, role, isLocked }: SimonSaysProps)
           background: 'rgba(0,0,0,0.5)', backdropFilter: 'blur(6px)', zIndex: 50, padding: 20,
         }}>
           <div style={{ fontSize: 28 }}>🎮</div>
-          <div style={{ fontSize: 18, fontFamily: '"DM Serif Display", serif', color: '#fff' }}>Game Over!</div>
+          <div style={{ fontSize: 18, fontFamily: '"DM Serif Display", serif', color: '#2b2f33' }}>Game Over!</div>
           {mode === 'classic' ? (
             <>
-              <div style={{ fontSize: 12, color: 'rgba(255,255,255,0.6)', textAlign: 'center' }}>
+              <div style={{ fontSize: 12, color: '#5b6169', textAlign: 'center' }}>
                 You reached round {round}<br />
                 Best this session: {Math.max(bestRound, round)}
               </div>
@@ -609,19 +667,19 @@ export default function SimonSays({ sessionId, role, isLocked }: SimonSaysProps)
             </>
           ) : (
             <>
-              <div style={{ fontSize: 12, color: 'rgba(255,255,255,0.6)', textAlign: 'center' }}>
+              <div style={{ fontSize: 12, color: '#5b6169', textAlign: 'center' }}>
                 {score} correct out of {cmdList.length} commands<br />
                 Traps dodged: {trapsAv}<br />
                 Fell for traps: {trapsHit}
               </div>
-              <div style={{ fontSize: 13, color: 'rgba(255,255,255,0.7)', textAlign: 'center' }}>
+              <div style={{ fontSize: 13, color: '#4a5057', textAlign: 'center' }}>
                 {cmdList.length > 0 ? (trapsAv / Math.max(1, trapsAv + trapsHit) > 0.8 ? 'Amazing self-control! ⭐⭐⭐' : trapsAv / Math.max(1, trapsAv + trapsHit) > 0.6 ? 'Great job! ⭐⭐' : 'Keep practising! ⭐') : '⭐'}
               </div>
             </>
           )}
           <div style={{ display: 'flex', gap: 8 }}>
             <button onClick={handlePlayAgain}
-              style={{ padding: '8px 20px', borderRadius: 8, border: '1px solid rgba(74,124,111,0.4)', background: 'rgba(74,124,111,0.2)', color: '#b8d4ce', cursor: 'pointer', fontSize: 12 }}
+              style={{ padding: '8px 20px', borderRadius: 8, border: '1px solid rgba(74,124,111,0.22)', background: 'rgba(74,124,111,0.2)', color: '#2f6d5e', cursor: 'pointer', fontSize: 12 }}
             >Play again</button>
           </div>
         </div>
@@ -632,7 +690,7 @@ export default function SimonSays({ sessionId, role, isLocked }: SimonSaysProps)
         <div style={{
           position: 'absolute', top: '30%', left: '50%', transform: 'translate(-50%,-50%)',
           background: 'rgba(0,0,0,0.6)', backdropFilter: 'blur(8px)', borderRadius: 10,
-          padding: '6px 14px', color: '#fff', fontSize: 12, zIndex: 100, pointerEvents: 'none',
+          padding: '6px 14px', color: '#2b2f33', fontSize: 12, zIndex: 100, pointerEvents: 'none',
         }}>
           {toast.msg}
         </div>

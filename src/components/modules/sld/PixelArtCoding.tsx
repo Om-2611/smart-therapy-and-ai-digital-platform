@@ -1,8 +1,10 @@
 'use client'
-import { useState, useEffect, useRef, useCallback } from 'react'
+import { useState, useEffect, useRef, useCallback, useMemo } from 'react'
 import { doc, onSnapshot, updateDoc } from 'firebase/firestore'
 import { db } from '@/lib/firebase'
 import { logModuleEvent } from '@/lib/sessionEvents'
+import { staadPraise, staadCancel } from '@/lib/voice/staadVoice'
+import { useVoiceLanguage } from '@/lib/voice/useVoiceLanguage'
 
 interface PixelArtCodingProps {
   sessionId: string
@@ -21,7 +23,7 @@ const GRID_SIZES: { key: GridSize; label: string }[] = [
 
 const COLORS = [
   '#4a7c6f', '#c8602a', '#f7c948',
-  '#5b8dd9', '#e86d8a', '#ffffff',
+  '#5b8dd9', '#e86d8a', '#2b2f33',
 ]
 
 const COMMANDS = [
@@ -148,23 +150,58 @@ const PATTERN_NAMES: { key: string; label: string }[] = [
   { key: 'letter-c', label: 'C' },
 ]
 
-function calcMatchPercent(cells: Record<string, string>, pattern: number[][]): number {
-  const size = pattern.length
-  let matched = 0
+/**
+ * Resample a pattern to the selected grid size (nearest neighbour).
+ *
+ * Every PATTERNS entry is authored 8x8, but the grid can be 6, 8 or 10. Scoring
+ * used to iterate the PATTERN's 8x8 bounds while the board only rendered
+ * gridSize cells, so on a 6x6 board every pattern cell in rows/cols 6-7 was
+ * unreachable and permanently counted as a mismatch — capping the score at
+ * 73-95% (91% for the default heart) and making 100% impossible. The target
+ * preview, meanwhile, cropped to the top-left 6x6, so the child was shown a
+ * different shape from the one being graded.
+ *
+ * Scaling makes the preview and the scoring agree at all three sizes.
+ */
+function scalePattern(pattern: number[][], size: number): number[][] {
+  const src = pattern.length
+  if (src === size) return pattern
+  const out: number[][] = []
   for (let r = 0; r < size; r++) {
+    const row: number[] = []
+    const sr = Math.min(src - 1, Math.floor((r * src) / size))
     for (let c = 0; c < size; c++) {
+      const sc = Math.min(src - 1, Math.floor((c * src) / size))
+      row.push(pattern[sr][sc] === 1 ? 1 : 0)
+    }
+    out.push(row)
+  }
+  return out
+}
+
+function calcMatchPercent(cells: Record<string, string>, pattern: number[][], gridSize: number): number {
+  // Grade the whole visible board: required cells come from the scaled pattern,
+  // and anything painted outside it still counts against the match.
+  const target = scalePattern(pattern, gridSize)
+  let matched = 0
+  for (let r = 0; r < gridSize; r++) {
+    for (let c = 0; c < gridSize; c++) {
       const key = `${r}-${c}`
       const isFilled = key in cells
-      const shouldBeFilled = pattern[r][c] === 1
+      const shouldBeFilled = target[r][c] === 1
       if (isFilled === shouldBeFilled) matched++
     }
   }
-  return Math.round((matched / (size * size)) * 100)
+  return Math.round((matched / (gridSize * gridSize)) * 100)
 }
 
 export default function PixelArtCoding({ sessionId, role, isLocked }: PixelArtCodingProps) {
   const isTherapist = role === 'therapist'
   const canInteract = isTherapist || !isLocked
+
+  const voiceLanguage = useVoiceLanguage(sessionId)
+  const voiceLangRef = useRef(voiceLanguage)
+  voiceLangRef.current = voiceLanguage
 
   const [mode, setMode] = useState<PacMode>('paint')
   const [gridSize, setGridSize] = useState<GridSize>(8)
@@ -180,6 +217,7 @@ export default function PixelArtCoding({ sessionId, role, isLocked }: PixelArtCo
   const [celebrating, setCelebrating] = useState(false)
   const [celebEmojis, setCelebEmojis] = useState<{ id: number; x: number; emoji: string }[]>([])
   const [perfectCells, setPerfectCells] = useState<Set<string>>(new Set())
+  const [showCodeHelp, setShowCodeHelp] = useState(true)
 
   const isDragging = useRef(false)
   const celebIdRef = useRef(0)
@@ -189,6 +227,8 @@ export default function PixelArtCoding({ sessionId, role, isLocked }: PixelArtCo
   cellsRef.current = cells
   const cursorRef = useRef(cursorPos)
   cursorRef.current = cursorPos
+  const gridSizeRef = useRef(gridSize)
+  gridSizeRef.current = gridSize
 
   const writeToFirestore = useCallback(async (data: Record<string, unknown>) => {
     try {
@@ -196,7 +236,9 @@ export default function PixelArtCoding({ sessionId, role, isLocked }: PixelArtCo
         ...data,
         'timestamps.updatedAt': new Date().toISOString(),
       })
-    } catch {}
+    } catch (err) {
+      console.warn('[PixelArtCoding] Firestore write failed', err)
+    }
   }, [sessionId])
 
   useEffect(() => {
@@ -221,7 +263,7 @@ export default function PixelArtCoding({ sessionId, role, isLocked }: PixelArtCo
     return () => {
       executeRef.current = false
       if (runTimeoutRef.current) clearTimeout(runTimeoutRef.current)
-      window.speechSynthesis?.cancel()
+      staadCancel()
     }
   }, [])
 
@@ -236,10 +278,11 @@ export default function PixelArtCoding({ sessionId, role, isLocked }: PixelArtCo
 
     const pattern = PATTERNS[targetPattern]
     if (pattern) {
+      const target = scalePattern(pattern, gridSizeRef.current)
       const pCells = new Set<string>()
-      for (let r = 0; r < pattern.length; r++) {
-        for (let c = 0; c < pattern[r].length; c++) {
-          if (pattern[r][c] === 1) pCells.add(`${r}-${c}`)
+      for (let r = 0; r < target.length; r++) {
+        for (let c = 0; c < target[r].length; c++) {
+          if (target[r][c] === 1) pCells.add(`${r}-${c}`)
         }
       }
       setPerfectCells(pCells)
@@ -255,13 +298,8 @@ export default function PixelArtCoding({ sessionId, role, isLocked }: PixelArtCo
       }, i * 150)
     }
 
-    if (typeof window !== 'undefined' && 'speechSynthesis' in window) {
-      window.speechSynthesis.cancel()
-      const utterance = new SpeechSynthesisUtterance('Amazing! You matched the pattern!')
-      utterance.rate = 0.9
-      utterance.pitch = 1.1
-      window.speechSynthesis.speak(utterance)
-    }
+    staadCancel()
+    staadPraise(voiceLangRef.current, 'Amazing! You matched the pattern!')
 
     setTimeout(() => {
       setCelebrating(false)
@@ -276,7 +314,7 @@ export default function PixelArtCoding({ sessionId, role, isLocked }: PixelArtCo
     if (mode !== 'paint' || celebrating) return
     const pattern = PATTERNS[targetPattern]
     if (!pattern) return
-    const pct = calcMatchPercent(cells, pattern)
+    const pct = calcMatchPercent(cells, pattern, gridSizeRef.current)
     if (pct === 100 && !matched) {
       triggerCelebration()
     }
@@ -503,12 +541,51 @@ export default function PixelArtCoding({ sessionId, role, isLocked }: PixelArtCo
   }
 
   const pattern = PATTERNS[targetPattern]
+  // Single scaled target shared by the preview and the score, so what the child
+  // is shown is exactly what is graded.
+  const scaledTarget = pattern ? scalePattern(pattern, gridSize) : null
+
+  // Dry-run the program the child has built so far and report where the robot
+  // would travel and which cells it would paint. Rendered as ghost markers on the
+  // grid, this turns an abstract block list into visible cause-and-effect BEFORE
+  // pressing Run. Mirrors handleRun's stepping rules exactly (including the
+  // out-of-bounds stop) but touches no state.
+  const projection = useMemo(() => {
+    if (mode !== 'code' || isRunning || program.length === 0) {
+      return { path: new Set<string>(), paint: new Set<string>(), end: null as null | { row: number; col: number }, blocked: false }
+    }
+    let row = cursorPos.row
+    let col = cursorPos.col
+    const path = new Set<string>()
+    const paint = new Set<string>()
+    let blocked = false
+    for (const cmd of program) {
+      if (cmd === 'paint') {
+        paint.add(`${row}-${col}`)
+        continue
+      }
+      let nr = row
+      let nc = col
+      if (cmd === 'up') nr--
+      else if (cmd === 'down') nr++
+      else if (cmd === 'left') nc--
+      else if (cmd === 'right') nc++
+      if (nr < 0 || nr >= gridSize || nc < 0 || nc >= gridSize) {
+        blocked = true
+        break
+      }
+      row = nr
+      col = nc
+      path.add(`${row}-${col}`)
+    }
+    return { path, paint, end: { row, col }, blocked }
+  }, [mode, isRunning, program, cursorPos.row, cursorPos.col, gridSize])
   const matchPct = pattern && mode === 'paint' && !celebrating
-    ? calcMatchPercent(cells, pattern)
+    ? calcMatchPercent(cells, pattern, gridSize)
     : null
 
   const gridGap = gridSize >= 10 ? 1 : 2
-  const previewCellSize = `calc(80px / ${gridSize})`
+  const previewCellSize = `calc(56px / ${gridSize})`
 
   return (
     <>
@@ -552,9 +629,21 @@ export default function PixelArtCoding({ sessionId, role, isLocked }: PixelArtCo
         {/* TOP SECTION — Therapist Controls              */}
         {/* ============================================== */}
         {isTherapist && (
-          <div style={{ flexShrink: 0, paddingBottom: 6, borderBottom: '1px solid rgba(255,255,255,0.06)', marginBottom: 6 }}>
+          <div style={{
+            flexShrink: 0,
+            paddingBottom: 8,
+            marginBottom: 8,
+            borderBottom: '1px solid rgba(0,0,0,0.05)',
+            width: '100%',
+            maxWidth: 1000,
+            alignSelf: 'center',
+            display: 'flex',
+            alignItems: 'center',
+            flexWrap: 'wrap',
+            gap: 12,
+          }}>
             {/* Mode toggle */}
-            <div className="flex items-center" style={{ gap: 3, marginBottom: 5 }}>
+            <div className="flex items-center" style={{ gap: 6, flex: '1 1 160px' }}>
               {[{ key: 'paint' as PacMode, label: '🖌️ Paint' }, { key: 'code' as PacMode, label: '💻 Code' }].map((m) => (
                 <button
                   key={m.key}
@@ -564,11 +653,11 @@ export default function PixelArtCoding({ sessionId, role, isLocked }: PixelArtCo
                     padding: '3px 0',
                     borderRadius: 12,
                     border: 'none',
-                    fontSize: 8,
+                    fontSize: 11,
                     fontWeight: 500,
                     cursor: 'pointer',
-                    background: mode === m.key ? 'rgba(74,124,111,0.3)' : 'rgba(255,255,255,0.07)',
-                    color: mode === m.key ? '#b8d4ce' : 'rgba(255,255,255,0.5)',
+                    background: mode === m.key ? 'rgba(74,124,111,0.18)' : 'rgba(0,0,0,0.05)',
+                    color: mode === m.key ? '#2f6d5e' : '#6b7280',
                     transition: 'all 0.15s',
                   }}
                 >
@@ -592,8 +681,8 @@ export default function PixelArtCoding({ sessionId, role, isLocked }: PixelArtCo
                         fontSize: 7,
                         fontWeight: 500,
                         cursor: 'pointer',
-                        background: targetPattern === p.key ? 'rgba(74,124,111,0.3)' : 'rgba(255,255,255,0.07)',
-                        color: targetPattern === p.key ? '#b8d4ce' : 'rgba(255,255,255,0.5)',
+                        background: targetPattern === p.key ? 'rgba(74,124,111,0.18)' : 'rgba(0,0,0,0.05)',
+                        color: targetPattern === p.key ? '#2f6d5e' : '#6b7280',
                         transition: 'all 0.15s',
                       }}
                     >
@@ -615,7 +704,7 @@ export default function PixelArtCoding({ sessionId, role, isLocked }: PixelArtCo
                       width: 20,
                       height: 20,
                       borderRadius: 4,
-                      border: activeColor === c ? '2px solid #fff' : '1px solid rgba(255,255,255,0.2)',
+                      border: activeColor === c ? '2px solid #fff' : '1px solid rgba(0,0,0,0.16)',
                       background: c,
                       cursor: 'pointer',
                       flexShrink: 0,
@@ -627,7 +716,7 @@ export default function PixelArtCoding({ sessionId, role, isLocked }: PixelArtCo
             )}
 
             {/* Grid size selector */}
-            <div className="flex items-center" style={{ gap: 3, marginBottom: 5 }}>
+            <div className="flex items-center" style={{ gap: 6, flex: '1 1 160px' }}>
               {GRID_SIZES.map((s) => (
                 <button
                   key={s.key}
@@ -637,11 +726,11 @@ export default function PixelArtCoding({ sessionId, role, isLocked }: PixelArtCo
                     padding: '3px 0',
                     borderRadius: 12,
                     border: 'none',
-                    fontSize: 8,
+                    fontSize: 11,
                     fontWeight: 500,
                     cursor: 'pointer',
-                    background: gridSize === s.key ? 'rgba(74,124,111,0.3)' : 'rgba(255,255,255,0.07)',
-                    color: gridSize === s.key ? '#b8d4ce' : 'rgba(255,255,255,0.5)',
+                    background: gridSize === s.key ? 'rgba(74,124,111,0.18)' : 'rgba(0,0,0,0.05)',
+                    color: gridSize === s.key ? '#2f6d5e' : '#6b7280',
                     transition: 'all 0.15s',
                   }}
                 >
@@ -654,13 +743,13 @@ export default function PixelArtCoding({ sessionId, role, isLocked }: PixelArtCo
             <button
               onClick={handleReset}
               style={{
-                width: '100%',
-                padding: '4px 0',
+                flex: '0 0 auto',
+                padding: '6px 14px',
                 borderRadius: 8,
-                border: '1px solid rgba(200,96,42,0.3)',
+                border: '1px solid rgba(200,96,42,0.18)',
                 background: 'rgba(200,96,42,0.1)',
                 color: '#c8602a',
-                fontSize: 9,
+                fontSize: 11,
                 fontWeight: 600,
                 cursor: 'pointer',
               }}
@@ -672,7 +761,7 @@ export default function PixelArtCoding({ sessionId, role, isLocked }: PixelArtCo
 
         {/* Locked overlay notice */}
         {!canInteract && (
-          <div style={{ flexShrink: 0, fontSize: 9, color: 'rgba(255,255,255,0.4)', textAlign: 'center', paddingBottom: 4 }}>
+          <div style={{ flexShrink: 0, fontSize: 9, color: '#8b9096', textAlign: 'center', paddingBottom: 4 }}>
             Therapist is controlling
           </div>
         )}
@@ -680,27 +769,28 @@ export default function PixelArtCoding({ sessionId, role, isLocked }: PixelArtCo
         {/* ============================================== */}
         {/* MIDDLE SECTION — Canvas (scrollable)          */}
         {/* ============================================== */}
-        <div style={{ flex: 1, minHeight: 0, overflowY: 'auto' }}>
+        <div style={{ flex: 1, minHeight: 0, overflowY: 'auto', display: 'flex', flexDirection: 'column' }}>
           {/* Target preview - Mode A */}
-          {mode === 'paint' && pattern && (
-            <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexShrink: 0, paddingBottom: 6 }}>
+          {mode === 'paint' && pattern && scaledTarget && (
+            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 10, flexShrink: 0, paddingBottom: 6 }}>
               <div
                 style={{
                   display: 'grid',
                   gridTemplateColumns: `repeat(${gridSize}, ${previewCellSize})`,
                   gap: 0.5,
-                  width: 80,
-                  height: 80,
+                  width: 56,
+                  height: 56,
+                  flexShrink: 0,
                 }}
               >
                 {Array.from({ length: gridSize }, (_, r) =>
                   Array.from({ length: gridSize }, (_, c) => {
-                    const shouldFill = r < pattern.length && c < pattern[r].length ? pattern[r][c] === 1 : false
+                    const shouldFill = scaledTarget[r][c] === 1
                     return (
                       <div
                         key={`preview-${r}-${c}`}
                         style={{
-                          background: shouldFill ? '#4a7c6f' : 'rgba(255,255,255,0.04)',
+                          background: shouldFill ? '#4a7c6f' : 'rgba(0,0,0,0.04)',
                           borderRadius: 1,
                         }}
                       />
@@ -708,7 +798,7 @@ export default function PixelArtCoding({ sessionId, role, isLocked }: PixelArtCo
                   })
                 )}
               </div>
-              <span style={{ fontSize: 9, color: 'rgba(255,255,255,0.4)' }}>Match this</span>
+              <span style={{ fontSize: 9, color: '#8b9096' }}>Match this</span>
             </div>
           )}
 
@@ -719,6 +809,8 @@ export default function PixelArtCoding({ sessionId, role, isLocked }: PixelArtCo
               alignItems: 'center',
               justifyContent: 'center',
               paddingBottom: 4,
+              flex: 1,
+              minHeight: 0,
             }}
           >
             <div
@@ -728,8 +820,12 @@ export default function PixelArtCoding({ sessionId, role, isLocked }: PixelArtCo
                 display: 'grid',
                 gridTemplateColumns: `repeat(${gridSize}, 1fr)`,
                 gap: gridGap,
-                width: '100%',
-                maxWidth: 288,
+                // Square, sized from the height the canvas actually leaves,
+                // rather than a fixed 288px sidebar cap.
+                height: '100%',
+                minHeight: 120,
+                aspectRatio: '1',
+                maxWidth: '100%',
                 touchAction: 'none',
               }}
             >
@@ -739,6 +835,10 @@ export default function PixelArtCoding({ sessionId, role, isLocked }: PixelArtCo
                   const filledColor = cells[key]
                   const isCursor = mode === 'code' && cursorPos.row === r && cursorPos.col === c
                   const isPerfectCell = perfectCells.has(key)
+                  // Ghost preview of the program the child is building.
+                  const willPaint = projection.paint.has(key)
+                  const onPath = projection.path.has(key)
+                  const isEnd = !!projection.end && projection.end.row === r && projection.end.col === c
 
                   return (
                     <div
@@ -751,13 +851,21 @@ export default function PixelArtCoding({ sessionId, role, isLocked }: PixelArtCo
                         aspectRatio: '1',
                         borderRadius: 2,
                         background: isCursor
-                          ? 'rgba(74,124,111,0.5)'
+                          ? 'rgba(74,124,111,0.25)'
                           : filledColor
                             ? filledColor
-                            : 'rgba(255,255,255,0.05)',
+                            : willPaint
+                              ? 'rgba(247,201,72,0.35)'
+                              : onPath
+                                ? 'rgba(74,124,111,0.14)'
+                                : 'rgba(0,0,0,0.04)',
                         border: isCursor
                           ? '2px solid #4a7c6f'
-                          : '0.5px solid rgba(255,255,255,0.08)',
+                          : isEnd
+                            ? '1.5px dashed rgba(247,201,72,0.8)'
+                            : willPaint
+                              ? '1px dashed rgba(247,201,72,0.7)'
+                              : '0.5px solid rgba(0,0,0,0.06)',
                         cursor: canInteract && mode === 'paint' && !isRunning ? 'pointer' : 'default',
                         transition: isCursor
                           ? 'all 0.25s ease'
@@ -786,7 +894,7 @@ export default function PixelArtCoding({ sessionId, role, isLocked }: PixelArtCo
           {/* Match percentage - Mode A */}
           {mode === 'paint' && matchPct !== null && (
             <div style={{ textAlign: 'center', paddingBottom: 4, flexShrink: 0 }}>
-              <span style={{ fontSize: 9, color: matchPct === 100 ? '#6ba395' : 'rgba(255,255,255,0.5)' }}>
+              <span style={{ fontSize: 9, color: matchPct === 100 ? '#6ba395' : '#6b7280' }}>
                 {matchPct}% matched
               </span>
             </div>
@@ -796,17 +904,80 @@ export default function PixelArtCoding({ sessionId, role, isLocked }: PixelArtCo
         {/* ============================================== */}
         {/* BOTTOM SECTION — Command Tray + Score         */}
         {/* ============================================== */}
-        <div style={{ flexShrink: 0, borderTop: '1px solid rgba(255,255,255,0.06)', paddingTop: 6, marginTop: 6 }}>
+        <div style={{ flexShrink: 0, borderTop: '1px solid rgba(0,0,0,0.05)', paddingTop: 6, marginTop: 6 }}>
           {/* Block Coding Mode */}
           {mode === 'code' && (
             <>
+              {/* How Mode B works — a worked example, since a bare row of arrows
+                  gives no clue what "running a program" does. Dismissible, and
+                  it stays hidden once the child has started building. */}
+              {showCodeHelp && program.length === 0 && (
+                <div
+                  style={{
+                    marginBottom: 5,
+                    padding: '6px 8px',
+                    borderRadius: 8,
+                    background: 'rgba(74,124,111,0.12)',
+                    border: '1px solid rgba(74,124,111,0.18)',
+                  }}
+                >
+                  <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 4 }}>
+                    <span style={{ fontSize: 9, fontWeight: 600, color: '#2f6d5e' }}>
+                      How it works
+                    </span>
+                    <button
+                      onClick={() => setShowCodeHelp(false)}
+                      style={{ background: 'none', border: 'none', color: '#8b9096', cursor: 'pointer', fontSize: 9, padding: 0 }}
+                    >
+                      Got it ✕
+                    </button>
+                  </div>
+                  <div style={{ fontSize: 8, color: '#5b6169', lineHeight: 1.5 }}>
+                    The green square is your robot. Tap blocks to tell it where to
+                    go, then press Run.
+                  </div>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 3, marginTop: 5 }}>
+                    {['➡', '➡', '🎨'].map((g, i) => (
+                      <span
+                        key={i}
+                        style={{ padding: '1px 5px', borderRadius: 8, background: 'rgba(74,124,111,0.25)', fontSize: 10 }}
+                      >
+                        {g}
+                      </span>
+                    ))}
+                    <span style={{ fontSize: 8, color: '#6b7280', marginLeft: 2 }}>
+                      = move right, right, then colour that square
+                    </span>
+                  </div>
+                </div>
+              )}
+
+              {/* Plain-English readout of the program being built, plus what the
+                  ghost markers on the grid mean. */}
+              {program.length > 0 && !isRunning && (
+                <div style={{ marginBottom: 4, fontSize: 8, color: '#6b7280', lineHeight: 1.4 }}>
+                  {projection.blocked ? (
+                    <span style={{ color: '#e8a87c' }}>
+                      ⚠ This program walks off the grid — remove a move block.
+                    </span>
+                  ) : (
+                    <>
+                      Robot will make {program.filter((c) => c !== 'paint').length} move
+                      {program.filter((c) => c !== 'paint').length === 1 ? '' : 's'} and colour{' '}
+                      {projection.paint.size} square{projection.paint.size === 1 ? '' : 's'}
+                      {projection.paint.size > 0 ? ' (shown in yellow)' : ''}.
+                    </>
+                  )}
+                </div>
+              )}
+
               {/* Program sequence */}
               <div
                 style={{
                   display: 'flex',
                   gap: 3,
                   padding: '4px 6px',
-                  background: 'rgba(255,255,255,0.05)',
+                  background: 'rgba(0,0,0,0.04)',
                   borderRadius: 8,
                   marginBottom: 4,
                   overflowX: 'auto',
@@ -827,20 +998,21 @@ export default function PixelArtCoding({ sessionId, role, isLocked }: PixelArtCo
                         padding: '2px 6px',
                         borderRadius: 10,
                         background: 'rgba(74,124,111,0.2)',
-                        color: '#b8d4ce',
+                        color: '#2f6d5e',
                         fontSize: 10,
                         whiteSpace: 'nowrap',
                         flexShrink: 0,
                       }}
                     >
                       <span>{c?.label || cmd}</span>
+                      <span style={{ fontSize: 8, opacity: 0.75 }}>{c?.name}</span>
                       {canInteract && !isRunning && (
                         <button
                           onClick={() => handleRemoveCommand(i)}
                           style={{
                             background: 'none',
                             border: 'none',
-                            color: 'rgba(255,255,255,0.4)',
+                            color: '#8b9096',
                             cursor: 'pointer',
                             padding: 0,
                             fontSize: 9,
@@ -854,7 +1026,7 @@ export default function PixelArtCoding({ sessionId, role, isLocked }: PixelArtCo
                   )
                 })}
                 {program.length === 0 && programStatus === 'idle' && (
-                  <span style={{ fontSize: 8, color: 'rgba(255,255,255,0.3)' }}>
+                  <span style={{ fontSize: 8, color: 'rgba(0,0,0,0.22)' }}>
                     Click blocks below to build your program
                   </span>
                 )}
@@ -875,12 +1047,13 @@ export default function PixelArtCoding({ sessionId, role, isLocked }: PixelArtCo
                       fontSize: 12,
                       cursor: canInteract && !isRunning ? 'pointer' : 'default',
                       opacity: canInteract && !isRunning ? 1 : 0.4,
-                      background: 'rgba(255,255,255,0.07)',
-                      color: '#b8d4ce',
+                      background: 'rgba(0,0,0,0.05)',
+                      color: '#2f6d5e',
                       transition: 'all 0.15s',
                     }}
                   >
-                    {cmd.label}
+                    <span style={{ display: 'block', fontSize: 13, lineHeight: 1.1 }}>{cmd.label}</span>
+                    <span style={{ display: 'block', fontSize: 7, opacity: 0.7, lineHeight: 1.3 }}>{cmd.name}</span>
                   </button>
                 ))}
               </div>
@@ -900,8 +1073,8 @@ export default function PixelArtCoding({ sessionId, role, isLocked }: PixelArtCo
                       fontWeight: 600,
                       cursor: program.length > 0 ? 'pointer' : 'default',
                       opacity: program.length > 0 ? 1 : 0.4,
-                      background: 'rgba(74,124,111,0.3)',
-                      color: '#b8d4ce',
+                      background: 'rgba(74,124,111,0.18)',
+                      color: '#2f6d5e',
                     }}
                   >
                     ▶ Run
@@ -917,7 +1090,7 @@ export default function PixelArtCoding({ sessionId, role, isLocked }: PixelArtCo
                       fontSize: 9,
                       fontWeight: 600,
                       cursor: 'pointer',
-                      background: 'rgba(200,96,42,0.25)',
+                      background: 'rgba(200,96,42,0.16)',
                       color: '#c8602a',
                     }}
                   >
@@ -934,8 +1107,8 @@ export default function PixelArtCoding({ sessionId, role, isLocked }: PixelArtCo
                     fontSize: 9,
                     fontWeight: 600,
                     cursor: 'pointer',
-                    background: 'rgba(255,255,255,0.07)',
-                    color: 'rgba(255,255,255,0.5)',
+                    background: 'rgba(0,0,0,0.05)',
+                    color: '#6b7280',
                   }}
                 >
                   🔄 Reset
@@ -979,10 +1152,10 @@ export default function PixelArtCoding({ sessionId, role, isLocked }: PixelArtCo
               position: 'relative',
             }}
           >
-            <span style={{ fontSize: 10, color: 'rgba(255,255,255,0.5)' }}>
+            <span style={{ fontSize: 10, color: '#6b7280' }}>
               {mode === 'paint' ? '🎨 Free Paint' : '💻 Block Code'}
             </span>
-            <span style={{ fontSize: 10, color: 'rgba(255,255,255,0.5)' }}>
+            <span style={{ fontSize: 10, color: '#6b7280' }}>
               ✓ {score} completed
             </span>
 

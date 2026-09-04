@@ -29,11 +29,10 @@ export const MODULE_CATEGORIES: ModuleCategory[] = [
     iconBg: 'rgba(120,90,220,0.25)',
     iconBorder: 'rgba(120,90,220,0.3)',
     modules: [
-      { id: 'digital-sand-tray', name: 'Digital Sand Tray', emoji: '🏖️', desc: 'Non-verbal expression · emotional processing' },
       { id: 'word-building', name: 'Word Building', emoji: '🔤', desc: 'Phonics · spelling · decoding' },
       { id: 'whack-a-mole-math', name: 'Whack-a-Mole Math', emoji: '🔨', desc: 'Math fluency · number recognition' },
       { id: 'pixel-art-coding', name: 'Pixel Art Coding', emoji: '🎨', desc: 'Sequential thinking · pattern recognition' },
-      { id: 'bubble_splash', name: 'Bubble Splash', emoji: '🫧', desc: 'Sight words · reading fluency' },
+      { id: 'bubble-splash', name: 'Bubble Splash', emoji: '🫧', desc: 'Sight words · reading fluency' },
     ],
   },
   {
@@ -85,17 +84,37 @@ export const MODULE_CATEGORIES: ModuleCategory[] = [
     iconBorder: 'rgba(100,100,100,0.3)',
     modules: [
       { id: 'emotion-wheel', name: 'Emotion Wheel', emoji: '🎡', desc: 'Emotion identification · granular awareness' },
-      { id: 'safe-space-builder', name: 'Safe Space Builder', emoji: '🏠', desc: 'Grounding · personalized calm environment' },
       { id: 'defusion-river', name: 'Defusion River', emoji: '🌊', desc: 'Cognitive defusion · thought observation' },
       { id: 'thought-challenger', name: 'Thought Challenger', emoji: '⚖️', desc: 'CBT · evidence-based thought restructuring' },
       { id: 'micro-quest-board', name: 'Micro Quest Board', emoji: '🗺️', desc: 'Behavioral activation · micro-goals' },
       { id: 'values-card-sort', name: 'Values Card Sort', emoji: '🃏', desc: 'ACT · values clarification & commitment' },
-      { id: 'urge-surfing', name: 'Urge Surfing', emoji: '🏄', desc: 'DBT · urge tolerance · mindfulness' },
       { id: 'worry-vault', name: 'Worry Vault', emoji: '🗄️', desc: 'Worry containment · scheduled worry time' },
       { id: 'facts-vs-feelings', name: 'Facts vs Feelings', emoji: '🔍', desc: 'Reality testing · emotion-fact distinction' },
     ],
   },
+  {
+    id: 'skill',
+    name: 'Skill Development',
+    desc: 'Life skills for children aged 8–18',
+    emoji: '🌱',
+    iconBg: 'rgba(16,163,127,0.18)',
+    iconBorder: 'rgba(16,163,127,0.28)',
+    modules: [
+      { id: 'story-choice-adventure', name: 'Story Choice Adventure', emoji: '📖', desc: 'Learn consequences through interactive choices' },
+      { id: 'emotion-detective', name: 'Emotion Detective', emoji: '🔍', desc: 'Identify how others feel in real-life situations' },
+      { id: 'build-together', name: 'Build Together', emoji: '🌉', desc: 'Combine what you know to build something together' },
+      { id: 'treasure-quest', name: 'Treasure Quest', emoji: '🗺️', desc: 'Follow a chain of clues by sharing what you each know' },
+    ],
+  },
 ]
+
+// Skill Development modules render in the dedicated full-canvas SkillDevLayout
+// instead of the normal session room layout. Every other module is unaffected.
+export const SKILL_MODULE_IDS: string[] =
+  MODULE_CATEGORIES.find((c) => c.id === 'skill')?.modules.map((m) => m.id) ?? []
+
+export const isSkillModule = (id: string | null | undefined): boolean =>
+  !!id && SKILL_MODULE_IDS.includes(id)
 
 export const ALL_MODULES: ModuleItem[] = MODULE_CATEGORIES.flatMap((c) => c.modules)
 export const ALL_MODULE_IDS: string[] = ALL_MODULES.map((m) => m.id)
@@ -103,7 +122,26 @@ export const ALL_MODULE_IDS: string[] = ALL_MODULES.map((m) => m.id)
 const MODULE_NAME_BY_ID: Record<string, string> = Object.fromEntries(
   ALL_MODULES.map((m) => [m.id, m.name])
 )
-export const moduleName = (id: string): string => MODULE_NAME_BY_ID[id] ?? id
+
+/**
+ * Slugs that no longer exist in the registry but may still appear in historical
+ * session records (moduleEvents, usage rows, reports). Without these, past
+ * sessions render the raw slug — e.g. "digital-sand-tray" — in the notes
+ * timeline. Nothing here is launchable; this is display only.
+ */
+const RETIRED_MODULE_NAMES: Record<string, string> = {
+  // Removed entirely — concept judged wrong for the category.
+  'digital-sand-tray': 'Digital Sand Tray',
+  // Pre-unification slugs for what is now 'bubble-splash'.
+  bubble_splash: 'Bubble Splash',
+  'bubble-splash-sld': 'Bubble Splash',
+  // Removed — testers did not understand either activity.
+  'urge-surfing': 'Urge Surfing',
+  'safe-space-builder': 'Safe Space Builder',
+}
+
+export const moduleName = (id: string): string =>
+  MODULE_NAME_BY_ID[id] ?? RETIRED_MODULE_NAMES[id] ?? id
 
 // Resolve a therapist's effective allowed module ids.
 // `allModulesAllowed` true (default) means unrestricted -> every module.

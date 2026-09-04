@@ -3,6 +3,9 @@ import { useState, useEffect, useRef, useCallback } from 'react'
 import { doc, onSnapshot, updateDoc } from 'firebase/firestore'
 import { db } from '@/lib/firebase'
 import { logModuleEvent } from '@/lib/sessionEvents'
+import { staadSpeak, randomPraise } from '@/lib/voice/staadVoice'
+import { useVoiceLanguage } from '@/lib/voice/useVoiceLanguage'
+import VoiceLanguageToggle from '@/components/modules/VoiceLanguageToggle'
 
 interface WordBuildingProps {
   sessionId: string
@@ -52,6 +55,7 @@ export default function WordBuilding({ sessionId, role, isLocked }: WordBuilding
   const [dragging, setDragging] = useState<{ tileIndex: number; offsetX: number; offsetY: number } | null>(null)
   const [dragPos, setDragPos] = useState<{ x: number; y: number } | null>(null)
   const [selectedTile, setSelectedTile] = useState<number | null>(null)
+  const voiceLanguage = useVoiceLanguage(sessionId)
 
   const slotRefs = useRef<(HTMLDivElement | null)[]>([])
   const poolRef = useRef<HTMLDivElement>(null)
@@ -60,6 +64,11 @@ export default function WordBuilding({ sessionId, role, isLocked }: WordBuilding
 
   const ref = useRef({ targetWord: '', tiles, slots, difficulty, wordIndex, score })
   ref.current = { targetWord, tiles, slots, difficulty, wordIndex, score }
+
+  // Read through a ref so the success effect's dependencies (and therefore the
+  // game logic) are untouched by a language change.
+  const voiceLangRef = useRef(voiceLanguage)
+  voiceLangRef.current = voiceLanguage
 
   const writeToFirestore = useCallback(async (data: Record<string, unknown>) => {
     try {
@@ -199,12 +208,11 @@ export default function WordBuilding({ sessionId, role, isLocked }: WordBuilding
     }
   }
 
+  // The target word is always spoken in English — it IS the English word being
+  // built — so this one call stays on 'en-IN' regardless of the praise language.
   const speakWord = useCallback((word: string) => {
-    if (!word || typeof window === 'undefined') return
-    const utterance = new SpeechSynthesisUtterance(word)
-    utterance.rate = 0.85
-    utterance.pitch = 1.1
-    window.speechSynthesis.speak(utterance)
+    if (!word) return
+    staadSpeak({ text: word, language: 'en-IN', type: 'instruction' })
   }, [])
 
   useEffect(() => {
@@ -239,6 +247,9 @@ export default function WordBuilding({ sessionId, role, isLocked }: WordBuilding
       })
     }
 
+    // Reward voice: shared praise phrase, then the word itself (queued behind it
+    // by the speech engine) so the word is still reinforced as it was before.
+    staadSpeak({ text: randomPraise(voiceLangRef.current), language: voiceLangRef.current, type: 'praise' })
     speakWord(targetWord)
 
     const emojis: { id: number; x: number }[] = []
@@ -299,22 +310,22 @@ export default function WordBuilding({ sessionId, role, isLocked }: WordBuilding
       >
         {/* Therapist controls */}
         {isTherapist && (
-          <div style={{ flexShrink: 0 }}>
-            <div className="flex items-center" style={{ gap: 4, marginBottom: 6 }}>
+          <div style={{ flexShrink: 0, width: '100%', maxWidth: 1000, alignSelf: 'center', display: 'flex', alignItems: 'center', gap: 12, flexWrap: 'wrap' }}>
+            <div className="flex items-center" style={{ gap: 6, flex: 1, minWidth: 0 }}>
               {DIFFICULTIES.map((d) => (
                 <button
                   key={d.key}
                   onClick={() => handleDifficultySelect(d.key)}
                   style={{
                     flex: 1,
-                    padding: '4px 0',
-                    borderRadius: 14,
+                    padding: '6px 0',
+                    borderRadius: 12,
                     border: 'none',
-                    fontSize: 9,
+                    fontSize: 11,
                     fontWeight: 500,
                     cursor: 'pointer',
-                    background: difficulty === d.key ? 'rgba(74,124,111,0.3)' : 'rgba(255,255,255,0.07)',
-                    color: difficulty === d.key ? '#b8d4ce' : 'rgba(255,255,255,0.5)',
+                    background: difficulty === d.key ? 'rgba(74,124,111,0.18)' : 'rgba(0,0,0,0.05)',
+                    color: difficulty === d.key ? '#2f6d5e' : '#6b7280',
                     transition: 'all 0.15s',
                   }}
                 >
@@ -322,8 +333,9 @@ export default function WordBuilding({ sessionId, role, isLocked }: WordBuilding
                 </button>
               ))}
             </div>
+            <VoiceLanguageToggle sessionId={sessionId} language={voiceLanguage} />
             {difficulty === 'custom' && (
-              <div className="flex items-center" style={{ gap: 4 }}>
+              <div className="flex items-center" style={{ gap: 6, flex: '0 1 260px' }}>
                 <input
                   value={customInput}
                   onChange={(e) => setCustomInput(e.target.value.replace(/[^a-zA-Z]/g, '').slice(0, 10))}
@@ -331,11 +343,11 @@ export default function WordBuilding({ sessionId, role, isLocked }: WordBuilding
                   placeholder="Type a word"
                   style={{
                     flex: 1,
-                    background: 'rgba(255,255,255,0.06)',
-                    border: '1px solid rgba(255,255,255,0.1)',
+                    background: 'rgba(0,0,0,0.05)',
+                    border: '1px solid rgba(0,0,0,0.08)',
                     borderRadius: 6,
                     padding: '5px 8px',
-                    color: 'rgba(255,255,255,0.8)',
+                    color: '#3d4348',
                     fontSize: 11,
                     fontFamily: "'DM Sans', sans-serif",
                     outline: 'none',
@@ -347,8 +359,8 @@ export default function WordBuilding({ sessionId, role, isLocked }: WordBuilding
                     padding: '5px 10px',
                     borderRadius: 6,
                     border: 'none',
-                    background: 'rgba(74,124,111,0.3)',
-                    color: '#b8d4ce',
+                    background: 'rgba(74,124,111,0.18)',
+                    color: '#2f6d5e',
                     fontSize: 9,
                     fontWeight: 500,
                     cursor: 'pointer',
@@ -365,7 +377,7 @@ export default function WordBuilding({ sessionId, role, isLocked }: WordBuilding
         {!targetWord && (
           <div className="flex flex-col items-center justify-center" style={{ flex: 1 }}>
             <span style={{ fontSize: 28, marginBottom: 8 }}>🔤</span>
-            <span style={{ fontSize: 11, color: 'rgba(255,255,255,0.4)' }}>
+            <span style={{ fontSize: 11, color: '#8b9096' }}>
               {isTherapist ? 'Select a word to begin' : 'Waiting for therapist to set a word...'}
             </span>
           </div>
@@ -374,6 +386,21 @@ export default function WordBuilding({ sessionId, role, isLocked }: WordBuilding
         {/* Game area */}
         {targetWord && (
           <>
+            {/* Play area.
+                Owns the leftover canvas height and centres the word in it, so
+                the wide layout has no dead band between the tiles and the score
+                bar (which is pinned to the bottom by `marginTop: auto`). */}
+            <div
+              style={{
+                flex: 1,
+                minHeight: 0,
+                display: 'flex',
+                flexDirection: 'column',
+                alignItems: 'center',
+                justifyContent: 'center',
+                gap: 10,
+              }}
+            >
             {/* Target word dashes */}
             <div
               className="flex items-center justify-center"
@@ -387,10 +414,10 @@ export default function WordBuilding({ sessionId, role, isLocked }: WordBuilding
                 <div key={i} style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 4 }}>
                   <div
                     style={{
-                      width: 28,
-                      height: 2,
+                      width: 44,
+                      height: 3,
                       borderRadius: 1,
-                      background: slotLetters[i] ? 'rgba(74,124,111,0.5)' : 'rgba(255,255,255,0.25)',
+                      background: slotLetters[i] ? 'rgba(74,124,111,0.25)' : 'rgba(0,0,0,0.18)',
                       transition: 'background 0.2s',
                     }}
                   />
@@ -404,7 +431,7 @@ export default function WordBuilding({ sessionId, role, isLocked }: WordBuilding
               onPointerMove={handlePointerMove}
               onPointerUp={handlePointerUp}
               style={{
-                gap: 5,
+                gap: 9,
                 flexWrap: 'wrap',
                 flexShrink: 0,
                 minHeight: 40,
@@ -420,30 +447,30 @@ export default function WordBuilding({ sessionId, role, isLocked }: WordBuilding
                     ref={(el) => { slotRefs.current[i] = el }}
                     onClick={() => handleSlotClick(i)}
                     style={{
-                      width: 32,
-                      height: 36,
-                      borderRadius: 7,
+                      width: 52,
+                      height: 58,
+                      borderRadius: 10,
                       display: 'flex',
                       alignItems: 'center',
                       justifyContent: 'center',
-                      fontSize: 18,
+                      fontSize: 28,
                       fontWeight: 500,
-                      color: '#fff',
+                      color: '#2b2f33',
                       cursor: !canInteract ? 'default' : slots[i] !== null ? 'pointer' : selectedTile !== null ? 'pointer' : 'default',
                       background: isCorrect
-                        ? 'rgba(74,124,111,0.4)'
+                        ? 'rgba(74,124,111,0.22)'
                         : isWrong
-                        ? 'rgba(200,96,42,0.3)'
+                        ? 'rgba(200,96,42,0.18)'
                         : slots[i] !== null
-                        ? 'rgba(255,255,255,0.12)'
-                        : 'rgba(255,255,255,0.06)',
+                        ? 'rgba(0,0,0,0.07)'
+                        : 'rgba(0,0,0,0.05)',
                       border: isCorrect
                         ? '1.5px solid rgba(74,124,111,0.6)'
                         : isWrong
                         ? '1.5px solid rgba(200,96,42,0.5)'
                         : slots[i] !== null
-                        ? '1.5px solid rgba(255,255,255,0.3)'
-                        : '1.5px dashed rgba(255,255,255,0.2)',
+                        ? '1.5px solid rgba(0,0,0,0.22)'
+                        : '1.5px dashed rgba(0,0,0,0.16)',
                       animation: isWrong ? 'wbShake 0.4s ease' : 'none',
                       transition: 'all 0.15s',
                       userSelect: 'none',
@@ -460,7 +487,7 @@ export default function WordBuilding({ sessionId, role, isLocked }: WordBuilding
               ref={poolRef}
               className="flex items-center justify-center"
               style={{
-                gap: 5,
+                gap: 9,
                 flexWrap: 'wrap',
                 flexShrink: 0,
                 minHeight: 40,
@@ -484,23 +511,23 @@ export default function WordBuilding({ sessionId, role, isLocked }: WordBuilding
                       handleTileClick(idx)
                     }}
                     style={{
-                      width: 32,
-                      height: 36,
-                      borderRadius: 7,
+                      width: 52,
+                      height: 58,
+                      borderRadius: 10,
                       display: 'flex',
                       alignItems: 'center',
                       justifyContent: 'center',
-                      fontSize: 18,
+                      fontSize: 28,
                       fontWeight: 500,
-                      color: '#fff',
+                      color: '#2b2f33',
                       cursor: canInteract ? 'grab' : 'default',
                       opacity: isDragging ? 0.3 : 1,
                       background: isSelected
-                        ? 'rgba(74,124,111,0.35)'
-                        : 'rgba(255,255,255,0.10)',
+                        ? 'rgba(74,124,111,0.22)'
+                        : 'rgba(0,0,0,0.08)',
                       border: isSelected
                         ? '1.5px solid rgba(74,124,111,0.6)'
-                        : '1px solid rgba(255,255,255,0.18)',
+                        : '1px solid rgba(0,0,0,0.14)',
                       transform: isSelected ? 'scale(1.1)' : 'none',
                       transition: 'all 0.12s',
                       userSelect: 'none',
@@ -514,6 +541,7 @@ export default function WordBuilding({ sessionId, role, isLocked }: WordBuilding
               })}
             </div>
 
+            </div>
             {/* Drag ghost */}
             {dragging && dragPos && (
               <div
@@ -521,16 +549,16 @@ export default function WordBuilding({ sessionId, role, isLocked }: WordBuilding
                   position: 'fixed',
                   left: dragPos.x - 16,
                   top: dragPos.y - 18,
-                  width: 32,
-                  height: 36,
-                  borderRadius: 7,
+                  width: 52,
+                  height: 58,
+                  borderRadius: 10,
                   display: 'flex',
                   alignItems: 'center',
                   justifyContent: 'center',
-                  fontSize: 18,
+                  fontSize: 28,
                   fontWeight: 500,
-                  color: '#fff',
-                  background: 'rgba(74,124,111,0.5)',
+                  color: '#2b2f33',
+                  background: 'rgba(74,124,111,0.25)',
                   border: '1.5px solid rgba(74,124,111,0.7)',
                   zIndex: 999,
                   pointerEvents: 'none',
@@ -568,11 +596,11 @@ export default function WordBuilding({ sessionId, role, isLocked }: WordBuilding
                 justifyContent: 'space-between',
                 marginTop: 'auto',
                 paddingTop: 6,
-                borderTop: '1px solid rgba(255,255,255,0.06)',
+                borderTop: '1px solid rgba(0,0,0,0.05)',
                 flexShrink: 0,
               }}
             >
-              <span style={{ fontSize: 10, color: 'rgba(255,255,255,0.4)' }}>
+              <span style={{ fontSize: 10, color: '#8b9096' }}>
                 ✓ {score} words
               </span>
               <div className="flex items-center" style={{ gap: 4 }}>
@@ -581,9 +609,9 @@ export default function WordBuilding({ sessionId, role, isLocked }: WordBuilding
                   style={{
                     padding: '4px 8px',
                     borderRadius: 5,
-                    border: '1px solid rgba(255,255,255,0.1)',
-                    background: 'rgba(255,255,255,0.06)',
-                    color: 'rgba(255,255,255,0.5)',
+                    border: '1px solid rgba(0,0,0,0.08)',
+                    background: 'rgba(0,0,0,0.05)',
+                    color: '#6b7280',
                     fontSize: 9,
                     cursor: 'pointer',
                   }}
@@ -600,9 +628,9 @@ export default function WordBuilding({ sessionId, role, isLocked }: WordBuilding
                     style={{
                       padding: '4px 8px',
                       borderRadius: 5,
-                      border: '1px solid rgba(255,255,255,0.1)',
-                      background: 'rgba(255,255,255,0.06)',
-                      color: 'rgba(255,255,255,0.5)',
+                      border: '1px solid rgba(0,0,0,0.08)',
+                      background: 'rgba(0,0,0,0.05)',
+                      color: '#6b7280',
                       fontSize: 9,
                       cursor: 'pointer',
                     }}

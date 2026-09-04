@@ -45,7 +45,6 @@ export interface RAGContext {
 }
 
 export const AVAILABLE_MODULES = [
-  'digital-sand-tray',
   'word-building',
   'whack-a-mole-math',
   'pixel-art-coding',
@@ -61,12 +60,10 @@ export const AVAILABLE_MODULES = [
   'social-story',
   'virtual-shop',
   'emotion-wheel',
-  'safe-space-builder',
   'defusion-river',
   'thought-challenger',
   'micro-quest-board',
   'values-card-sort',
-  'urge-surfing',
   'worry-vault',
   'facts-vs-feelings',
 ]

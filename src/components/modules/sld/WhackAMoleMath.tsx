@@ -181,7 +181,11 @@ export default function WhackAMoleMath({ sessionId, role, isLocked }: WhackAMole
         ...data,
         'timestamps.updatedAt': new Date().toISOString(),
       })
-    } catch {}
+    } catch (err) {
+      // Was silent. A failed write means the two screens have diverged, which is
+      // impossible to diagnose from the UI alone.
+      console.warn('[WhackAMoleMath] Firestore write failed', err)
+    }
   }, [sessionId])
 
   useEffect(() => {
@@ -217,8 +221,16 @@ export default function WhackAMoleMath({ sessionId, role, isLocked }: WhackAMole
     return () => unsub()
   }, [sessionId])
 
-  const startNewQuestion = useCallback(() => {
-    const { operation, difficulty } = gameRef.current
+  // `override` matters when the therapist has just changed operation/difficulty:
+  // gameRef still holds the previous value at that point in the event handler, so
+  // the new setting has to be passed in explicitly.
+  const startNewQuestion = useCallback((override?: {
+    operation?: Operation
+    difficulty?: DifficultyLevel
+    forceWrite?: boolean
+  }) => {
+    const operation = override?.operation ?? gameRef.current.operation
+    const difficulty = override?.difficulty ?? gameRef.current.difficulty
     const { question: q, numbers } = generateQuestion(operation, difficulty)
     const answerIdx = numbers.indexOf(q.answer)
     const molesArr = buildMoles(numbers, answerIdx)
@@ -231,7 +243,9 @@ export default function WhackAMoleMath({ sessionId, role, isLocked }: WhackAMole
     setHoleFlashes({})
     setSpinningHole(null)
 
-    if (gameRef.current.isPlaying) {
+    // Paused sessions still need the write when the therapist deliberately
+    // changed a setting, so both screens show the newly generated question.
+    if (gameRef.current.isPlaying || override?.forceWrite) {
       writeToFirestore({
         'moduleState.wamQuestion': q,
         'moduleState.wamMoles': upMoles,
@@ -319,14 +333,21 @@ export default function WhackAMoleMath({ sessionId, role, isLocked }: WhackAMole
 
   const handleOperationChange = (op: Operation) => {
     if (!isTherapist) return
+    if (op === gameRef.current.operation) return
     setOperation(op)
     writeToFirestore({ 'moduleState.wamOperation': op })
+    // Switching operation must take effect on the question on screen, not only
+    // on the next one — otherwise the control looks dead until the child answers.
+    startNewQuestion({ operation: op, forceWrite: true })
   }
 
   const handleDifficultyChange = (diff: DifficultyLevel) => {
     if (!isTherapist) return
+    if (diff === gameRef.current.difficulty) return
     setDifficulty(diff)
     writeToFirestore({ 'moduleState.wamDifficulty': diff })
+    // Same immediate-effect reasoning as the operation switch above.
+    startNewQuestion({ difficulty: diff, forceWrite: true })
   }
 
   const handleSpeedChange = (ms: number, label: string) => {
@@ -407,24 +428,27 @@ export default function WhackAMoleMath({ sessionId, role, isLocked }: WhackAMole
           gap: 6,
         }}
       >
-        {/* Therapist controls */}
+        {/* Therapist controls.
+            Capped and centred: on the wide canvas each `flex: 1` pill would
+            otherwise stretch to hundreds of pixels with 8px text inside it. */}
         {isTherapist && (
-          <div style={{ flexShrink: 0 }}>
-            <div className="flex items-center" style={{ gap: 3, marginBottom: 5 }}>
+          <div style={{ flexShrink: 0, width: '100%', maxWidth: 1000, alignSelf: 'center', display: 'flex', alignItems: 'center', gap: 12 }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 14, flex: 1, minWidth: 0, flexWrap: 'wrap' }}>
+            <div className="flex items-center" style={{ gap: 6, flex: '2 1 240px' }}>
               {OPERATIONS.map((op) => (
                 <button
                   key={op.key}
                   onClick={() => handleOperationChange(op.key)}
                   style={{
                     flex: 1,
-                    padding: '3px 0',
+                    padding: '6px 0',
                     borderRadius: 12,
                     border: 'none',
-                    fontSize: 8,
+                    fontSize: 11,
                     fontWeight: 500,
                     cursor: 'pointer',
-                    background: operation === op.key ? 'rgba(74,124,111,0.3)' : 'rgba(255,255,255,0.07)',
-                    color: operation === op.key ? '#b8d4ce' : 'rgba(255,255,255,0.5)',
+                    background: operation === op.key ? 'rgba(74,124,111,0.18)' : 'rgba(0,0,0,0.05)',
+                    color: operation === op.key ? '#2f6d5e' : '#6b7280',
                     transition: 'all 0.15s',
                   }}
                 >
@@ -432,21 +456,21 @@ export default function WhackAMoleMath({ sessionId, role, isLocked }: WhackAMole
                 </button>
               ))}
             </div>
-            <div className="flex items-center" style={{ gap: 3, marginBottom: 5 }}>
+            <div className="flex items-center" style={{ gap: 6, flex: '1 1 180px' }}>
               {DIFFICULTIES.map((d) => (
                 <button
                   key={d.key}
                   onClick={() => handleDifficultyChange(d.key)}
                   style={{
                     flex: 1,
-                    padding: '3px 0',
+                    padding: '6px 0',
                     borderRadius: 12,
                     border: 'none',
-                    fontSize: 8,
+                    fontSize: 11,
                     fontWeight: 500,
                     cursor: 'pointer',
-                    background: difficulty === d.key ? 'rgba(74,124,111,0.3)' : 'rgba(255,255,255,0.07)',
-                    color: difficulty === d.key ? '#b8d4ce' : 'rgba(255,255,255,0.5)',
+                    background: difficulty === d.key ? 'rgba(74,124,111,0.18)' : 'rgba(0,0,0,0.05)',
+                    color: difficulty === d.key ? '#2f6d5e' : '#6b7280',
                     transition: 'all 0.15s',
                   }}
                 >
@@ -454,21 +478,21 @@ export default function WhackAMoleMath({ sessionId, role, isLocked }: WhackAMole
                 </button>
               ))}
             </div>
-            <div className="flex items-center" style={{ gap: 3, marginBottom: 5 }}>
+            <div className="flex items-center" style={{ gap: 6, flex: '1 1 180px' }}>
               {SPEEDS.map((s) => (
                 <button
                   key={s.key}
                   onClick={() => handleSpeedChange(s.ms, s.key)}
                   style={{
                     flex: 1,
-                    padding: '3px 0',
+                    padding: '6px 0',
                     borderRadius: 12,
                     border: 'none',
-                    fontSize: 8,
+                    fontSize: 11,
                     fontWeight: 500,
                     cursor: 'pointer',
-                    background: speed === s.ms ? 'rgba(74,124,111,0.3)' : 'rgba(255,255,255,0.07)',
-                    color: speed === s.ms ? '#b8d4ce' : 'rgba(255,255,255,0.5)',
+                    background: speed === s.ms ? 'rgba(74,124,111,0.18)' : 'rgba(0,0,0,0.05)',
+                    color: speed === s.ms ? '#2f6d5e' : '#6b7280',
                     transition: 'all 0.15s',
                   }}
                 >
@@ -476,18 +500,19 @@ export default function WhackAMoleMath({ sessionId, role, isLocked }: WhackAMole
                 </button>
               ))}
             </div>
+            </div>
             <button
               onClick={handleTogglePlaying}
               style={{
-                width: '100%',
-                padding: '5px 0',
-                borderRadius: 8,
+                flex: '0 0 auto',
+                padding: '6px 18px',
+                borderRadius: 12,
                 border: 'none',
-                fontSize: 10,
+                fontSize: 12,
                 fontWeight: 600,
                 cursor: 'pointer',
-                background: isPlaying ? 'rgba(200,96,42,0.25)' : 'rgba(74,124,111,0.3)',
-                color: isPlaying ? 'var(--accent, #c8602a)' : '#b8d4ce',
+                background: isPlaying ? 'rgba(200,96,42,0.18)' : 'rgba(74,124,111,0.22)',
+                color: isPlaying ? '#c8602a' : '#2f6d5e',
                 transition: 'all 0.15s',
               }}
             >
@@ -500,7 +525,7 @@ export default function WhackAMoleMath({ sessionId, role, isLocked }: WhackAMole
         {!isPlaying && !question && (
           <div className="flex flex-col items-center justify-center" style={{ flex: 1 }}>
             <span style={{ fontSize: 28, marginBottom: 8 }}>🔨</span>
-            <span style={{ fontSize: 11, color: 'rgba(255,255,255,0.4)' }}>
+            <span style={{ fontSize: 11, color: '#9aa0a6' }}>
               {isTherapist ? 'Press Start to begin' : 'Waiting for therapist to start...'}
             </span>
           </div>
@@ -513,18 +538,21 @@ export default function WhackAMoleMath({ sessionId, role, isLocked }: WhackAMole
             <div
               style={{
                 textAlign: 'center',
-                background: 'rgba(255,255,255,0.06)',
+                background: 'rgba(0,0,0,0.035)',
                 borderRadius: 12,
-                padding: '8px 14px',
-                border: '1px solid rgba(255,255,255,0.1)',
+                padding: '6px 18px',
+                border: '1px solid rgba(0,0,0,0.08)',
                 flexShrink: 0,
+                width: '100%',
+                maxWidth: 760,
+                alignSelf: 'center',
               }}
             >
               <span
                 style={{
                   fontFamily: "'DM Serif Display', serif",
-                  fontSize: 24,
-                  color: '#fff',
+                  fontSize: 26,
+                  color: '#2b2f33',
                 }}
               >
                 {question.display}
@@ -533,20 +561,51 @@ export default function WhackAMoleMath({ sessionId, role, isLocked }: WhackAMole
 
             {/* Locked overlay */}
             {!canInteract && isPlaying && (
-              <div style={{ fontSize: 9, color: 'rgba(255,255,255,0.4)', textAlign: 'center', flexShrink: 0 }}>
+              <div style={{ fontSize: 9, color: '#9aa0a6', textAlign: 'center', flexShrink: 0 }}>
                 Therapist is controlling
               </div>
             )}
 
             {/* Mole grid */}
+            {/* Wrapper owns the leftover height; the square grid is sized FROM
+                that height so it can never overflow the canvas, and is centred
+                horizontally. Sizing the grid itself as the flex item instead
+                either collapsed it to dots (height-as-flex-basis) or pushed the
+                bottom row off-canvas (width-as-authority). */}
             <div
               style={{
                 flex: 1,
+                minHeight: 0,
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                padding: '4px 0',
+                // Only bites on unusually short windows, where the floor below
+                // keeps the holes tappable rather than shrinking them to dots.
+                overflow: 'auto',
+              }}
+            >
+            <div
+              style={{
+                height: '100%',
+                // Floor is deliberately low: it exists only so the holes stay
+                // tappable on a very short window, not to force a scroll. On a
+                // normal screen `height: 100%` is what wins.
+                minHeight: 150,
+                // Columns span the FULL canvas width so the holes are evenly
+                // distributed rather than bunched into a narrow centred block;
+                // each hole is then sized from its row height and centred in its
+                // cell, so they stay circular and never overflow.
+                width: '100%',
+                // Same 760px content column as the question box and the score
+                // bar, so the three elements line up instead of the holes
+                // drifting out to the canvas edges on a wide screen.
+                maxWidth: 760,
+                margin: '0 auto',
                 display: 'grid',
                 gridTemplateColumns: 'repeat(3, 1fr)',
-                gap: 6,
-                padding: '6px 0',
-                alignContent: 'center',
+                gridTemplateRows: 'repeat(3, 1fr)',
+                gap: 'min(16px, 2%)',
                 position: 'relative',
               }}
             >
@@ -564,7 +623,7 @@ export default function WhackAMoleMath({ sessionId, role, isLocked }: WhackAMole
                     backdropFilter: 'blur(2px)',
                   }}
                 >
-                  <span style={{ fontSize: 11, color: 'rgba(255,255,255,0.5)' }}>Paused</span>
+                  <span style={{ fontSize: 11, color: '#6b7280' }}>Paused</span>
                 </div>
               )}
 
@@ -595,11 +654,12 @@ export default function WhackAMoleMath({ sessionId, role, isLocked }: WhackAMole
                     onClick={() => handleMoleClick(mole.holeIndex)}
                     style={{
                       position: 'relative',
-                      width: '100%',
+                      height: '100%',
                       aspectRatio: '1',
+                      justifySelf: 'center',
                       background: holeBg,
                       borderRadius: '50%',
-                      border: '2px solid rgba(0,0,0,0.3)',
+                      border: '2px solid rgba(0,0,0,0.18)',
                       overflow: 'hidden',
                       cursor: canInteract && isPlaying ? 'pointer' : 'default',
                       transition: flash ? 'none' : 'background 0.3s',
@@ -639,6 +699,7 @@ export default function WhackAMoleMath({ sessionId, role, isLocked }: WhackAMole
                 )
               })}
             </div>
+            </div>
 
             {/* Score + streak */}
             <div
@@ -647,15 +708,18 @@ export default function WhackAMoleMath({ sessionId, role, isLocked }: WhackAMole
                 alignItems: 'center',
                 justifyContent: 'space-between',
                 flexShrink: 0,
-                paddingTop: 4,
-                borderTop: '1px solid rgba(255,255,255,0.06)',
+                paddingTop: 8,
+                borderTop: '1px solid rgba(0,0,0,0.07)',
                 position: 'relative',
+                width: '100%',
+                maxWidth: 760,
+                alignSelf: 'center',
               }}
             >
-              <span style={{ fontSize: 10, color: 'rgba(255,255,255,0.5)' }}>
+              <span style={{ fontSize: 12, color: '#5b6169' }}>
                 ✓ {score} correct
               </span>
-              <span style={{ fontSize: 10, color: 'rgba(255,255,255,0.5)' }}>
+              <span style={{ fontSize: 12, color: '#5b6169' }}>
                 🔥 {streak} streak
               </span>
 

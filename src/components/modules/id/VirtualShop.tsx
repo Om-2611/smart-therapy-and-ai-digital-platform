@@ -4,6 +4,8 @@ import { useState, useEffect, useRef, useCallback, useMemo } from 'react'
 import { doc, onSnapshot, updateDoc, arrayUnion } from 'firebase/firestore'
 import { db } from '@/lib/firebase'
 import { logModuleEvent } from '@/lib/sessionEvents'
+import { staadPraise, staadCancel } from '@/lib/voice/staadVoice'
+import { useVoiceLanguage } from '@/lib/voice/useVoiceLanguage'
 
 interface VirtualShopProps {
   sessionId: string
@@ -80,6 +82,9 @@ function fmtPrice(amt: number, cur: string): string {
 }
 
 export default function VirtualShop({ sessionId, role, isLocked }: VirtualShopProps) {
+  const voiceLanguage = useVoiceLanguage(sessionId)
+  const voiceLangRef = useRef(voiceLanguage)
+  voiceLangRef.current = voiceLanguage
   const isT = role === 'therapist'
   const canInteract = isT || !isLocked
 
@@ -128,7 +133,7 @@ export default function VirtualShop({ sessionId, role, isLocked }: VirtualShopPr
     return () => unsub()
   }, [sessionId])
 
-  useEffect(() => () => { if (toastT.current) clearTimeout(toastT.current); window.speechSynthesis?.cancel() }, [])
+  useEffect(() => () => { if (toastT.current) clearTimeout(toastT.current); staadCancel() }, [])
 
   const showToast = useCallback((msg: string) => {
     setToast({ msg })
@@ -239,11 +244,7 @@ export default function VirtualShop({ sessionId, role, isLocked }: VirtualShopPr
         type: 'purchase_completed',
         detail: `Bought ${itemCount} item${itemCount === 1 ? '' : 's'} for ${fmtPrice(total, currency)} (difficulty ${difficulty})${shoppingList.length ? ', shopping list complete' : ''}`,
       })
-      if ('speechSynthesis' in window) {
-        const u = new SpeechSynthesisUtterance('Well done! You bought everything on your list!')
-        u.rate = 0.85
-        window.speechSynthesis.speak(u)
-      }
+      staadPraise(voiceLangRef.current, 'Well done! You bought everything on your list!')
     }, 700)
   }, [canPay, paying, walletBalance, basket, total, walletAmount, score, write, sessionId, itemCount, currency, difficulty, shoppingList.length])
 

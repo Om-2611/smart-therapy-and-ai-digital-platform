@@ -32,7 +32,6 @@ function getEmotionColor(emotion: string): string {
 }
 
 const MODULE_NAMES: Record<string, string> = {
-  'digital-sand-tray':  'Digital Sand Tray',
   'word-building':      'Word Building',
   'whack-a-mole-math':  'Whack-a-Mole Math',
   'pixel-art-coding':   'Pixel Art Coding',
@@ -48,12 +47,10 @@ const MODULE_NAMES: Record<string, string> = {
   'social-story':       'Social Story',
   'virtual-shop':       'Virtual Shop',
   'emotion-wheel':      'Emotion Wheel',
-  'safe-space-builder': 'Safe Space Builder',
   'defusion-river':     'Defusion River',
   'thought-challenger': 'Thought Challenger',
   'micro-quest-board':  'Micro Quest Board',
   'values-card-sort':   'Values Card Sort',
-  'urge-surfing':       'Urge Surfing',
   'worry-vault':        'Worry Vault',
   'facts-vs-feelings':  'Facts vs Feelings',
 }

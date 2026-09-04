@@ -76,6 +76,15 @@ const CHECKIN_EMOTIONS = [
   { emoji: '🥺', id: 'lonely' }, { emoji: '😰', id: 'worried' }, { emoji: '🤩', id: 'excited' },
 ]
 
+// How many emoji choices to show. Kept small deliberately: this is a
+// recognition task for children who may be anxious or have a reading
+// difficulty, and a wall of twelve faces is a memory test, not an emotion one.
+const OPTION_COUNT: Record<string, number> = {
+  simple: 4,
+  standard: 5,
+  advanced: 6,
+}
+
 function shuffleArray<T>(arr: T[]): T[] {
   const a = [...arr]
   for (let i = a.length - 1; i > 0; i--) {
@@ -151,15 +160,43 @@ export default function EmotionalCharades({ sessionId, role, isLocked }: Emotion
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [sessionId])
 
-  // Generate options when card changes
+  const getFilteredCards = useCallback((): EmotionCard[] => {
+    if (difficulty === 'simple') return CARDS.filter(c => c.category === 'basic')
+    let cats = [...categories]
+    if (difficulty === 'advanced' && !cats.includes('scenario')) cats.push('scenario')
+    if (cats.length === 0) return [...CARDS]
+    return CARDS.filter(c => cats.includes(c.category))
+  }, [categories, difficulty])
+
+  // Generate options when card changes.
+  //
+  // Two problems fixed here:
+  //  - Distractors were drawn from ALL cards while the target came from the
+  //    difficulty-filtered deck, so on 'simple' the target was the only basic
+  //    emotion among complex/therapy/scenario cards — identifiable by category
+  //    without reading it.
+  //  - Twelve options is far too many for emotion recognition with an anxious
+  //    or SLD child; comparable tasks here use 4-6.
   useEffect(() => {
     if (!currentCardId || answered) return
     const card = CARDS.find(c => c.id === currentCardId)
     if (!card) return
-    const pool = CARDS.filter(c => c.id !== currentCardId)
-    const shuffled = shuffleArray(pool).slice(0, 11)
-    setOptions(shuffleArray([card, ...shuffled]))
-  }, [currentCardId, answered])
+
+    const tier = getFilteredCards()
+    const wanted = OPTION_COUNT[difficulty] ?? 5
+    const sameTier = shuffleArray(tier.filter(c => c.id !== currentCardId))
+    let distractors = sameTier.slice(0, wanted - 1)
+
+    // Only if the chosen tier cannot fill the row (a narrow category
+    // selection) do we top up from the wider deck.
+    if (distractors.length < wanted - 1) {
+      const used = new Set([currentCardId, ...distractors.map(c => c.id)])
+      const extra = shuffleArray(CARDS.filter(c => !used.has(c.id)))
+      distractors = [...distractors, ...extra.slice(0, wanted - 1 - distractors.length)]
+    }
+
+    setOptions(shuffleArray([card, ...distractors]))
+  }, [currentCardId, answered, difficulty, getFilteredCards])
 
   // Elapsed session time for check-in
   useEffect(() => {
@@ -179,14 +216,6 @@ export default function EmotionalCharades({ sessionId, role, isLocked }: Emotion
       if (elapsedRef.current) clearInterval(elapsedRef.current)
     }
   }, [])
-
-  const getFilteredCards = useCallback((): EmotionCard[] => {
-    if (difficulty === 'simple') return CARDS.filter(c => c.category === 'basic')
-    let cats = [...categories]
-    if (difficulty === 'advanced' && !cats.includes('scenario')) cats.push('scenario')
-    if (cats.length === 0) return [...CARDS]
-    return CARDS.filter(c => cats.includes(c.category))
-  }, [categories, difficulty])
 
   const handleDrawCard = () => {
     if (!isTherapist) return
@@ -304,6 +333,25 @@ export default function EmotionalCharades({ sessionId, role, isLocked }: Emotion
   const currentCard = currentCardId ? CARDS.find(c => c.id === currentCardId) || null : null
   const showDesc = difficulty !== 'advanced' && difficulty !== 'simple'
   const deckTotal = getFilteredCards().length
+
+  /**
+   * In Identify mode the child answers by tapping an EMOJI, so the prompt card
+   * must not display that same emoji — it did, alongside the answer's label,
+   * which reduced the exercise to matching two identical pictures. ("It shows
+   * one emoji, and the same emoji is already present in the answer options.")
+   *
+   * While a question is open the prompt therefore describes the feeling in
+   * words instead. On 'simple' the emotion word is kept as scaffolding, so the
+   * task is word -> face; on the harder tiers only the description is shown and
+   * the child has to infer the feeling first. Once answered, the full card is
+   * revealed as feedback.
+   *
+   * Express mode is unaffected: the guesser already sees a face-down card and
+   * the actor is *supposed* to see the full card in order to act it out.
+   */
+  const identifyQuestionOpen = mode === 'identify' && !answered
+  const promptShowsEmoji = !identifyQuestionOpen
+  const promptShowsLabel = !identifyQuestionOpen || difficulty === 'simple'
 
   // Express mode: who sees the card?
   const guesserSeesCardBack = mode === 'express' && !expressRevealed && (
@@ -582,17 +630,34 @@ export default function EmotionalCharades({ sessionId, role, isLocked }: Emotion
                 textAlign: 'center',
                 animation: cardFlip ? 'none' : 'ecCardFlip 0.35s ease',
               }}>
-                <div style={{ fontSize: 56, marginBottom: 4 }}>{currentCard.emoji}</div>
-                <div style={{
-                  fontFamily: "'DM Serif Display', serif",
-                  fontSize: difficulty === 'simple' ? 24 : 20,
-                  color: '#fff',
-                }}>
-                  {currentCard.label}
-                </div>
-                {showDesc && (
-                  <div style={{ fontSize: 11, color: 'rgba(255,255,255,0.5)', fontStyle: 'italic', marginTop: 4 }}>
+                {promptShowsEmoji && (
+                  <div style={{ fontSize: 56, marginBottom: 4 }}>{currentCard.emoji}</div>
+                )}
+                {promptShowsLabel && (
+                  <div style={{
+                    fontFamily: "'DM Serif Display', serif",
+                    fontSize: difficulty === 'simple' ? 24 : 20,
+                    color: '#fff',
+                  }}>
+                    {currentCard.label}
+                  </div>
+                )}
+                {/* The description carries the question while the answer is
+                    hidden, so it is shown prominently rather than as a footnote. */}
+                {(identifyQuestionOpen || showDesc) && (
+                  <div style={{
+                    fontSize: identifyQuestionOpen ? 15 : 11,
+                    lineHeight: 1.5,
+                    color: identifyQuestionOpen ? 'rgba(255,255,255,0.9)' : 'rgba(255,255,255,0.5)',
+                    fontStyle: 'italic',
+                    marginTop: promptShowsLabel || promptShowsEmoji ? 4 : 0,
+                  }}>
                     {currentCard.desc}
+                  </div>
+                )}
+                {identifyQuestionOpen && (
+                  <div style={{ fontSize: 11, color: 'rgba(255,255,255,0.45)', marginTop: 8 }}>
+                    Which face matches this feeling?
                   </div>
                 )}
               </div>

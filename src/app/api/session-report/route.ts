@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { prisma } from '@/lib/db'
 import { generateSessionReport } from '@/lib/report/generate'
+import { getReportStats } from '@/lib/report/session-data'
 
 function ageFrom(dob: Date | null | undefined): number | undefined {
   if (!dob) return undefined
@@ -17,7 +18,9 @@ export async function GET(req: NextRequest) {
     return NextResponse.json({ error: 'sessionId is required' }, { status: 400 })
   }
   const report = await prisma.sessionReport.findUnique({ where: { sessionId } })
-  return NextResponse.json({ report })
+  // Stats live on the Firestore session doc, saved when the report was generated.
+  const stats = report ? await getReportStats(sessionId) : null
+  return NextResponse.json({ report, stats })
 }
 
 // Generate (or regenerate) the report for a session, then persist it.
@@ -44,7 +47,7 @@ export async function POST(req: NextRequest) {
       },
     })
 
-    const { content, model } = await generateSessionReport(sessionId, {
+    const { content, model, stats } = await generateSessionReport(sessionId, {
       name: `${session.client.firstName} ${session.client.lastName}`.trim(),
       age: ageFrom(session.client.dateOfBirth),
       conditions: session.client.diagnosis,
@@ -70,7 +73,7 @@ export async function POST(req: NextRequest) {
       },
     })
 
-    return NextResponse.json({ report })
+    return NextResponse.json({ report, stats })
   } catch (e: any) {
     console.error('[session-report] generate failed:', e)
     return NextResponse.json(

@@ -3,10 +3,8 @@ import { useEffect, useRef } from 'react'
 import { Lock, LockOpen } from 'lucide-react'
 import { logModuleEvent } from '@/lib/sessionEvents'
 import MazeModule from '@/components/modules/MazeModule'
-import BubbleSplashModule from '@/components/modules/BubbleSplashModule'
 import TalkingCalculatorModule from '@/components/modules/TalkingCalculatorModule'
 import MemoryMatchModule from '@/components/modules/MemoryMatchModule'
-import DigitalSandTray from '@/components/modules/sld/DigitalSandTray'
 import WordBuilding from '@/components/modules/sld/WordBuilding'
 import WhackAMoleMath from '@/components/modules/sld/WhackAMoleMath'
 import PixelArtCoding from '@/components/modules/sld/PixelArtCoding'
@@ -22,25 +20,25 @@ import SocialStorySequencing from '@/components/modules/id/SocialStorySequencing
 import VirtualShop from '@/components/modules/id/VirtualShop'
 import SimonSays from '@/components/modules/adhd/SimonSays'
 import EmotionWheel from '@/components/modules/general/EmotionWheel'
-import SafeSpaceBuilder from '@/components/modules/general/SafeSpaceBuilder'
 import DefusionRiver from '@/components/modules/general/DefusionRiver'
 import ThoughtChallenger from '@/components/modules/general/ThoughtChallenger'
 import MicroQuestBoard from '@/components/modules/general/MicroQuestBoard'
 import ValuesCardSort from '@/components/modules/general/ValuesCardSort'
-import UrgeSurfing from '@/components/modules/general/UrgeSurfing'
 import WorryVault from '@/components/modules/general/WorryVault'
 import FactsVsFeelings from '@/components/modules/general/FactsVsFeelings'
+import StoryChoiceAdventure from '@/components/modules/skill/StoryChoiceAdventure'
+import EmotionDetective from '@/components/modules/skill/EmotionDetective'
+import BuildTogether from '@/components/modules/skill/BuildTogether'
+import TreasureQuest from '@/components/modules/skill/TreasureQuest'
 
 const MODULES = [
   { id: 'maze', name: 'Maze', icon: '🌀', label: 'Maze' },
-  { id: 'bubble_splash', name: 'Bubble Splash', icon: '🫧', label: 'Bubbles' },
   { id: 'talking_calculator', name: 'Calculator', icon: '🔢', label: 'Calc' },
   { id: 'memory_match', name: 'Memory Match', icon: '🧩', label: 'Memory' },
-  { id: 'digital-sand-tray', name: 'Digital Sand Tray', icon: '🏖️', label: 'Sand Tray' },
   { id: 'word-building', name: 'Word Building', icon: '🔤', label: 'Word' },
   { id: 'whack-a-mole-math', name: 'Whack-a-Mole Math', icon: '🔨', label: 'Math' },
   { id: 'pixel-art-coding', name: 'Pixel Art Coding', icon: '🎨', label: 'Pixel Art' },
-  { id: 'bubble-splash-sld', name: 'Reading Bubbles', icon: '🫧', label: 'Reading' },
+  { id: 'bubble-splash', name: 'Bubble Splash', icon: '🫧', label: 'Bubbles' },
   { id: 'n-back-challenge', name: 'N-Back Challenge', icon: '🧠', label: 'N-Back' },
   { id: 'grounding-game', name: 'Grounding Game', icon: '🌱', label: 'Grounding' },
   { id: 'emotional-charades', name: 'Emotional Charades', icon: '🎭', label: 'Charades' },
@@ -51,26 +49,29 @@ const MODULES = [
   { id: 'virtual-shop', name: 'Virtual Shop', icon: '🛒', label: 'Shop' },
   { id: 'simon-says', name: 'Simon Says', icon: '🎮', label: 'Simon' },
   { id: 'emotion-wheel', name: 'Emotion Wheel', icon: '🎡', label: 'Emotion' },
-  { id: 'safe-space-builder', name: 'Safe Space Builder', icon: '🏠', label: 'SafeSpace' },
   { id: 'defusion-river', name: 'Defusion River', icon: '🌊', label: 'Defusion' },
   { id: 'thought-challenger', name: 'Thought Challenger', icon: '⚖️', label: 'Thoughts' },
   { id: 'micro-quest-board', name: 'Micro Quest Board', icon: '🗺️', label: 'Quests' },
   { id: 'values-card-sort', name: 'Values Card Sort', icon: '🃏', label: 'Values' },
-  { id: 'urge-surfing', name: 'Urge Surfing', icon: '🏄', label: 'Urge' },
   { id: 'worry-vault', name: 'Worry Vault', icon: '🗄️', label: 'Vault' },
   { id: 'facts-vs-feelings', name: 'Facts vs Feelings', icon: '🔍', label: 'Facts' },
+  { id: 'story-choice-adventure', name: 'Story Choice Adventure', icon: '📖', label: 'Story' },
+  { id: 'emotion-detective', name: 'Emotion Detective', icon: '🔍', label: 'Emotion' },
+  { id: 'build-together', name: 'Build Together', icon: '🌉', label: 'Build' },
+  { id: 'treasure-quest', name: 'Treasure Quest', icon: '🗺️', label: 'Quest' },
 ]
 
 const MODULE_INFO: Record<string, { title: string; subtitle: string }> = {
   maze: { title: 'Virtual Maze', subtitle: 'Sustained attention · motor planning' },
-  bubble_splash: { title: 'Bubble Splash', subtitle: 'Pop & interact' },
   talking_calculator: { title: 'Calculator', subtitle: 'Talk through it' },
   memory_match: { title: 'Memory Match', subtitle: 'Match & recall' },
-  'digital-sand-tray': { title: 'Digital Sand Tray', subtitle: 'Non-verbal expression' },
   'word-building': { title: 'Word Building', subtitle: 'Phonics · spelling · decoding' },
   'whack-a-mole-math': { title: 'Whack-a-Mole Math', subtitle: 'Math fluency · number recognition' },
   'pixel-art-coding': { title: 'Pixel Art Coding', subtitle: 'Pattern recognition · sequencing' },
-  'bubble-splash-sld': { title: 'Reading Bubbles', subtitle: 'Reading fluency · sight words' },
+  // Title matches the registry entry; legacy keys kept so an in-flight session
+  // with an old slug still shows a proper header.
+  'bubble-splash': { title: 'Bubble Splash', subtitle: 'Sight words · reading fluency' },
+  'bubble-splash-sld': { title: 'Bubble Splash', subtitle: 'Sight words · reading fluency' },
   'n-back-challenge': { title: 'N-Back Challenge', subtitle: 'Working memory · clinically validated' },
   'grounding-game': { title: 'Grounding Game', subtitle: 'Sensory anchoring · anxiety reduction' },
   '5-4-3-2-1-grounding': { title: 'Grounding Game', subtitle: 'Sensory anchoring · anxiety reduction' },
@@ -82,14 +83,44 @@ const MODULE_INFO: Record<string, { title: string; subtitle: string }> = {
   'virtual-shop': { title: 'Virtual Shop', subtitle: 'Money skills · daily living' },
   'simon-says': { title: 'Simon Says', subtitle: 'Executive function · inhibitory control' },
   'emotion-wheel': { title: 'Emotion Wheel', subtitle: 'Emotion identification · granular awareness' },
-  'safe-space-builder': { title: 'Safe Space Builder', subtitle: 'Grounding · personalized calm environment' },
   'defusion-river': { title: 'Defusion River', subtitle: 'Cognitive defusion · thought observation' },
   'thought-challenger': { title: 'Thought Challenger', subtitle: 'CBT · evidence-based thought restructuring' },
   'micro-quest-board': { title: 'Micro Quest Board', subtitle: 'Behavioral activation · micro-goals' },
   'values-card-sort': { title: 'Values Card Sort', subtitle: 'ACT · values clarification & commitment' },
-  'urge-surfing': { title: 'Urge Surfing', subtitle: 'DBT · urge tolerance · mindfulness' },
   'worry-vault': { title: 'Worry Vault', subtitle: 'Worry containment · scheduled worry time' },
   'facts-vs-feelings': { title: 'Facts vs Feelings', subtitle: 'Reality testing · emotion-fact distinction' },
+  'story-choice-adventure': { title: 'Story Choice Adventure', subtitle: 'Consequential thinking · emotional intelligence' },
+  'emotion-detective': { title: 'Emotion Detective', subtitle: 'Emotion identification · perspective taking' },
+  'build-together': { title: 'Build Together', subtitle: 'Shared problem solving · communication' },
+  'treasure-quest': { title: 'Treasure Quest', subtitle: 'Sequential clue chain · shared discovery' },
+}
+
+// Renders a Skill Development module on its own, for the full-canvas SkillDevLayout.
+// The normal panel path below still routes every module (including these) through
+// its own switch, so this is additive only.
+export function SkillModuleView({
+  moduleId,
+  sessionId,
+  role,
+  isLocked,
+}: {
+  moduleId: string | null
+  sessionId: string
+  role: 'therapist' | 'client'
+  isLocked: boolean
+}) {
+  switch (moduleId) {
+    case 'story-choice-adventure':
+      return <StoryChoiceAdventure sessionId={sessionId} role={role} isLocked={isLocked} />
+    case 'emotion-detective':
+      return <EmotionDetective sessionId={sessionId} role={role} isLocked={isLocked} />
+    case 'build-together':
+      return <BuildTogether sessionId={sessionId} role={role} isLocked={isLocked} />
+    case 'treasure-quest':
+      return <TreasureQuest sessionId={sessionId} role={role} isLocked={isLocked} />
+    default:
+      return null
+  }
 }
 
 interface GlassModulePanelProps {
@@ -100,6 +131,107 @@ interface GlassModulePanelProps {
   onModuleSwitch: (moduleId: string) => void
   onLockToggle: () => void
   onClose?: () => void
+}
+
+/**
+ * The module tree itself, extracted so the two intentional layouts can render
+ * exactly the same component with no duplicated switch:
+ *   - GlassModulePanel  — the 420px sidebar (module selector / client mirror)
+ *   - ModuleStage       — the wide session-room canvas used when a module is live
+ *
+ * Purely a move: no case was added, removed or altered.
+ */
+export interface ModuleContentProps {
+  activeModule: string | null
+  sessionId: string
+  role: 'therapist' | 'client'
+  isLocked: boolean
+  isTherapist: boolean
+}
+
+export function ModuleContent({
+  activeModule,
+  sessionId,
+  role,
+  isLocked,
+  isTherapist,
+}: ModuleContentProps) {
+  const info = activeModule ? MODULE_INFO[activeModule] : null
+    switch (activeModule) {
+      case 'maze':
+        return <VirtualMaze sessionId={sessionId} role={role} isLocked={isLocked} />
+      case 'talking_calculator':
+        return <TalkingCalculatorModule sessionId={sessionId} role={role} isLocked={isLocked} />
+      case 'memory_match':
+        return <MemoryMatchModule sessionId={sessionId} role={role} isLocked={isLocked} />
+      case 'word-building':
+        return <WordBuilding sessionId={sessionId} role={role} isLocked={isLocked} />
+      case 'whack-a-mole-math':
+        return <WhackAMoleMath sessionId={sessionId} role={role} isLocked={isLocked} />
+      case 'pixel-art-coding':
+        return <PixelArtCoding sessionId={sessionId} role={role} isLocked={isLocked} />
+      // Canonical slug plus the two legacy forms, so a session already holding
+      // an old activeModuleId still resolves to the intended module.
+      case 'bubble-splash':
+      case 'bubble-splash-sld':
+      case 'bubble_splash':
+        return <BubbleSplash sessionId={sessionId} role={role} isLocked={isLocked} />
+      case 'n-back-challenge':
+        return <NBackChallenge sessionId={sessionId} role={role} isLocked={isLocked} />
+      case 'grounding-game':
+      case '5-4-3-2-1-grounding':
+        return <GroundingGame sessionId={sessionId} role={role} isLocked={isLocked} />
+      case 'emotional-charades':
+        return <EmotionalCharades sessionId={sessionId} role={role} isLocked={isLocked} />
+      case 'virtual-box-popping':
+        return <BoxPopping sessionId={sessionId} role={role} isLocked={isLocked} />
+      case 'worry-box':
+        return <WorryBox sessionId={sessionId} role={role} isLocked={isLocked} />
+      case 'drag-drop-sorting':
+        return <DragDropSorting sessionId={sessionId} role={role} isLocked={isLocked} />
+      case 'social-story-sequencing':
+        return <SocialStorySequencing sessionId={sessionId} role={role} isLocked={isLocked} />
+      case 'virtual-shop':
+        return <VirtualShop sessionId={sessionId} role={role} isLocked={isLocked} />
+      case 'simon-says':
+        return <SimonSays sessionId={sessionId} role={role} isLocked={isLocked} />
+      case 'emotion-wheel':
+        return <EmotionWheel sessionId={sessionId} role={role} isLocked={isLocked} />
+      case 'defusion-river':
+        return <DefusionRiver sessionId={sessionId} role={role} isLocked={isLocked} />
+      case 'thought-challenger':
+        return <ThoughtChallenger sessionId={sessionId} role={role} isLocked={isLocked} />
+      case 'micro-quest-board':
+        return <MicroQuestBoard sessionId={sessionId} role={role} isLocked={isLocked} />
+      case 'values-card-sort':
+        return <ValuesCardSort sessionId={sessionId} role={role} isLocked={isLocked} />
+      case 'worry-vault':
+        return <WorryVault sessionId={sessionId} role={role} isLocked={isLocked} />
+      case 'facts-vs-feelings':
+        return <FactsVsFeelings sessionId={sessionId} role={role} isLocked={isLocked} />
+      case 'story-choice-adventure':
+        return <StoryChoiceAdventure sessionId={sessionId} role={role} isLocked={isLocked} />
+      case 'emotion-detective':
+        return <EmotionDetective sessionId={sessionId} role={role} isLocked={isLocked} />
+      case 'build-together':
+        return <BuildTogether sessionId={sessionId} role={role} isLocked={isLocked} />
+      case 'treasure-quest':
+        return <TreasureQuest sessionId={sessionId} role={role} isLocked={isLocked} />
+      default:
+        return (
+          <div className="flex flex-col items-center justify-center h-full text-center px-4">
+            <span style={{ fontSize: 36, marginBottom: 12 }}>🎯</span>
+            <span style={{ fontSize: 14, fontWeight: 500, color: '#FFFFFF', marginBottom: 4 }}>
+              {info?.title || 'Ready for Activity'}
+            </span>
+            <span style={{ fontSize: 11, color: 'rgba(255,255,255,0.6)' }}>
+              {info?.subtitle || (isTherapist
+                ? 'Select a module below to begin'
+                : 'Your therapist will choose an activity soon.')}
+            </span>
+          </div>
+        )
+    }
 }
 
 export default function GlassModulePanel({
@@ -137,80 +269,15 @@ export default function GlassModulePanel({
     })
   }, [activeModule, isTherapist, sessionId])
 
-  const renderModule = () => {
-    switch (activeModule) {
-      case 'maze':
-        return <VirtualMaze sessionId={sessionId} role={role} isLocked={isLocked} />
-      case 'bubble_splash':
-        return <BubbleSplashModule sessionId={sessionId} role={role} isLocked={isLocked} />
-      case 'talking_calculator':
-        return <TalkingCalculatorModule sessionId={sessionId} role={role} isLocked={isLocked} />
-      case 'memory_match':
-        return <MemoryMatchModule sessionId={sessionId} role={role} isLocked={isLocked} />
-      case 'digital-sand-tray':
-        return <DigitalSandTray sessionId={sessionId} role={role} isLocked={isLocked} />
-      case 'word-building':
-        return <WordBuilding sessionId={sessionId} role={role} isLocked={isLocked} />
-      case 'whack-a-mole-math':
-        return <WhackAMoleMath sessionId={sessionId} role={role} isLocked={isLocked} />
-      case 'pixel-art-coding':
-        return <PixelArtCoding sessionId={sessionId} role={role} isLocked={isLocked} />
-      case 'bubble-splash-sld':
-        return <BubbleSplash sessionId={sessionId} role={role} isLocked={isLocked} />
-      case 'n-back-challenge':
-        return <NBackChallenge sessionId={sessionId} role={role} isLocked={isLocked} />
-      case 'grounding-game':
-      case '5-4-3-2-1-grounding':
-        return <GroundingGame sessionId={sessionId} role={role} isLocked={isLocked} />
-      case 'emotional-charades':
-        return <EmotionalCharades sessionId={sessionId} role={role} isLocked={isLocked} />
-      case 'virtual-box-popping':
-        return <BoxPopping sessionId={sessionId} role={role} isLocked={isLocked} />
-      case 'worry-box':
-        return <WorryBox sessionId={sessionId} role={role} isLocked={isLocked} />
-      case 'drag-drop-sorting':
-        return <DragDropSorting sessionId={sessionId} role={role} isLocked={isLocked} />
-      case 'social-story-sequencing':
-        return <SocialStorySequencing sessionId={sessionId} role={role} isLocked={isLocked} />
-      case 'virtual-shop':
-        return <VirtualShop sessionId={sessionId} role={role} isLocked={isLocked} />
-      case 'simon-says':
-        return <SimonSays sessionId={sessionId} role={role} isLocked={isLocked} />
-      case 'emotion-wheel':
-        return <EmotionWheel sessionId={sessionId} role={role} isLocked={isLocked} />
-      case 'safe-space-builder':
-        return <SafeSpaceBuilder sessionId={sessionId} role={role} isLocked={isLocked} />
-      case 'defusion-river':
-        return <DefusionRiver sessionId={sessionId} role={role} isLocked={isLocked} />
-      case 'thought-challenger':
-        return <ThoughtChallenger sessionId={sessionId} role={role} isLocked={isLocked} />
-      case 'micro-quest-board':
-        return <MicroQuestBoard sessionId={sessionId} role={role} isLocked={isLocked} />
-      case 'values-card-sort':
-        return <ValuesCardSort sessionId={sessionId} role={role} isLocked={isLocked} />
-      case 'urge-surfing':
-        return <UrgeSurfing sessionId={sessionId} role={role} isLocked={isLocked} />
-      case 'worry-vault':
-        return <WorryVault sessionId={sessionId} role={role} isLocked={isLocked} />
-      case 'facts-vs-feelings':
-        return <FactsVsFeelings sessionId={sessionId} role={role} isLocked={isLocked} />
-      default:
-        return (
-          <div className="flex flex-col items-center justify-center h-full text-center px-4">
-            <span style={{ fontSize: 36, marginBottom: 12 }}>🎯</span>
-            <span style={{ fontSize: 14, fontWeight: 500, color: '#FFFFFF', marginBottom: 4 }}>
-              {info?.title || 'Ready for Activity'}
-            </span>
-            <span style={{ fontSize: 11, color: 'rgba(255,255,255,0.6)' }}>
-              {info?.subtitle || (isTherapist
-                ? 'Select a module below to begin'
-                : 'Your therapist will choose an activity soon.')}
-            </span>
-          </div>
-        )
-    }
-  }
-
+  const renderModule = () => (
+    <ModuleContent
+      activeModule={activeModule}
+      sessionId={sessionId}
+      role={role}
+      isLocked={isLocked}
+      isTherapist={isTherapist}
+    />
+  )
   return (
     <div
       style={{
