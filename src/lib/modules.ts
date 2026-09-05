@@ -17,6 +17,8 @@ export interface ModuleCategory {
   emoji: string
   iconBg: string
   iconBorder: string
+  /** Solid title colour for the module header on the light stage canvas. */
+  accent: string
   modules: ModuleItem[]
 }
 
@@ -28,6 +30,7 @@ export const MODULE_CATEGORIES: ModuleCategory[] = [
     emoji: '📚',
     iconBg: 'rgba(120,90,220,0.25)',
     iconBorder: 'rgba(120,90,220,0.3)',
+    accent: '#6D4AE0',
     modules: [
       { id: 'word-building', name: 'Word Building', emoji: '🔤', desc: 'Phonics · spelling · decoding' },
       { id: 'whack-a-mole-math', name: 'Whack-a-Mole Math', emoji: '🔨', desc: 'Math fluency · number recognition' },
@@ -42,6 +45,7 @@ export const MODULE_CATEGORIES: ModuleCategory[] = [
     emoji: '⚡',
     iconBg: 'rgba(220,150,40,0.22)',
     iconBorder: 'rgba(220,150,40,0.3)',
+    accent: '#3730D8',
     modules: [
       { id: 'n-back-challenge', name: 'N-Back Challenge', emoji: '🧠', desc: 'Working memory · clinically validated' },
       { id: 'maze', name: 'Virtual Maze', emoji: '🌀', desc: 'Sustained attention · motor planning' },
@@ -55,6 +59,7 @@ export const MODULE_CATEGORIES: ModuleCategory[] = [
     emoji: '🌿',
     iconBg: 'rgba(74,124,111,0.25)',
     iconBorder: 'rgba(74,124,111,0.3)',
+    accent: '#2F7D5F',
     modules: [
       { id: '5-4-3-2-1-grounding', name: '5-4-3-2-1 Grounding', emoji: '🌱', desc: 'Sensory anchoring · anxiety reduction' },
       { id: 'emotional-charades', name: 'Emotional Charades', emoji: '🎭', desc: 'Emotion identification · social learning' },
@@ -69,6 +74,7 @@ export const MODULE_CATEGORIES: ModuleCategory[] = [
     emoji: '🌟',
     iconBg: 'rgba(40,130,210,0.22)',
     iconBorder: 'rgba(40,130,210,0.3)',
+    accent: '#2563EB',
     modules: [
       { id: 'drag-drop-sorting', name: 'Drag & Drop Sorting', emoji: '🗂️', desc: 'Categorisation · concept formation' },
       { id: 'social-story-sequencing', name: 'Social Story Sequencing', emoji: '📖', desc: 'Narrative comprehension · social prep' },
@@ -82,6 +88,7 @@ export const MODULE_CATEGORIES: ModuleCategory[] = [
     emoji: '🧘',
     iconBg: 'rgba(100,100,100,0.22)',
     iconBorder: 'rgba(100,100,100,0.3)',
+    accent: '#4C3FBF',
     modules: [
       { id: 'emotion-wheel', name: 'Emotion Wheel', emoji: '🎡', desc: 'Emotion identification · granular awareness' },
       { id: 'defusion-river', name: 'Defusion River', emoji: '🌊', desc: 'Cognitive defusion · thought observation' },
@@ -99,6 +106,7 @@ export const MODULE_CATEGORIES: ModuleCategory[] = [
     emoji: '🌱',
     iconBg: 'rgba(16,163,127,0.18)',
     iconBorder: 'rgba(16,163,127,0.28)',
+    accent: '#10A37F',
     modules: [
       { id: 'story-choice-adventure', name: 'Story Choice Adventure', emoji: '📖', desc: 'Learn consequences through interactive choices' },
       { id: 'emotion-detective', name: 'Emotion Detective', emoji: '🔍', desc: 'Identify how others feel in real-life situations' },

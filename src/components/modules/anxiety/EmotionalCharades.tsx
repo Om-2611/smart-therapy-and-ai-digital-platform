@@ -2,6 +2,7 @@
 
 import { useState, useEffect, useRef, useCallback } from 'react'
 import { doc, onSnapshot, updateDoc, arrayUnion } from 'firebase/firestore'
+import { Shuffle, MessageCircle, Lightbulb } from 'lucide-react'
 import { db } from '@/lib/firebase'
 import { logModuleEvent } from '@/lib/sessionEvents'
 
@@ -85,6 +86,24 @@ const OPTION_COUNT: Record<string, number> = {
   advanced: 6,
 }
 
+/* ============================================================================
+   Visual language (redesign only — no behaviour depends on any of this).
+
+   The module renders on ModuleStage's WHITE canvas, so every value here is
+   dark-on-light. White type appears in exactly one place: on the solid forest
+   green fills. `var(--ink-muted)` / `var(--glass-border)` stay in use for muted
+   text and hairlines because ModuleStage scopes them to light values.
+   ========================================================================== */
+const GREEN = '#1F7A44'
+const GREEN_DEEP = '#17693A'
+const GREEN_SOFT = '#E8F4EC'
+const GREEN_LINE = 'rgba(31,122,68,0.34)'
+const CREAM = '#FBF9F2'
+const CARD_CREAM = '#FEFDF9'
+const LINE = '#e7eaef'
+const INK = '#1F2A24'
+const INK_SOFT = '#48544D'
+
 function shuffleArray<T>(arr: T[]): T[] {
   const a = [...arr]
   for (let i = a.length - 1; i > 0; i--) {
@@ -92,6 +111,77 @@ function shuffleArray<T>(arr: T[]): T[] {
     [a[i], a[j]] = [a[j], a[i]]
   }
   return a
+}
+
+/** Theatre masks — the module's hero mark, drawn inline so it needs no asset. */
+function TheatreMasks({ w = 132 }: { w?: number }) {
+  const body = 'M2 6c0-3 2-5 5-5h34c3 0 5 2 5 5v18c0 14-9 23-22 23S2 38 2 24V6z'
+  return (
+    <svg width={w} height={w * 0.6} viewBox="0 0 100 60" fill="none" aria-hidden="true">
+      <g transform="translate(1 3) rotate(-9 24 25)">
+        <path d={body} fill="#4E9BEA" />
+        <path d="M12 19c2.5-3.6 6-3.6 8.5 0M27.5 19c2.5-3.6 6-3.6 8.5 0" stroke="#fff" strokeWidth="3" strokeLinecap="round" />
+        <path d="M14 30c4.5 7 15.5 7 20 0" stroke="#fff" strokeWidth="3.2" strokeLinecap="round" />
+      </g>
+      <g transform="translate(52 7) rotate(10 24 25)">
+        <path d={body} fill="#F5C445" />
+        <path d="M12 16c2.5 3.6 6 3.6 8.5 0M27.5 16c2.5 3.6 6 3.6 8.5 0" stroke="#fff" strokeWidth="3" strokeLinecap="round" />
+        <path d="M14 36c4.5-7 15.5-7 20 0" stroke="#fff" strokeWidth="3.2" strokeLinecap="round" />
+      </g>
+    </svg>
+  )
+}
+
+/** Card-stack mark. `fill` is the card colour, `ink` the little face on it. */
+function CardStackIcon({ s = 26, fill = GREEN, ink = '#ffffff' }: { s?: number; fill?: string; ink?: string }) {
+  return (
+    <svg width={s} height={s} viewBox="0 0 26 26" fill="none" aria-hidden="true">
+      <rect x="1.5" y="2" width="14" height="17" rx="3.5" fill={fill} opacity="0.42" />
+      <rect x="8" y="6" width="16" height="18" rx="4" fill={fill} />
+      <circle cx="13.4" cy="13" r="1.15" fill={ink} />
+      <circle cx="18.6" cy="13" r="1.15" fill={ink} />
+      <path d="M13 17c1.6 1.9 4.4 1.9 6 0" stroke={ink} strokeWidth="1.5" strokeLinecap="round" fill="none" />
+    </svg>
+  )
+}
+
+/** Faint leaf / sparkle / heart motifs scattered across the activity ground. */
+const DECOR: { kind: 'leaf' | 'sparkle' | 'heart'; s: number; rot: number; pos: React.CSSProperties }[] = [
+  { kind: 'leaf', s: 66, rot: 12, pos: { left: '1%', bottom: '4%' } },
+  { kind: 'leaf', s: 52, rot: -160, pos: { right: '3%', top: '6%' } },
+  { kind: 'leaf', s: 44, rot: 200, pos: { right: '14%', bottom: '8%' } },
+  { kind: 'sparkle', s: 22, rot: 0, pos: { left: '6%', top: '14%' } },
+  { kind: 'sparkle', s: 15, rot: 0, pos: { left: '17%', top: '46%' } },
+  { kind: 'sparkle', s: 18, rot: 0, pos: { right: '7%', top: '44%' } },
+  { kind: 'sparkle', s: 13, rot: 0, pos: { left: '12%', bottom: '18%' } },
+  { kind: 'heart', s: 20, rot: -8, pos: { right: '20%', bottom: '30%' } },
+]
+
+function GroundDecor() {
+  return (
+    <div aria-hidden="true" style={{ position: 'absolute', inset: 0, pointerEvents: 'none', zIndex: 0, overflow: 'hidden', borderRadius: 24 }}>
+      {DECOR.map((d, i) => (
+        <span key={i} style={{ position: 'absolute', lineHeight: 0, transform: `rotate(${d.rot}deg)`, ...d.pos }}>
+          {d.kind === 'leaf' && (
+            <svg width={d.s} height={d.s} viewBox="0 0 24 24" fill="none">
+              <path d="M21 3c0 9.4-6 15.4-13 15.4-2 0-3.8-.5-4.8-1.3C2.4 8.9 9.6 3 21 3z" fill="#2F7D5F" opacity="0.10" />
+              <path d="M21 3C13.8 6.2 7.8 12.2 3.6 20.4" stroke="#2F7D5F" strokeOpacity="0.18" strokeWidth="1.1" strokeLinecap="round" />
+            </svg>
+          )}
+          {d.kind === 'sparkle' && (
+            <svg width={d.s} height={d.s} viewBox="0 0 24 24" fill="none">
+              <path d="M12 1.6c.9 5.7 3.8 8.6 9.5 9.5-5.7.9-8.6 3.8-9.5 9.5-.9-5.7-3.8-8.6-9.5-9.5 5.7-.9 8.6-3.8 9.5-9.5z" fill="#5FA98A" opacity="0.26" />
+            </svg>
+          )}
+          {d.kind === 'heart' && (
+            <svg width={d.s} height={d.s} viewBox="0 0 24 24" fill="none">
+              <path d="M12 20.5S3.5 15 3.5 9.2A4.7 4.7 0 0 1 12 6.4a4.7 4.7 0 0 1 8.5 2.8c0 5.8-8.5 11.3-8.5 11.3z" fill="#E8A33D" opacity="0.16" />
+            </svg>
+          )}
+        </span>
+      ))}
+    </div>
+  )
 }
 
 export default function EmotionalCharades({ sessionId, role, isLocked }: EmotionalCharadesProps) {
@@ -333,6 +423,9 @@ export default function EmotionalCharades({ sessionId, role, isLocked }: Emotion
   const currentCard = currentCardId ? CARDS.find(c => c.id === currentCardId) || null : null
   const showDesc = difficulty !== 'advanced' && difficulty !== 'simple'
   const deckTotal = getFilteredCards().length
+  // An un-shuffled deck is stored as [] but plays as the full filtered set
+  // (handleDrawCard reshuffles on empty), so show it as full rather than 0.
+  const deckLeft = deckRemaining.length > 0 ? deckRemaining.length : deckTotal
 
   /**
    * In Identify mode the child answers by tapping an EMOJI, so the prompt card
@@ -363,20 +456,76 @@ export default function EmotionalCharades({ sessionId, role, isLocked }: Emotion
     (expressSubMode === 'therapist-acts' && isTherapist)
   )
 
-  const pillStyle = (active: boolean, customColor?: string) => ({
-    padding: '5px 10px',
-    borderRadius: 20,
-    border: `1px solid ${active ? (customColor || 'var(--sage)') : 'var(--glass-border)'}`,
-    background: active ? (customColor ? `${customColor}33` : 'var(--sage-light)') : 'transparent',
-    color: active ? (customColor || 'var(--sage-mid)') : 'var(--ink-muted)',
-    fontSize: 10,
-    fontWeight: 500,
+  /* ---- Style helpers (presentation only) ---- */
+
+  /** Mode / difficulty segment pill: mint tint + green type when selected. */
+  const segPill = (active: boolean): React.CSSProperties => ({
+    display: 'inline-flex',
+    alignItems: 'center',
+    gap: 6,
+    padding: '8px 15px',
+    borderRadius: 999,
+    border: `1px solid ${active ? GREEN_LINE : LINE}`,
+    background: active ? GREEN_SOFT : '#ffffff',
+    color: active ? GREEN : INK,
+    fontSize: 12.5,
+    fontWeight: 700,
+    lineHeight: 1.1,
     cursor: 'pointer',
+    whiteSpace: 'nowrap',
+    boxShadow: active ? 'none' : '0 1px 2px rgba(20,30,40,0.05)',
     transition: 'all 0.15s',
-  } as React.CSSProperties)
+  })
+
+  /** Category pill: solid green + white type when selected, outline when not. */
+  const catPill = (active: boolean): React.CSSProperties => ({
+    padding: '7px 16px',
+    borderRadius: 999,
+    border: `1px solid ${active ? GREEN : GREEN_LINE}`,
+    background: active ? GREEN : '#ffffff',
+    color: active ? '#ffffff' : GREEN,
+    fontSize: 12,
+    fontWeight: 700,
+    lineHeight: 1.1,
+    cursor: 'pointer',
+    whiteSpace: 'nowrap',
+    transition: 'all 0.15s',
+  })
+
+  /** White secondary action (Shuffle / Check-in). */
+  const ghostBtn: React.CSSProperties = {
+    display: 'inline-flex',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 8,
+    padding: '10px 20px',
+    borderRadius: 12,
+    border: `1px solid ${LINE}`,
+    background: '#ffffff',
+    color: INK,
+    fontSize: 13.5,
+    fontWeight: 700,
+    cursor: 'pointer',
+    boxShadow: '0 1px 3px rgba(20,30,40,0.06)',
+    transition: 'all 0.15s',
+  }
+
+  const sideCard: React.CSSProperties = {
+    background: '#ffffff',
+    border: `1px solid ${LINE}`,
+    borderRadius: 18,
+    boxShadow: '0 4px 16px rgba(24,40,32,0.06)',
+    padding: 14,
+    position: 'relative',
+    zIndex: 1,
+  }
+
+  const tipText = mode === 'express'
+    ? 'Use gestures, expressions and actions to express the emotion!'
+    : 'Read the clue out loud, then pick the face that matches the feeling.'
 
   return (
-    <div style={{ display: 'flex', flexDirection: 'column', height: '100%', overflow: 'hidden' }}>
+    <div style={{ display: 'flex', flexDirection: 'column', height: '100%', minHeight: 0, overflow: 'hidden' }}>
       <style>{`
         @keyframes ecCardFlip {
           0% { transform: rotateY(90deg); opacity: 0; }
@@ -393,42 +542,46 @@ export default function EmotionalCharades({ sessionId, role, isLocked }: Emotion
           0%,100% { transform: scale(1); }
           50% { transform: scale(1.08); }
         }
+        .ec-hover:hover { border-color: ${GREEN_LINE} !important; box-shadow: 0 3px 10px rgba(31,122,68,0.13) !important; }
+        .ec-opt:hover { transform: translateY(-2px); border-color: ${GREEN_LINE} !important; box-shadow: 0 6px 16px rgba(31,122,68,0.16) !important; }
+        .ec-primary:hover { background: ${GREEN_DEEP} !important; }
       `}</style>
 
-      {/* Therapist controls */}
+      {/* ── Settings rows (therapist only). No module title here — ModuleStage
+          already renders "Emotional Charades" and the category line above. ── */}
       {isTherapist && (
-        <div style={{ flexShrink: 0, padding: '8px 12px', borderBottom: '1px solid rgba(255,255,255,0.06)', display: 'flex', flexDirection: 'column', gap: 6 }}>
-          {/* Mode + difficulty row */}
-          <div style={{ display: 'flex', gap: 4, flexWrap: 'wrap', alignItems: 'center' }}>
+        <div style={{ flexShrink: 0, display: 'flex', flexDirection: 'column', gap: 8, paddingBottom: 10 }}>
+          {/* Mode pair + difficulty triple */}
+          <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', alignItems: 'center' }}>
             <button onClick={() => {
               setMode('identify')
               setExpressRevealed(false)
               writeToFirestore({ 'moduleState.ecMode': 'identify' })
-            }} style={pillStyle(mode === 'identify')}>
-              🔍 Identify
+            }} style={segPill(mode === 'identify')}>
+              <span style={{ fontSize: 14 }}>🔍</span> Identify
             </button>
             <button onClick={() => {
               setMode('express')
               writeToFirestore({ 'moduleState.ecMode': 'express' })
-            }} style={pillStyle(mode === 'express')}>
-              🎭 Express
+            }} style={segPill(mode === 'express')}>
+              <span style={{ fontSize: 14 }}>🎭</span> Express
             </button>
-            <span style={{ width: 1, height: 16, background: 'rgba(255,255,255,0.1)', margin: '0 4px' }} />
+            <span style={{ width: 1, height: 20, background: 'var(--glass-border)', margin: '0 4px' }} />
             {(['simple', 'standard', 'advanced'] as const).map(d => (
               <button key={d} onClick={() => {
                 setDifficulty(d)
                 setDeckRemaining([])
                 setDeckDrawn([])
                 writeToFirestore({ 'moduleState.ecDifficulty': d, 'moduleState.ecDeckRemaining': [], 'moduleState.ecDeckDrawn': [] })
-              }} style={pillStyle(difficulty === d, d === 'simple' ? '#4a7c6f' : d === 'standard' ? '#5b8dd9' : '#9b59b6')}>
+              }} style={segPill(difficulty === d)}>
                 {d === 'simple' ? 'Simple' : d === 'standard' ? 'Standard' : 'Advanced'}
               </button>
             ))}
           </div>
 
           {/* Categories */}
-          <div style={{ display: 'flex', gap: 4, flexWrap: 'wrap', alignItems: 'center' }}>
-            <span style={{ fontSize: 9, color: 'var(--ink-faint)', marginRight: 4 }}>Categories:</span>
+          <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', alignItems: 'center' }}>
+            <span style={{ fontSize: 12, fontWeight: 700, color: 'var(--ink-muted)', marginRight: 2 }}>Categories:</span>
             <button onClick={() => {
               const all = categories.length === 4
               const next = all ? [] : ['basic', 'complex', 'therapy', 'scenario']
@@ -436,7 +589,7 @@ export default function EmotionalCharades({ sessionId, role, isLocked }: Emotion
               setDeckRemaining([])
               setDeckDrawn([])
               writeToFirestore({ 'moduleState.ecCategories': next, 'moduleState.ecDeckRemaining': [], 'moduleState.ecDeckDrawn': [] })
-            }} style={pillStyle(categories.length === 4)}>
+            }} style={catPill(categories.length === 4)}>
               All
             </button>
             {CATEGORY_LABELS.map(cat => (
@@ -448,108 +601,55 @@ export default function EmotionalCharades({ sessionId, role, isLocked }: Emotion
                 setDeckRemaining([])
                 setDeckDrawn([])
                 writeToFirestore({ 'moduleState.ecCategories': next, 'moduleState.ecDeckRemaining': [], 'moduleState.ecDeckDrawn': [] })
-              }} style={pillStyle(categories.includes(cat.key))}>
+              }} style={catPill(categories.includes(cat.key))}>
                 {cat.label}
               </button>
             ))}
-            <span style={{ flex: 1 }} />
-            <button onClick={handleShuffleDeck} style={{
-              padding: '4px 8px',
-              borderRadius: 6,
-              border: '1px solid var(--glass-border)',
-              background: 'transparent',
-              color: 'var(--ink-muted)',
-              fontSize: 9,
-              cursor: 'pointer',
-            }}>
-              🔄 Shuffle
-            </button>
-          </div>
-
-          {/* Deck controls + check-in */}
-          <div style={{ display: 'flex', gap: 6, alignItems: 'center', flexWrap: 'wrap' }}>
-            <button onClick={handleDrawCard} style={{
-              padding: '6px 14px',
-              borderRadius: 8,
-              border: '1px solid var(--sage)',
-              background: 'var(--sage-light)',
-              color: 'var(--sage-mid)',
-              fontSize: 11,
-              fontWeight: 600,
-              cursor: 'pointer',
-            }}>
-              🎴 Draw card
-            </button>
-            <span style={{ fontSize: 9, color: 'var(--ink-faint)' }}>
-              {deckRemaining.length} / {deckTotal} cards
-            </span>
-            <span style={{ width: 1, height: 14, background: 'rgba(255,255,255,0.1)' }} />
-            <button onClick={() => setShowCheckIn(true)} style={{
-              padding: '4px 10px',
-              borderRadius: 6,
-              border: '1px solid var(--glass-border)',
-              background: 'transparent',
-              color: 'var(--ink-muted)',
-              fontSize: 9,
-              cursor: 'pointer',
-            }}>
-              💬 Check in
-            </button>
-            {mode === 'express' && currentCardId && !expressRevealed && (
-              <>
-                <span style={{ width: 1, height: 14, background: 'rgba(255,255,255,0.1)' }} />
-                {(['child-acts', 'therapist-acts'] as const).map(sm => (
-                  <button key={sm} onClick={() => {
-                    setExpressSubMode(sm)
-                    setExpressRevealed(false)
-                    writeToFirestore({ 'moduleState.ecExpressSubMode': sm, 'moduleState.ecExpressRevealed': false })
-                  }} style={pillStyle(expressSubMode === sm)}>
-                    {sm === 'child-acts' ? '👶 Acts → You guess' : 'You act → 👶 guesses'}
-                  </button>
-                ))}
-                {answered && (
-                  <button onClick={handleReveal} style={{
-                    padding: '4px 10px',
-                    borderRadius: 6,
-                    border: '1px solid #f7c948',
-                    background: 'rgba(247,201,72,0.15)',
-                    color: '#f7c948',
-                    fontSize: 9,
-                    cursor: 'pointer',
-                    fontWeight: 600,
-                  }}>
-                    Reveal answer
-                  </button>
-                )}
-              </>
-            )}
           </div>
         </div>
       )}
 
-      {/* Main content */}
-      <div style={{ flex: 1, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', padding: '8px 16px', overflow: 'hidden', position: 'relative' }}>
-        {/* Check-in overlay */}
+      {/* ── Activity ground: cream, decorated, three columns ── */}
+      <div style={{
+        flex: 1,
+        minHeight: 0,
+        position: 'relative',
+        display: 'flex',
+        alignItems: 'stretch',
+        gap: 14,
+        padding: 16,
+        borderRadius: 24,
+        background: `linear-gradient(150deg, ${CREAM} 0%, #F7F4EA 100%)`,
+        border: '1px solid rgba(31,122,68,0.10)',
+        overflow: 'hidden',
+      }}>
+        <GroundDecor />
+
+        {/* Check-in overlay (light scrim — dark type on cream) */}
         {showCheckIn && (
           <div style={{
-            position: 'absolute', inset: 0, zIndex: 10,
-            background: 'rgba(0,0,0,0.75)',
+            position: 'absolute', inset: 0, zIndex: 20,
+            background: 'rgba(251,249,242,0.97)',
             display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center',
-            padding: 20,
+            padding: 20, borderRadius: 24,
           }}>
-            <div style={{ fontSize: 14, color: 'rgba(255,255,255,0.85)', marginBottom: 16, fontFamily: "'DM Serif Display', serif" }}>
+            <div style={{ fontSize: 20, fontWeight: 800, color: INK, marginBottom: 4, letterSpacing: -0.3 }}>
               How are you feeling right now?
             </div>
-            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 10, maxWidth: 280 }}>
+            <div style={{ fontSize: 12.5, color: 'var(--ink-muted)', marginBottom: 16 }}>
+              Tap the face that fits best.
+            </div>
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 10 }}>
               {CHECKIN_EMOTIONS.map(ce => (
-                <button key={ce.id} onClick={() => handleCheckInResponse(ce.id)} style={{
-                  width: 64,
-                  height: 64,
-                  borderRadius: 14,
-                  border: '1px solid rgba(255,255,255,0.12)',
-                  background: 'rgba(255,255,255,0.05)',
+                <button key={ce.id} onClick={() => handleCheckInResponse(ce.id)} className="ec-opt" style={{
+                  width: 66,
+                  height: 66,
+                  borderRadius: 16,
+                  border: `1px solid ${LINE}`,
+                  background: '#ffffff',
+                  boxShadow: '0 2px 8px rgba(20,30,40,0.06)',
                   cursor: 'pointer',
-                  fontSize: 24,
+                  fontSize: 28,
                   display: 'flex',
                   alignItems: 'center',
                   justifyContent: 'center',
@@ -560,324 +660,457 @@ export default function EmotionalCharades({ sessionId, role, isLocked }: Emotion
               ))}
             </div>
             {isTherapist && (
-              <button onClick={() => setShowCheckIn(false)} style={{
-                marginTop: 16,
-                padding: '6px 16px',
-                borderRadius: 6,
-                border: '1px solid var(--glass-border)',
-                background: 'transparent',
-                color: 'var(--ink-muted)',
-                fontSize: 10,
-                cursor: 'pointer',
-              }}>
+              <button onClick={() => setShowCheckIn(false)} style={{ ...ghostBtn, marginTop: 16, padding: '8px 20px', fontSize: 12.5 }}>
                 Cancel
               </button>
             )}
           </div>
         )}
 
-        {/* No card drawn */}
-        {!currentCardId && !showCheckIn && (
-          <div style={{ textAlign: 'center' }}>
-            <div style={{
-              background: 'rgba(255,255,255,0.06)',
-              border: '1.5px solid rgba(255,255,255,0.1)',
-              borderRadius: 16,
-              padding: 24,
-              marginBottom: 12,
-            }}>
-              <div style={{ fontSize: 56, marginBottom: 8 }}>🃏</div>
-              <div style={{ fontSize: 12, color: 'rgba(255,255,255,0.4)' }}>
-                {isTherapist ? 'Draw a card to begin' : 'Waiting for therapist to draw a card...'}
+        {/* ── LEFT: deck / score card ── */}
+        <aside style={{ width: 178, flexShrink: 0, display: 'flex', flexDirection: 'column', justifyContent: 'center', zIndex: 1 }}>
+          <div style={sideCard}>
+            <button
+              onClick={handleDrawCard}
+              disabled={!isTherapist}
+              className={isTherapist ? 'ec-hover' : undefined}
+              style={{
+                width: '100%',
+                display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 8,
+                border: 'none', background: 'transparent', padding: 0,
+                cursor: isTherapist ? 'pointer' : 'default',
+              }}
+            >
+              <CardStackIcon s={54} fill={GREEN} ink={CARD_CREAM} />
+              <span style={{ fontSize: 15, fontWeight: 800, color: INK, letterSpacing: -0.2 }}>
+                {isTherapist ? 'Draw card' : 'Card deck'}
+              </span>
+            </button>
+            <div style={{ textAlign: 'center', fontSize: 12.5, color: 'var(--ink-muted)', marginTop: 2 }}>
+              {deckLeft} / {deckTotal} cards
+            </div>
+
+            {isTherapist && (
+              <button onClick={() => setShowCheckIn(true)} className="ec-hover" style={{ ...ghostBtn, width: '100%', marginTop: 12, padding: '9px 10px', fontSize: 13 }}>
+                <MessageCircle size={15} strokeWidth={2.2} color={GREEN} /> Check in
+              </button>
+            )}
+
+            <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginTop: 12, flexWrap: 'wrap', justifyContent: 'center' }}>
+              <span style={{ fontSize: 12, fontWeight: 700, color: GREEN }}>✓ {score} correct</span>
+              <span style={{ fontSize: 12, color: 'var(--ink-muted)' }}>📋 {cardsPlayed} cards</span>
+            </div>
+
+            {answerHistory.length > 0 && (
+              <div style={{ display: 'flex', gap: 5, marginTop: 9, justifyContent: 'center', flexWrap: 'wrap' }}>
+                {answerHistory.map((a, i) => {
+                  const card = CARDS.find(c => c.id === a.answer)
+                  if (!card) return null
+                  return (
+                    <div key={i} style={{
+                      width: 24,
+                      height: 24,
+                      borderRadius: 8,
+                      border: `1.5px solid ${a.correct ? GREEN : '#DB5A55'}`,
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'center',
+                      fontSize: 12,
+                      background: '#ffffff',
+                      position: 'relative',
+                    }}>
+                      {card.emoji}
+                      <span style={{
+                        position: 'absolute',
+                        top: -5,
+                        right: -4,
+                        fontSize: 8,
+                        color: a.correct ? GREEN : '#DB5A55',
+                        fontWeight: 800,
+                      }}>
+                        {a.correct ? '✓' : '✗'}
+                      </span>
+                    </div>
+                  )
+                })}
               </div>
+            )}
+          </div>
+        </aside>
+
+        {/* ── CENTRE: the play card ── */}
+        <main style={{
+          flex: 1,
+          minWidth: 0,
+          minHeight: 0,
+          zIndex: 1,
+          background: CARD_CREAM,
+          border: '1px solid rgba(31,122,68,0.09)',
+          borderRadius: 22,
+          boxShadow: '0 10px 30px rgba(24,40,32,0.06)',
+          padding: '18px 22px',
+          display: 'flex',
+          flexDirection: 'column',
+          alignItems: 'center',
+          justifyContent: 'center',
+          gap: 10,
+          overflowY: 'auto',
+        }}>
+          {/* Idle: no card drawn */}
+          {!currentCardId && (
+            <>
+              <TheatreMasks w={136} />
+              <div style={{ fontSize: 34, fontWeight: 800, color: INK, letterSpacing: -1, lineHeight: 1.1 }}>
+                Ready to Play?
+              </div>
+              {isTherapist ? (
+                <>
+                  <div style={{ fontSize: 15.5, color: INK_SOFT, lineHeight: 1.5, textAlign: 'center', maxWidth: 460 }}>
+                    Click “Draw Card” to get a new emotion.<br />
+                    Act it out and let the other person guess!
+                  </div>
+                  <button onClick={handleDrawCard} className="ec-primary" style={{
+                    display: 'inline-flex', alignItems: 'center', justifyContent: 'center', gap: 12,
+                    marginTop: 6,
+                    padding: '15px 42px',
+                    borderRadius: 14,
+                    border: 'none',
+                    background: GREEN,
+                    color: '#ffffff',
+                    fontSize: 21,
+                    fontWeight: 800,
+                    letterSpacing: -0.3,
+                    cursor: 'pointer',
+                    boxShadow: '0 8px 20px rgba(31,122,68,0.28)',
+                    transition: 'background 0.15s',
+                  }}>
+                    <CardStackIcon s={26} fill="#ffffff" ink={GREEN} /> Draw Card
+                  </button>
+                  <div style={{ display: 'flex', gap: 10, marginTop: 4, flexWrap: 'wrap', justifyContent: 'center' }}>
+                    <button onClick={handleShuffleDeck} className="ec-hover" style={ghostBtn}>
+                      <Shuffle size={16} strokeWidth={2.2} color={INK} /> Shuffle
+                    </button>
+                    <button onClick={() => setShowCheckIn(true)} className="ec-hover" style={ghostBtn}>
+                      <MessageCircle size={16} strokeWidth={2.2} color={GREEN} /> Check-in
+                    </button>
+                  </div>
+                </>
+              ) : (
+                <div style={{ fontSize: 15, color: INK_SOFT, lineHeight: 1.5, textAlign: 'center', maxWidth: 420 }}>
+                  Waiting for your therapist to draw a card…
+                </div>
+              )}
+            </>
+          )}
+
+          {/* Card drawn */}
+          {currentCard && currentCardId && (
+            <div style={{ width: '100%', display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 10 }}>
+              {/* Prompt card */}
+              {guesserSeesCardBack ? (
+                <div style={{
+                  width: '100%',
+                  maxWidth: 520,
+                  background: '#ffffff',
+                  border: `1.5px dashed ${GREEN_LINE}`,
+                  borderRadius: 18,
+                  padding: '18px 20px',
+                  textAlign: 'center',
+                  animation: 'ecCardFlip 0.35s ease',
+                }}>
+                  <div style={{ fontSize: 46, marginBottom: 6, lineHeight: 1 }}>❓</div>
+                  <div style={{ fontSize: 14, color: INK_SOFT, fontStyle: 'italic' }}>
+                    {expressSubMode === 'child-acts'
+                      ? 'Watch the webcam — what emotion is it?'
+                      : 'Watch the therapist — what feeling is it?'}
+                  </div>
+                  {!answered && (
+                    <div style={{ fontSize: 12.5, color: 'var(--ink-muted)', marginTop: 7 }}>
+                      Pick an emotion below
+                    </div>
+                  )}
+                </div>
+              ) : (
+                <div style={{
+                  width: '100%',
+                  maxWidth: 520,
+                  background: `linear-gradient(135deg, ${currentCard.color}2e 0%, ${currentCard.color}12 100%)`,
+                  border: `1px solid ${currentCard.color}66`,
+                  borderRadius: 18,
+                  padding: '18px 20px',
+                  textAlign: 'center',
+                  animation: cardFlip ? 'none' : 'ecCardFlip 0.35s ease',
+                }}>
+                  {promptShowsEmoji && (
+                    <div style={{ fontSize: 54, marginBottom: 4, lineHeight: 1 }}>{currentCard.emoji}</div>
+                  )}
+                  {promptShowsLabel && (
+                    <div style={{
+                      fontSize: difficulty === 'simple' ? 27 : 23,
+                      fontWeight: 800,
+                      letterSpacing: -0.5,
+                      color: INK,
+                    }}>
+                      {currentCard.label}
+                    </div>
+                  )}
+                  {/* The description carries the question while the answer is
+                      hidden, so it is shown prominently rather than as a footnote. */}
+                  {(identifyQuestionOpen || showDesc) && (
+                    <div style={{
+                      fontSize: identifyQuestionOpen ? 17 : 12.5,
+                      lineHeight: 1.5,
+                      fontWeight: identifyQuestionOpen ? 600 : 400,
+                      color: identifyQuestionOpen ? INK : INK_SOFT,
+                      fontStyle: 'italic',
+                      marginTop: promptShowsLabel || promptShowsEmoji ? 5 : 0,
+                    }}>
+                      {currentCard.desc}
+                    </div>
+                  )}
+                  {identifyQuestionOpen && (
+                    <div style={{ fontSize: 12.5, color: 'var(--ink-muted)', marginTop: 8 }}>
+                      Which face matches this feeling?
+                    </div>
+                  )}
+                </div>
+              )}
+
+              {/* Express mode instructions */}
+              {actorSeesFullCard && (
+                <div style={{ fontSize: 13.5, color: INK_SOFT, fontStyle: 'italic', textAlign: 'center' }}>
+                  {isTherapist
+                    ? 'Act this out on camera!'
+                    : 'Act out this feeling without words!'}
+                </div>
+              )}
+
+              {/* Identify response area */}
+              {mode === 'identify' && !guesserSeesCardBack && (
+                <div style={{ width: '100%' }}>
+                  {!answered && (
+                    <div style={{ fontSize: 13, fontWeight: 600, color: 'var(--ink-muted)', marginBottom: 9, textAlign: 'center' }}>
+                      How does this person feel?
+                    </div>
+                  )}
+
+                  {feedback && (
+                    <div style={{ textAlign: 'center', padding: '6px 0' }}>
+                      {feedback === 'correct' ? (
+                        <div style={{
+                          display: 'inline-flex', alignItems: 'center', gap: 7,
+                          padding: '9px 22px', borderRadius: 999,
+                          background: GREEN_SOFT,
+                          border: `1px solid ${GREEN_LINE}`,
+                          color: GREEN, fontSize: 15, fontWeight: 800,
+                          animation: 'ecPulse 0.5s ease 2',
+                        }}>
+                          ✓ That&apos;s right!
+                        </div>
+                      ) : (
+                        <div style={{ fontSize: 14, color: INK_SOFT }}>
+                          The feeling is <strong style={{ color: INK }}>{currentCard.label}</strong> {currentCard.emoji}
+                        </div>
+                      )}
+                    </div>
+                  )}
+
+                  {/* Emoji options (hidden during feedback) */}
+                  {!feedback && !answered && (
+                    <div style={{
+                      display: 'grid',
+                      gridTemplateColumns: `repeat(${Math.max(options.length, 1)}, 1fr)`,
+                      gap: 10,
+                      width: '100%',
+                      maxWidth: 76 * Math.max(options.length, 1),
+                      margin: '0 auto',
+                    }}>
+                      {options.map(opt => (
+                        <button
+                          key={opt.id}
+                          onClick={() => handleAnswer(opt.id)}
+                          disabled={!canInteract}
+                          className="ec-opt"
+                          style={{
+                            width: '100%',
+                            aspectRatio: '1',
+                            borderRadius: 16,
+                            border: `1px solid ${LINE}`,
+                            background: '#ffffff',
+                            boxShadow: '0 2px 8px rgba(20,30,40,0.06)',
+                            cursor: canInteract ? 'pointer' : 'not-allowed',
+                            opacity: canInteract ? 1 : 0.55,
+                            fontSize: 27,
+                            display: 'flex',
+                            alignItems: 'center',
+                            justifyContent: 'center',
+                            transition: 'all 0.15s',
+                          }}
+                        >
+                          {opt.emoji}
+                        </button>
+                      ))}
+                    </div>
+                  )}
+
+                  {answered && !feedback && (
+                    <div style={{ fontSize: 12.5, color: 'var(--ink-muted)', textAlign: 'center', marginTop: 8 }}>
+                      Waiting for next card…
+                    </div>
+                  )}
+                </div>
+              )}
+
+              {/* Express response area */}
+              {mode === 'express' && guesserSeesCardBack && (
+                <div style={{ width: '100%' }}>
+                  {!answered && (
+                    <div style={{ fontSize: 13, fontWeight: 600, color: 'var(--ink-muted)', marginBottom: 9, textAlign: 'center' }}>
+                      What emotion is it?
+                    </div>
+                  )}
+                  {feedback ? (
+                    <div style={{ textAlign: 'center', padding: '6px 0' }}>
+                      {feedback === 'correct' ? (
+                        <div style={{
+                          display: 'inline-flex', alignItems: 'center', gap: 7,
+                          padding: '9px 22px', borderRadius: 999,
+                          background: GREEN_SOFT,
+                          border: `1px solid ${GREEN_LINE}`,
+                          color: GREEN, fontSize: 15, fontWeight: 800,
+                        }}>
+                          ✓ That&apos;s right!
+                        </div>
+                      ) : (
+                        <div style={{ fontSize: 14, color: INK_SOFT }}>
+                          It was <strong style={{ color: INK }}>{currentCard.label}</strong> {currentCard.emoji}
+                        </div>
+                      )}
+                    </div>
+                  ) : !answered ? (
+                    <div style={{
+                      display: 'grid',
+                      gridTemplateColumns: `repeat(${Math.max(options.length, 1)}, 1fr)`,
+                      gap: 10,
+                      width: '100%',
+                      maxWidth: 76 * Math.max(options.length, 1),
+                      margin: '0 auto',
+                    }}>
+                      {options.map(opt => (
+                        <button
+                          key={opt.id}
+                          onClick={() => handleAnswerExpress(opt.id)}
+                          disabled={!canInteract}
+                          className="ec-opt"
+                          style={{
+                            width: '100%',
+                            aspectRatio: '1',
+                            borderRadius: 16,
+                            border: `1px solid ${LINE}`,
+                            background: '#ffffff',
+                            boxShadow: '0 2px 8px rgba(20,30,40,0.06)',
+                            cursor: canInteract ? 'pointer' : 'not-allowed',
+                            opacity: canInteract ? 1 : 0.55,
+                            fontSize: 27,
+                            display: 'flex',
+                            alignItems: 'center',
+                            justifyContent: 'center',
+                            transition: 'all 0.15s',
+                          }}
+                        >
+                          {opt.emoji}
+                        </button>
+                      ))}
+                    </div>
+                  ) : null}
+                </div>
+              )}
+
+              {/* Express: actor waiting */}
+              {mode === 'express' && actorSeesFullCard && !expressRevealed && (
+                <div style={{ fontSize: 12.5, color: 'var(--ink-muted)', textAlign: 'center' }}>
+                  Waiting for {expressSubMode === 'child-acts' ? 'therapist' : 'client'} to guess…
+                </div>
+              )}
+
+              {/* Express: revealed */}
+              {mode === 'express' && expressRevealed && (
+                <div style={{ textAlign: 'center', fontSize: 13.5, color: INK_SOFT }}>
+                  {answered ? (
+                    feedback === 'correct'
+                      ? <span style={{ color: GREEN, fontWeight: 800 }}>✓ Correct!</span>
+                      : <span>It was <strong style={{ color: INK }}>{currentCard.label}</strong> {currentCard.emoji}</span>
+                  ) : (
+                    <span>Answer revealed — score not recorded for this round</span>
+                  )}
+                </div>
+              )}
+
+              {/* Therapist deck actions while a card is in play */}
+              {isTherapist && (
+                <div style={{ display: 'flex', gap: 9, flexWrap: 'wrap', justifyContent: 'center', marginTop: 2 }}>
+                  <button onClick={handleDrawCard} className="ec-primary" style={{
+                    display: 'inline-flex', alignItems: 'center', gap: 9,
+                    padding: '11px 26px', borderRadius: 12, border: 'none',
+                    background: GREEN, color: '#ffffff', fontSize: 14.5, fontWeight: 800,
+                    cursor: 'pointer', boxShadow: '0 6px 16px rgba(31,122,68,0.26)',
+                    transition: 'background 0.15s',
+                  }}>
+                    <CardStackIcon s={19} fill="#ffffff" ink={GREEN} /> Next Card
+                  </button>
+                  <button onClick={handleShuffleDeck} className="ec-hover" style={{ ...ghostBtn, padding: '10px 18px', fontSize: 13 }}>
+                    <Shuffle size={15} strokeWidth={2.2} color={INK} /> Shuffle
+                  </button>
+                  {mode === 'express' && !expressRevealed && (
+                    <>
+                      {(['child-acts', 'therapist-acts'] as const).map(sm => (
+                        <button key={sm} onClick={() => {
+                          setExpressSubMode(sm)
+                          setExpressRevealed(false)
+                          writeToFirestore({ 'moduleState.ecExpressSubMode': sm, 'moduleState.ecExpressRevealed': false })
+                        }} style={segPill(expressSubMode === sm)}>
+                          {sm === 'child-acts' ? '👶 Acts → You guess' : 'You act → 👶 guesses'}
+                        </button>
+                      ))}
+                      {answered && (
+                        <button onClick={handleReveal} style={{
+                          padding: '10px 18px',
+                          borderRadius: 12,
+                          border: '1px solid #E0A82E',
+                          background: '#FDF4DC',
+                          color: '#8A5B10',
+                          fontSize: 13,
+                          fontWeight: 800,
+                          cursor: 'pointer',
+                        }}>
+                          Reveal answer
+                        </button>
+                      )}
+                    </>
+                  )}
+                </div>
+              )}
+            </div>
+          )}
+        </main>
+
+        {/* ── RIGHT: tip card ── */}
+        <aside style={{ width: 196, flexShrink: 0, display: 'flex', flexDirection: 'column', justifyContent: 'flex-end', zIndex: 1 }}>
+          <div style={{ ...sideCard, display: 'flex', gap: 10, alignItems: 'flex-start' }}>
+            <span style={{ flexShrink: 0, lineHeight: 0, marginTop: 1 }}>
+              <Lightbulb size={22} strokeWidth={2.1} color="#E0A82E" fill="#FBE7B2" />
+            </span>
+            <div style={{ minWidth: 0 }}>
+              <div style={{ fontSize: 14.5, fontWeight: 800, color: INK, letterSpacing: -0.2, marginBottom: 3 }}>Tip</div>
+              <div style={{ fontSize: 12.5, lineHeight: 1.45, color: INK_SOFT }}>{tipText}</div>
+              {checkIns.length > 0 && (
+                <div style={{ fontSize: 11.5, color: 'var(--ink-muted)', marginTop: 8 }}>
+                  {checkIns.length} check-in{checkIns.length === 1 ? '' : 's'} logged
+                </div>
+              )}
             </div>
           </div>
-        )}
-
-        {/* Card drawn */}
-        {currentCard && currentCardId && !showCheckIn && (
-          <div style={{ width: '100%', display: 'flex', flexDirection: 'column', alignItems: 'center', overflow: 'hidden' }}>
-            {/* Card display */}
-            {guesserSeesCardBack ? (
-              <div style={{
-                width: '100%',
-                background: 'rgba(255,255,255,0.06)',
-                border: '1.5px solid rgba(255,255,255,0.1)',
-                borderRadius: 16,
-                padding: 20,
-                textAlign: 'center',
-                animation: 'ecCardFlip 0.35s ease',
-              }}>
-                <div style={{ fontSize: 48, marginBottom: 8 }}>❓</div>
-                <div style={{ fontSize: 12, color: 'rgba(255,255,255,0.35)', fontStyle: 'italic' }}>
-                  {expressSubMode === 'child-acts'
-                    ? 'Watch the webcam — what emotion is it?'
-                    : 'Watch the therapist — what feeling is it?'}
-                </div>
-                {!answered && (
-                  <div style={{ fontSize: 11, color: 'var(--ink-muted)', marginTop: 8 }}>
-                    Pick an emotion below
-                  </div>
-                )}
-              </div>
-            ) : (
-              <div style={{
-                width: '100%',
-                background: `linear-gradient(135deg, ${currentCard.color}33 0%, ${currentCard.color}11 100%)`,
-                border: `1.5px solid ${currentCard.color}66`,
-                borderRadius: 16,
-                padding: 20,
-                textAlign: 'center',
-                animation: cardFlip ? 'none' : 'ecCardFlip 0.35s ease',
-              }}>
-                {promptShowsEmoji && (
-                  <div style={{ fontSize: 56, marginBottom: 4 }}>{currentCard.emoji}</div>
-                )}
-                {promptShowsLabel && (
-                  <div style={{
-                    fontFamily: "'DM Serif Display', serif",
-                    fontSize: difficulty === 'simple' ? 24 : 20,
-                    color: '#fff',
-                  }}>
-                    {currentCard.label}
-                  </div>
-                )}
-                {/* The description carries the question while the answer is
-                    hidden, so it is shown prominently rather than as a footnote. */}
-                {(identifyQuestionOpen || showDesc) && (
-                  <div style={{
-                    fontSize: identifyQuestionOpen ? 15 : 11,
-                    lineHeight: 1.5,
-                    color: identifyQuestionOpen ? 'rgba(255,255,255,0.9)' : 'rgba(255,255,255,0.5)',
-                    fontStyle: 'italic',
-                    marginTop: promptShowsLabel || promptShowsEmoji ? 4 : 0,
-                  }}>
-                    {currentCard.desc}
-                  </div>
-                )}
-                {identifyQuestionOpen && (
-                  <div style={{ fontSize: 11, color: 'rgba(255,255,255,0.45)', marginTop: 8 }}>
-                    Which face matches this feeling?
-                  </div>
-                )}
-              </div>
-            )}
-
-            {/* Express mode instructions */}
-            {actorSeesFullCard && (
-              <div style={{
-                fontSize: 12, color: 'rgba(255,255,255,0.6)',
-                fontStyle: 'italic', marginTop: 10, textAlign: 'center',
-              }}>
-                {isTherapist
-                  ? 'Act this out on camera!'
-                  : 'Act out this feeling without words!'}
-              </div>
-            )}
-
-            {/* Response area */}
-            {mode === 'identify' && !guesserSeesCardBack && (
-              <div style={{ width: '100%', marginTop: 12 }}>
-                {!answered && (
-                  <div style={{ fontSize: 12, color: 'rgba(255,255,255,0.6)', marginBottom: 8, textAlign: 'center' }}>
-                    How does this person feel?
-                  </div>
-                )}
-
-                {/* Feedback display */}
-                {feedback && (
-                  <div style={{ textAlign: 'center', padding: '8px 0' }}>
-                    {feedback === 'correct' ? (
-                      <div style={{
-                        display: 'inline-flex', alignItems: 'center', gap: 6,
-                        padding: '6px 16px', borderRadius: 8,
-                        background: 'rgba(74,124,111,0.2)',
-                        color: '#b8d4ce', fontSize: 13, fontWeight: 600,
-                        animation: 'ecPulse 0.5s ease 2',
-                      }}>
-                        ✓ That's right!
-                      </div>
-                    ) : (
-                      <div style={{ fontSize: 12, color: 'rgba(255,255,255,0.6)' }}>
-                        The feeling is <strong style={{ color: currentCard.color }}>{currentCard.label}</strong>
-                      </div>
-                    )}
-                  </div>
-                )}
-
-                {/* Emoji grid (hide during feedback) */}
-                {!feedback && !answered && (
-                  <div style={{
-                    display: 'grid',
-                    gridTemplateColumns: 'repeat(4, 1fr)',
-                    gap: 8,
-                    width: '100%',
-                    maxWidth: 320,
-                    margin: '0 auto',
-                  }}>
-                    {options.map(opt => (
-                      <button
-                        key={opt.id}
-                        onClick={() => handleAnswer(opt.id)}
-                        style={{
-                          width: '100%',
-                          aspectRatio: '1',
-                          borderRadius: 12,
-                          border: '1px solid rgba(255,255,255,0.1)',
-                          background: 'rgba(255,255,255,0.06)',
-                          cursor: 'pointer',
-                          fontSize: 20,
-                          display: 'flex',
-                          alignItems: 'center',
-                          justifyContent: 'center',
-                          transition: 'all 0.15s',
-                        }}
-                      >
-                        {opt.emoji}
-                      </button>
-                    ))}
-                  </div>
-                )}
-
-                {/* Waiting for next card */}
-                {answered && !feedback && (
-                  <div style={{ fontSize: 11, color: 'var(--ink-muted)', textAlign: 'center', marginTop: 8 }}>
-                    Waiting for next card...
-                  </div>
-                )}
-              </div>
-            )}
-
-            {/* Express mode response */}
-            {mode === 'express' && guesserSeesCardBack && (
-              <div style={{ width: '100%', marginTop: 12, maxWidth: 320 }}>
-                {!answered && (
-                  <div style={{ fontSize: 12, color: 'rgba(255,255,255,0.6)', marginBottom: 8, textAlign: 'center' }}>
-                    What emotion is it?
-                  </div>
-                )}
-                {feedback ? (
-                  <div style={{ textAlign: 'center', padding: '8px 0' }}>
-                    {feedback === 'correct' ? (
-                      <div style={{
-                        display: 'inline-flex', alignItems: 'center', gap: 6,
-                        padding: '6px 16px', borderRadius: 8,
-                        background: 'rgba(74,124,111,0.2)',
-                        color: '#b8d4ce', fontSize: 13, fontWeight: 600,
-                      }}>
-                        ✓ That's right!
-                      </div>
-                    ) : (
-                      <div style={{ fontSize: 12, color: 'rgba(255,255,255,0.6)' }}>
-                        It was <strong style={{ color: currentCard.color }}>{currentCard.label}</strong>
-                      </div>
-                    )}
-                  </div>
-                ) : !answered ? (
-                  <div style={{
-                    display: 'grid',
-                    gridTemplateColumns: 'repeat(4, 1fr)',
-                    gap: 8,
-                  }}>
-                    {options.map(opt => (
-                      <button
-                        key={opt.id}
-                        onClick={() => handleAnswerExpress(opt.id)}
-                        style={{
-                          width: '100%',
-                          aspectRatio: '1',
-                          borderRadius: 12,
-                          border: '1px solid rgba(255,255,255,0.1)',
-                          background: 'rgba(255,255,255,0.06)',
-                          cursor: 'pointer',
-                          fontSize: 20,
-                          display: 'flex',
-                          alignItems: 'center',
-                          justifyContent: 'center',
-                          transition: 'all 0.15s',
-                        }}
-                      >
-                        {opt.emoji}
-                      </button>
-                    ))}
-                  </div>
-                ) : null}
-              </div>
-            )}
-
-            {/* Express mode: actor instruction + reveal button */}
-            {mode === 'express' && actorSeesFullCard && !expressRevealed && (
-              <div style={{ fontSize: 11, color: 'var(--ink-muted)', textAlign: 'center', marginTop: 8 }}>
-                Waiting for {expressSubMode === 'child-acts' ? 'therapist' : 'client'} to guess...
-              </div>
-            )}
-
-            {/* Express mode: both see revealed card */}
-            {mode === 'express' && expressRevealed && (
-              <div style={{
-                marginTop: 12,
-                textAlign: 'center',
-                fontSize: 12,
-                color: 'rgba(255,255,255,0.6)',
-              }}>
-                {answered ? (
-                  feedback === 'correct'
-                    ? <span style={{ color: '#b8d4ce', fontWeight: 600 }}>✓ Correct!</span>
-                    : <span>It was <strong style={{ color: currentCard.color }}>{currentCard.label}</strong></span>
-                ) : (
-                  <span>Answer revealed — score not recorded for this round</span>
-                )}
-              </div>
-            )}
-          </div>
-        )}
-      </div>
-
-      {/* Bottom: score + history */}
-      <div style={{
-        flexShrink: 0,
-        borderTop: '1px solid rgba(255,255,255,0.06)',
-        padding: '8px 16px',
-        display: 'flex',
-        alignItems: 'center',
-        gap: 12,
-      }}>
-        <span style={{ fontSize: 11, color: '#b8d4ce', fontWeight: 500 }}>✓ {score} correct</span>
-        <span style={{ fontSize: 11, color: 'var(--ink-muted)' }}>📋 {cardsPlayed} cards</span>
-        {answerHistory.length > 0 && (
-          <div style={{ display: 'flex', gap: 4, marginLeft: 'auto' }}>
-            {answerHistory.map((a, i) => {
-              const card = CARDS.find(c => c.id === a.answer)
-              if (!card) return null
-              return (
-                <div key={i} style={{
-                  width: 22,
-                  height: 22,
-                  borderRadius: 6,
-                  border: `1.5px solid ${a.correct ? 'var(--sage)' : 'var(--accent)'}`,
-                  display: 'flex',
-                  alignItems: 'center',
-                  justifyContent: 'center',
-                  fontSize: 11,
-                  background: 'rgba(255,255,255,0.05)',
-                  position: 'relative',
-                }}>
-                  {card.emoji}
-                  <span style={{
-                    position: 'absolute',
-                    top: -4,
-                    right: -4,
-                    fontSize: 7,
-                    color: a.correct ? 'var(--sage)' : 'var(--accent)',
-                    fontWeight: 700,
-                  }}>
-                    {a.correct ? '✓' : '✗'}
-                  </span>
-                </div>
-              )
-            })}
-          </div>
-        )}
+        </aside>
       </div>
     </div>
   )

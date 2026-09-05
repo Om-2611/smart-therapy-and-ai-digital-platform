@@ -474,9 +474,9 @@ export default function SocialStorySequencing({ sessionId, role, isLocked }: Soc
               <button key={s.id} onClick={() => loadStory(s.id)}
                 style={{
                   whiteSpace: 'nowrap', padding: '3px 8px', borderRadius: 10, cursor: 'pointer', fontSize: 10,
-                  border: storyId === s.id ? '1px solid rgba(74,124,111,0.6)' : '1px solid rgba(255,255,255,0.08)',
+                  border: storyId === s.id ? '1px solid rgba(74,124,111,0.6)' : '1px solid rgba(0,0,0,0.08)',
                   background: storyId === s.id ? 'rgba(74,124,111,0.2)' : 'transparent',
-                  color: storyId === s.id ? 'rgba(255,255,255,0.85)' : 'rgba(255,255,255,0.4)',
+                  color: storyId === s.id ? 'rgba(0,0,0,0.85)' : 'rgba(0,0,0,0.4)',
                 }}
               >{s.title}</button>
             ))}
@@ -484,29 +484,29 @@ export default function SocialStorySequencing({ sessionId, role, isLocked }: Soc
               <button onClick={() => loadStory('custom')}
                 style={{
                   whiteSpace: 'nowrap', padding: '3px 8px', borderRadius: 10, cursor: 'pointer', fontSize: 10,
-                  border: storyId === 'custom' ? '1px solid rgba(74,124,111,0.6)' : '1px solid rgba(255,255,255,0.08)',
+                  border: storyId === 'custom' ? '1px solid rgba(74,124,111,0.6)' : '1px solid rgba(0,0,0,0.08)',
                   background: storyId === 'custom' ? 'rgba(74,124,111,0.2)' : 'transparent',
-                  color: storyId === 'custom' ? 'rgba(255,255,255,0.85)' : 'rgba(255,255,255,0.4)',
+                  color: storyId === 'custom' ? 'rgba(0,0,0,0.85)' : 'rgba(0,0,0,0.4)',
                 }}
               >📝 {customStory.title}</button>
             )}
             <button onClick={() => setShowCustomForm(true)}
-              style={{ whiteSpace: 'nowrap', padding: '3px 8px', borderRadius: 10, cursor: 'pointer', fontSize: 10, border: '1px dashed rgba(255,255,255,0.2)', background: 'transparent', color: 'rgba(255,255,255,0.4)' }}
+              style={{ whiteSpace: 'nowrap', padding: '3px 8px', borderRadius: 10, cursor: 'pointer', fontSize: 10, border: '1px dashed rgba(0,0,0,0.2)', background: 'transparent', color: 'rgba(0,0,0,0.4)' }}
             >+ Custom</button>
           </div>
           <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
-            <span style={{ color: 'rgba(255,255,255,0.4)' }}>Difficulty:</span>
+            <span style={{ color: 'rgba(0,0,0,0.4)' }}>Difficulty:</span>
             {['guided', 'standard', 'challenge'].map(d => (
               <button key={d} onClick={() => write({ 'moduleState.ssDifficulty': d, 'moduleState.ssPlaced': {}, 'moduleState.ssAttempts': 0, 'moduleState.ssCompleted': false })}
                 style={{
                   padding: '2px 10px', borderRadius: 4, cursor: 'pointer', fontSize: 10, textTransform: 'capitalize',
-                  border: difficulty === d ? '1px solid rgba(74,124,111,0.6)' : '1px solid rgba(255,255,255,0.08)',
+                  border: difficulty === d ? '1px solid rgba(74,124,111,0.6)' : '1px solid rgba(0,0,0,0.08)',
                   background: difficulty === d ? 'rgba(74,124,111,0.15)' : 'transparent',
-                  color: difficulty === d ? 'rgba(255,255,255,0.8)' : 'rgba(255,255,255,0.35)',
+                  color: difficulty === d ? 'rgba(0,0,0,0.8)' : 'rgba(0,0,0,0.35)',
                 }}
               >{d === 'challenge' ? 'Challenge' : d === 'standard' ? 'Standard' : 'Guided'}</button>
             ))}
-            <label style={{ display: 'flex', alignItems: 'center', gap: 4, color: 'rgba(255,255,255,0.5)', cursor: 'pointer', marginLeft: 4 }}>
+            <label style={{ display: 'flex', alignItems: 'center', gap: 4, color: 'rgba(0,0,0,0.5)', cursor: 'pointer', marginLeft: 4 }}>
               <input type="checkbox" checked={readAloud} onChange={e => write({ 'moduleState.ssReadAloud': e.target.checked })} style={{ accentColor: '#4a7c6f' }} />
               Read aloud
             </label>
@@ -517,13 +517,13 @@ export default function SocialStorySequencing({ sessionId, role, isLocked }: Soc
       {/* Custom story form */}
       {showCustomForm && (
         <div style={{ flexShrink: 0, padding: '8px 10px', borderBottom: '1px solid var(--glass-border)', display: 'flex', flexDirection: 'column', gap: 6, fontSize: 11 }}>
-          <div style={{ fontSize: 13, fontFamily: '"DM Serif Display", serif', color: 'rgba(255,255,255,0.8)' }}>Create Custom Story</div>
+          <div style={{ fontSize: 13, fontFamily: '"DM Serif Display", serif', color: 'rgba(0,0,0,0.8)' }}>Create Custom Story</div>
           <input value={customTitle} onChange={e => setCustomTitle(e.target.value)} placeholder="Story title"
-            style={{ background: 'rgba(255,255,255,0.06)', border: '1px solid rgba(255,255,255,0.1)', borderRadius: 6, padding: '5px 8px', color: '#fff', fontSize: 11, outline: 'none' }}
+            style={{ background: 'rgba(0,0,0,0.06)', border: '1px solid rgba(0,0,0,0.1)', borderRadius: 6, padding: '5px 8px', color: '#2b2f33', fontSize: 11, outline: 'none' }}
           />
           {customPanels.map((p, i) => (
             <div key={i} style={{ display: 'flex', gap: 4, alignItems: 'center' }}>
-              <span style={{ color: 'rgba(255,255,255,0.3)', fontSize: 10, minWidth: 14 }}>{i + 1}.</span>
+              <span style={{ color: 'rgba(0,0,0,0.3)', fontSize: 10, minWidth: 14 }}>{i + 1}.</span>
               <div style={{ position: 'relative' }}>
                 <span style={{ fontSize: 20, cursor: 'pointer' }}
                   onClick={() => {
@@ -535,7 +535,7 @@ export default function SocialStorySequencing({ sessionId, role, isLocked }: Soc
               </div>
               <input value={p.caption} onChange={e => { const cp = [...customPanels]; cp[i] = { ...cp[i], caption: e.target.value.slice(0, 40) }; setCustomPanels(cp) }}
                 placeholder="Caption (max 40 chars)" maxLength={40}
-                style={{ flex: 1, background: 'rgba(255,255,255,0.06)', border: '1px solid rgba(255,255,255,0.1)', borderRadius: 4, padding: '4px 6px', color: '#fff', fontSize: 10, outline: 'none' }}
+                style={{ flex: 1, background: 'rgba(0,0,0,0.06)', border: '1px solid rgba(0,0,0,0.1)', borderRadius: 4, padding: '4px 6px', color: '#2b2f33', fontSize: 10, outline: 'none' }}
               />
               {customPanels.length > 3 && (
                 <button onClick={() => setCustomPanels(cp => cp.filter((_, j) => j !== i))}
@@ -545,15 +545,15 @@ export default function SocialStorySequencing({ sessionId, role, isLocked }: Soc
           ))}
           {customPanels.length < 6 && (
             <button onClick={() => setCustomPanels(cp => [...cp, { emoji: '😊', caption: '' }])}
-              style={{ padding: '3px 0', borderRadius: 4, border: '1px dashed rgba(255,255,255,0.15)', background: 'transparent', color: 'rgba(255,255,255,0.4)', cursor: 'pointer', fontSize: 10 }}
+              style={{ padding: '3px 0', borderRadius: 4, border: '1px dashed rgba(0,0,0,0.15)', background: 'transparent', color: 'rgba(0,0,0,0.4)', cursor: 'pointer', fontSize: 10 }}
             >+ Add panel</button>
           )}
           <div style={{ display: 'flex', gap: 4 }}>
             <button onClick={saveCustomStory}
-              style={{ flex: 1, padding: '5px 0', borderRadius: 6, border: '1px solid rgba(74,124,111,0.5)', background: 'rgba(74,124,111,0.2)', color: '#b8d4ce', cursor: 'pointer', fontSize: 11 }}
+              style={{ flex: 1, padding: '5px 0', borderRadius: 6, border: '1px solid rgba(74,124,111,0.5)', background: 'rgba(74,124,111,0.2)', color: '#1F7A44', cursor: 'pointer', fontSize: 11 }}
             >Save & use</button>
             <button onClick={() => setShowCustomForm(false)}
-              style={{ padding: '5px 12px', borderRadius: 6, border: '1px solid rgba(255,255,255,0.1)', background: 'transparent', color: 'rgba(255,255,255,0.4)', cursor: 'pointer', fontSize: 11 }}
+              style={{ padding: '5px 12px', borderRadius: 6, border: '1px solid rgba(0,0,0,0.1)', background: 'transparent', color: 'rgba(0,0,0,0.4)', cursor: 'pointer', fontSize: 11 }}
             >Cancel</button>
           </div>
         </div>
@@ -561,20 +561,20 @@ export default function SocialStorySequencing({ sessionId, role, isLocked }: Soc
 
       {/* No story selected (client) */}
       {!currentStory && !isT && (
-        <div style={{ flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center', color: 'rgba(255,255,255,0.3)', fontSize: 13 }}>
+        <div style={{ flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center', color: 'rgba(0,0,0,0.3)', fontSize: 13 }}>
           Waiting for therapist to choose a story...
         </div>
       )}
 
       {currentStory && (
-        <div ref={cRef} style={{ flex: 1, position: 'relative', overflow: 'hidden', minHeight: 0, display: 'flex', flexDirection: 'column', padding: 10, gap: 8, touchAction: 'none' }}>
+        <div ref={cRef} style={{ flex: 1, position: 'relative', overflow: 'hidden', minHeight: 0, display: 'flex', flexDirection: 'column', padding: 18, gap: 14, touchAction: 'none' }}>
           {/* Story title */}
-          <div style={{ fontSize: 14, fontFamily: '"DM Serif Display", serif', color: 'rgba(255,255,255,0.8)', textAlign: 'center', flexShrink: 0 }}>
+          <div style={{ fontSize: 14, fontFamily: '"DM Serif Display", serif', color: 'rgba(0,0,0,0.8)', textAlign: 'center', flexShrink: 0 }}>
             {currentStory.title}
           </div>
 
           {/* Sequence slots */}
-          <div style={{ display: 'flex', gap: 4, flexShrink: 0 }}>
+          <div style={{ display: 'flex', gap: 10, flexShrink: 0 }}>
             {Array.from({ length: slotCount }, (_, idx) => {
               const pid = placed[String(idx)]
               const panel = pid ? panelMap.get(pid) : null
@@ -591,8 +591,8 @@ export default function SocialStorySequencing({ sessionId, role, isLocked }: Soc
                   onDrop={e => onSlotDrop(e, idx)}
                   style={{
                     flex: 1, aspectRatio: '0.85', borderRadius: 12,
-                    background: isPlay ? 'rgba(74,124,111,0.2)' : isWrong ? 'rgba(200,96,42,0.15)' : isCorrect ? 'rgba(74,124,111,0.15)' : isHover ? 'rgba(74,124,111,0.1)' : 'rgba(255,255,255,0.04)',
-                    border: isPlay ? '2px solid #4a7c6f' : isWrong ? '1.5px solid rgba(200,96,42,0.5)' : isCorrect ? '1.5px solid rgba(74,124,111,0.6)' : isHover ? '1.5px solid rgba(74,124,111,0.4)' : '1.5px dashed rgba(255,255,255,0.15)',
+                    background: isPlay ? 'rgba(74,124,111,0.2)' : isWrong ? 'rgba(200,96,42,0.15)' : isCorrect ? 'rgba(74,124,111,0.15)' : isHover ? 'rgba(74,124,111,0.1)' : 'rgba(0,0,0,0.04)',
+                    border: isPlay ? '2px solid #4a7c6f' : isWrong ? '1.5px solid rgba(200,96,42,0.5)' : isCorrect ? '1.5px solid rgba(74,124,111,0.6)' : isHover ? '1.5px solid rgba(74,124,111,0.4)' : '1.5px dashed rgba(0,0,0,0.15)',
                     borderStyle: isHover ? 'solid' : isPlay ? 'solid' : isWrong ? 'solid' : isCorrect ? 'solid' : 'dashed',
                     display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', gap: 3,
                     transition: 'all 0.2s', cursor: canDrop && !isOccupied ? 'pointer' : 'default',
@@ -606,15 +606,15 @@ export default function SocialStorySequencing({ sessionId, role, isLocked }: Soc
                     <>
                       <span style={{ fontSize: 28, lineHeight: 1 }}>{panel.emoji}</span>
                       {difficulty !== 'challenge' && (
-                        <span style={{ fontSize: 8, color: 'rgba(255,255,255,0.7)', textAlign: 'center', lineHeight: 1.2, padding: '0 2px' }}>{panel.caption}</span>
+                        <span style={{ fontSize: 8, color: 'rgba(0,0,0,0.7)', textAlign: 'center', lineHeight: 1.2, padding: '0 2px' }}>{panel.caption}</span>
                       )}
                     </>
                   ) : (
                     <>
                       {difficulty === 'guided' && (
-                        <span style={{ fontSize: 16, color: 'rgba(255,255,255,0.15)', fontWeight: 700 }}>{idx + 1}</span>
+                        <span style={{ fontSize: 16, color: 'rgba(0,0,0,0.15)', fontWeight: 700 }}>{idx + 1}</span>
                       )}
-                      <span style={{ fontSize: 8, color: 'rgba(255,255,255,0.15)' }}>Drop here</span>
+                      <span style={{ fontSize: 8, color: 'rgba(0,0,0,0.15)' }}>Drop here</span>
                     </>
                   )}
                   {isWrong && <div className="sh-a" style={{ position: 'absolute', inset: 0, borderRadius: 12, pointerEvents: 'none' }} />}
@@ -624,7 +624,7 @@ export default function SocialStorySequencing({ sessionId, role, isLocked }: Soc
           </div>
 
           {/* Shuffled panel cards */}
-          <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6, padding: 6, minHeight: 86, alignContent: 'flex-start', background: 'rgba(255,255,255,0.03)', borderRadius: 10, border: '1px dashed rgba(255,255,255,0.08)', flex: 1, overflowY: 'auto' }}>
+          <div style={{ display: 'flex', flexWrap: 'wrap', gap: 12, padding: 16, minHeight: 110, alignContent: 'flex-start', background: 'rgba(0,0,0,0.035)', borderRadius: 14, border: '1px dashed rgba(0,0,0,0.14)', flex: 1, overflowY: 'auto' }}>
             {unplacedIds.map(id => {
               const panel = panelMap.get(id)
               if (!panel) return null
@@ -638,7 +638,7 @@ export default function SocialStorySequencing({ sessionId, role, isLocked }: Soc
                   className={isHint ? 'hint-pulse' : ''}
                   style={{
                     width: 68, height: 80, borderRadius: 12,
-                    background: 'rgba(255,255,255,0.07)', border: isHint ? '1.5px solid rgba(74,124,111,0.5)' : '1.5px solid rgba(255,255,255,0.12)',
+                    background: 'rgba(0,0,0,0.07)', border: isHint ? '1.5px solid rgba(74,124,111,0.5)' : '1.5px solid rgba(0,0,0,0.12)',
                     display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', gap: 3, padding: 4,
                     cursor: canDrop && !completed ? 'grab' : 'default',
                     transition: 'all 0.15s', userSelect: 'none', WebkitUserSelect: 'none',
@@ -649,25 +649,25 @@ export default function SocialStorySequencing({ sessionId, role, isLocked }: Soc
                 >
                   <span style={{ fontSize: 26, lineHeight: 1 }}>{panel.emoji}</span>
                   {difficulty !== 'challenge' && (
-                    <span style={{ fontSize: 7, color: 'rgba(255,255,255,0.65)', textAlign: 'center', lineHeight: 1.2, overflow: 'hidden', display: '-webkit-box', WebkitLineClamp: 2, WebkitBoxOrient: 'vertical' }}>
+                    <span style={{ fontSize: 7, color: 'rgba(0,0,0,0.65)', textAlign: 'center', lineHeight: 1.2, overflow: 'hidden', display: '-webkit-box', WebkitLineClamp: 2, WebkitBoxOrient: 'vertical' }}>
                       {panel.caption}
                     </span>
                   )}
                 </div>
               )
             })}
-            {unplacedIds.length === 0 && <div style={{ width: '100%', textAlign: 'center', color: 'rgba(255,255,255,0.2)', fontSize: 10, padding: 8 }}>All panels placed!</div>}
+            {unplacedIds.length === 0 && <div style={{ width: '100%', textAlign: 'center', color: 'rgba(0,0,0,0.2)', fontSize: 10, padding: 8 }}>All panels placed!</div>}
           </div>
 
           {/* Check button */}
-          <div style={{ display: 'flex', gap: 6, flexShrink: 0 }}>
+          <div style={{ display: 'flex', gap: 10, flexShrink: 0 }}>
             <button onClick={handleCheck}
               disabled={!canCheck}
               style={{
                 flex: 1, padding: '8px 0', borderRadius: 8, fontSize: 12, cursor: canCheck ? 'pointer' : 'default',
-                background: canCheck ? 'rgba(74,124,111,0.3)' : 'rgba(255,255,255,0.04)',
-                border: canCheck ? '1px solid rgba(74,124,111,0.4)' : '1px solid rgba(255,255,255,0.08)',
-                color: canCheck ? '#b8d4ce' : 'rgba(255,255,255,0.25)',
+                background: canCheck ? 'rgba(74,124,111,0.3)' : 'rgba(0,0,0,0.04)',
+                border: canCheck ? '1px solid rgba(74,124,111,0.4)' : '1px solid rgba(0,0,0,0.08)',
+                color: canCheck ? '#1F7A44' : 'rgba(0,0,0,0.25)',
                 opacity: canCheck ? 1 : 0.4,
               }}
             >Check my story ✓</button>
@@ -679,7 +679,7 @@ export default function SocialStorySequencing({ sessionId, role, isLocked }: Soc
           </div>
 
           {/* Score */}
-          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', fontSize: 11, color: 'rgba(255,255,255,0.4)', flexShrink: 0 }}>
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', fontSize: 11, color: 'rgba(0,0,0,0.4)', flexShrink: 0 }}>
             <span>🌟 {storiesDone} stories completed</span>
             <span>🔄 Attempt {attempts || 0} on this story</span>
           </div>
@@ -697,7 +697,7 @@ export default function SocialStorySequencing({ sessionId, role, isLocked }: Soc
         }}>
           <span style={{ fontSize: 26, lineHeight: 1 }}>{panelMap.get(dragId.current)!.emoji}</span>
           {difficulty !== 'challenge' && (
-            <span style={{ fontSize: 7, color: 'rgba(255,255,255,0.65)', textAlign: 'center', lineHeight: 1.2 }}>{panelMap.get(dragId.current)!.caption}</span>
+            <span style={{ fontSize: 7, color: 'rgba(0,0,0,0.65)', textAlign: 'center', lineHeight: 1.2 }}>{panelMap.get(dragId.current)!.caption}</span>
           )}
         </div>
       )}
@@ -709,15 +709,15 @@ export default function SocialStorySequencing({ sessionId, role, isLocked }: Soc
           background: 'rgba(74,124,111,0.2)', backdropFilter: 'blur(6px)', zIndex: 50, padding: 20,
         }}>
           <div style={{ fontSize: 36 }}>🌟</div>
-          <div style={{ fontSize: 18, fontFamily: '"DM Serif Display", serif', color: '#fff', textAlign: 'center' }}>You got the story right!</div>
-          <div style={{ fontSize: 12, color: 'rgba(255,255,255,0.5)' }}>Attempts: {attempts || 0}</div>
+          <div style={{ fontSize: 18, fontFamily: '"DM Serif Display", serif', color: '#2b2f33', textAlign: 'center' }}>You got the story right!</div>
+          <div style={{ fontSize: 12, color: 'rgba(0,0,0,0.5)' }}>Attempts: {attempts || 0}</div>
           <div style={{ display: 'flex', gap: 8 }}>
             <button onClick={resetStory}
-              style={{ padding: '8px 20px', borderRadius: 8, border: '1px solid rgba(255,255,255,0.12)', background: 'rgba(255,255,255,0.07)', color: 'rgba(255,255,255,0.8)', cursor: 'pointer', fontSize: 12 }}
+              style={{ padding: '8px 20px', borderRadius: 8, border: '1px solid rgba(0,0,0,0.12)', background: 'rgba(0,0,0,0.07)', color: 'rgba(0,0,0,0.8)', cursor: 'pointer', fontSize: 12 }}
             >Same story</button>
             {isT && (
               <button onClick={nextStory}
-                style={{ padding: '8px 20px', borderRadius: 8, border: '1px solid rgba(74,124,111,0.4)', background: 'rgba(74,124,111,0.2)', color: '#b8d4ce', cursor: 'pointer', fontSize: 12 }}
+                style={{ padding: '8px 20px', borderRadius: 8, border: '1px solid rgba(74,124,111,0.4)', background: 'rgba(74,124,111,0.2)', color: '#1F7A44', cursor: 'pointer', fontSize: 12 }}
               >New story</button>
             )}
           </div>
