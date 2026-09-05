@@ -2,6 +2,7 @@
 
 import { useState, useEffect, useCallback } from 'react'
 import { doc, onSnapshot, updateDoc } from 'firebase/firestore'
+import { ChevronLeft, Lightbulb } from 'lucide-react'
 import { db } from '@/lib/firebase'
 import { logModuleEvent } from '@/lib/sessionEvents'
 
@@ -11,14 +12,10 @@ interface EmotionWheelProps {
   isLocked: boolean
 }
 
-// valence buckets for coloring
-type Valence = 'pos' | 'neg' | 'anger'
-const VALENCE: Record<string, Valence> = {
-  good: 'pos', surprised: 'pos',
-  bad: 'neg', scared: 'neg', disgusted: 'neg',
-  angry: 'anger',
-}
-
+/* ---- Taxonomy (unchanged) --------------------------------------------
+   `L1` keys are the values persisted in `moduleState.ewPath`, so they stay
+   exactly as they were. Two of them read better to a client under their
+   mockup labels — see CORE below — but only the *label* differs. */
 const L1 = ['bad', 'good', 'scared', 'disgusted', 'surprised', 'angry']
 
 const L2: Record<string, string[]> = {
@@ -57,13 +54,44 @@ const L3: Record<string, string[]> = {
   unsure: ['hesitant', 'doubtful', 'torn'],
 }
 
-function colorFor(word: string, rootValence: Valence | undefined, selected: boolean, highlighted: boolean) {
-  if (selected) return { bg: 'rgba(74,124,111,0.4)', border: 'rgba(74,124,111,0.7)', text: '#cfe6df' }
-  if (highlighted) return { bg: 'rgba(220,150,40,0.3)', border: 'rgba(220,150,40,0.6)', text: '#f0d28a' }
-  if (rootValence === 'pos') return { bg: 'rgba(220,170,60,0.14)', border: 'rgba(220,170,60,0.3)', text: 'rgba(255,255,255,0.85)' }
-  if (rootValence === 'anger') return { bg: 'rgba(200,80,50,0.16)', border: 'rgba(200,80,50,0.35)', text: 'rgba(255,255,255,0.85)' }
-  return { bg: 'rgba(90,110,200,0.14)', border: 'rgba(90,110,200,0.3)', text: 'rgba(255,255,255,0.85)' } // neg / default cool
+/* ---- Palette ----------------------------------------------------------
+   This module renders on ModuleStage's WHITE canvas, so every colour is
+   stated literally and dark-on-light. The shared `--ink-*` CSS vars are
+   authored for the dark sidebar panel and are deliberately NOT used here. */
+const INK = '#16233A'          // headings — dark navy
+const INK_BODY = '#334155'     // card copy
+const INK_MUTED = '#475569'    // helper copy (7:1 on white)
+const INK_FAINT = '#64748B'    // micro-labels (4.9:1 on white)
+const LINE = '#e7eaef'
+const AMBER = '#D97706'        // therapist highlight marker
+
+interface CoreEmotion {
+  key: string       // taxonomy key — what Firestore stores
+  label: string     // what the client reads
+  emoji: string
+  accent: string    // saturated: text on tint, or fill behind white text
+  tint: string      // pale wash behind the tile
+  ring: string      // focus/selection halo
 }
+
+/* Mockup order, left to right. Each accent is dark enough to read on its own
+   tint (e.g. #DC2626 on #FEF2F2 ≈ 4.9:1) — never pale-on-pale. */
+const CORE: CoreEmotion[] = [
+  { key: 'angry',     label: 'Angry',     emoji: '😡', accent: '#DC2626', tint: '#FEF2F2', ring: 'rgba(220,38,38,0.18)' },
+  { key: 'bad',       label: 'Sad',       emoji: '😟', accent: '#2563EB', tint: '#EFF6FF', ring: 'rgba(37,99,235,0.18)' },
+  { key: 'scared',    label: 'Scared',    emoji: '😨', accent: '#7C3AED', tint: '#F5F3FF', ring: 'rgba(124,58,237,0.18)' },
+  { key: 'good',      label: 'Happy',     emoji: '😄', accent: '#16A34A', tint: '#F0FDF4', ring: 'rgba(22,163,74,0.18)' },
+  { key: 'surprised', label: 'Surprised', emoji: '😮', accent: '#D97706', tint: '#FFFBEB', ring: 'rgba(217,119,6,0.18)' },
+  { key: 'disgusted', label: 'Disgusted', emoji: '🤢', accent: '#65A30D', tint: '#F7FEE7', ring: 'rgba(101,163,13,0.18)' },
+]
+
+const CORE_BY_KEY: Record<string, CoreEmotion> = Object.fromEntries(CORE.map(c => [c.key, c]))
+
+/* Layers 2 and 3 are shades of whichever core emotion the client opened, so
+   they inherit that emotion's pair and keep the tile language. */
+const NEUTRAL: CoreEmotion = { key: '', label: '', emoji: '💭', accent: '#334155', tint: '#F8FAFC', ring: 'rgba(51,65,85,0.16)' }
+
+const labelFor = (word: string) => CORE_BY_KEY[word]?.label ?? word
 
 export default function EmotionWheel({ sessionId, role, isLocked }: EmotionWheelProps) {
   const isT = role === 'therapist'
@@ -90,8 +118,6 @@ export default function EmotionWheel({ sessionId, role, isLocked }: EmotionWheel
     })
     return () => unsub()
   }, [sessionId])
-
-  const rootValence = path[0] ? VALENCE[path[0]] : undefined
 
   const drillIn = useCallback((word: string) => {
     if (!canInteract) return
@@ -122,72 +148,263 @@ export default function EmotionWheel({ sessionId, role, isLocked }: EmotionWheel
   }, [isT, highlighted, write])
 
   const options = level === 1 ? L1 : level === 2 ? (L2[path[0]] || []) : (L3[path[1]] || [])
+  // Level 1 is laid out in the mockup's reading order; the taxonomy list itself is untouched.
+  const ordered = level === 1 ? CORE.map(c => c.key).filter(k => options.includes(k)) : options
+
+  // Deeper layers borrow the palette of the core emotion they descend from.
+  const rootPalette = CORE_BY_KEY[path[0]] ?? NEUTRAL
+  const isCoreLevel = level === 1
 
   return (
-    <div style={{ display: 'flex', flexDirection: 'column', gap: 12, padding: '4px 4px 12px', fontFamily: '"DM Sans", sans-serif' }}>
-      <div style={{ textAlign: 'center', fontFamily: '"DM Serif Display", serif', fontStyle: 'italic', fontSize: 15, color: 'rgba(255,255,255,0.85)' }}>
-        🎡 Emotion Wheel
+    /* Root fills the stage and never scrolls itself: ModuleStage's body is
+       overflow:hidden and hands every module a `height:100%` box with an
+       internal `flex:1` region. Only the tile field scrolls, and only if a
+       very short canvas forces it. */
+    <div style={{
+      height: '100%', minHeight: 0, maxWidth: '100%',
+      display: 'flex', flexDirection: 'column', gap: 10,
+      fontFamily: '"DM Sans", sans-serif', color: INK,
+    }}>
+      <style>{`
+        .ew-tile { transition: transform .14s ease, box-shadow .14s ease, border-color .14s ease; }
+        .ew-tile:not(:disabled):hover { transform: translateY(-3px); }
+        .ew-tile:disabled { cursor: default; }
+        .ew-scroll { scrollbar-width: thin; scrollbar-color: #cbd5e1 transparent; }
+        .ew-scroll::-webkit-scrollbar { width: 7px; }
+        .ew-scroll::-webkit-scrollbar-thumb { background: #cbd5e1; border-radius: 8px; }
+        .ew-input::placeholder { color: #94a3b8; }
+        .ew-input:focus { border-color: #94a3b8; box-shadow: 0 0 0 3px rgba(100,116,139,0.12); }
+      `}</style>
+
+      {/* ---- Identity mark + subtitle. The module TITLE is deliberately absent:
+              ModuleStage already renders "Emotion Wheel" and the category line
+              directly above this body. ---- */}
+      <div style={{ flexShrink: 0, display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 6 }}>
+        <div aria-hidden style={{
+          width: 44, height: 44, borderRadius: '50%', background: '#ffffff',
+          border: `1px solid ${LINE}`, boxShadow: '0 2px 8px rgba(20,30,45,0.08)',
+          display: 'flex', alignItems: 'center', justifyContent: 'center',
+        }}>
+          <div style={{
+            width: 30, height: 30, borderRadius: '50%',
+            background: `conic-gradient(${CORE.map((c, i) => `${c.accent} ${i * 60}deg ${(i + 1) * 60}deg`).join(', ')})`,
+            boxShadow: 'inset 0 0 0 1.5px rgba(255,255,255,0.75)',
+          }} />
+        </div>
+        <div style={{ fontSize: 15, fontWeight: 500, color: INK_MUTED, textAlign: 'center' }}>
+          Choose an emotion to explore deeper.
+        </div>
       </div>
 
-      {/* Breadcrumb */}
-      <div style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 11, color: 'rgba(255,255,255,0.5)', minHeight: 18 }}>
-        {level > 1 && canInteract && <button onClick={goBack} style={{ ...btnStyle, padding: '3px 8px' }}>‹ Back</button>}
-        <span style={{ textTransform: 'capitalize' }}>{path.length ? path.join(' › ') : 'Choose a broad feeling'}</span>
+      {/* ---- Layer bar: back, breadcrumb, depth dots. Fixed height so the tile
+              field never reflows between layers. ---- */}
+      <div style={{
+        flexShrink: 0, minHeight: 30, display: 'flex', alignItems: 'center',
+        justifyContent: 'center', gap: 10, flexWrap: 'wrap',
+      }}>
+        {level > 1 && canInteract && (
+          <button onClick={goBack} style={{
+            display: 'inline-flex', alignItems: 'center', gap: 4,
+            padding: '6px 12px 6px 8px', borderRadius: 999,
+            border: `1px solid ${LINE}`, background: '#ffffff',
+            fontSize: 12.5, fontWeight: 600, color: INK_MUTED,
+            fontFamily: '"DM Sans", sans-serif', cursor: 'pointer',
+            boxShadow: '0 1px 4px rgba(20,30,45,0.05)',
+          }}>
+            <ChevronLeft size={15} strokeWidth={2.4} /> Back
+          </button>
+        )}
+
+        <span style={{
+          padding: '6px 14px', borderRadius: 999,
+          background: level > 1 ? rootPalette.tint : '#F8FAFC',
+          border: `1px solid ${level > 1 ? rootPalette.accent : LINE}`,
+          fontSize: 12.5, fontWeight: 700, letterSpacing: 0.1,
+          color: level > 1 ? rootPalette.accent : INK_FAINT,
+          textTransform: 'capitalize',
+        }}>
+          {path.length ? path.map(labelFor).join(' › ') : 'Layer 1 · core feelings'}
+        </span>
+
+        <span aria-hidden style={{ display: 'inline-flex', gap: 5, alignItems: 'center' }}>
+          {[1, 2, 3].map(l => (
+            <span key={l} style={{
+              width: 7, height: 7, borderRadius: '50%',
+              background: level >= l ? (level > 1 ? rootPalette.accent : INK_FAINT) : '#DDE3EC',
+            }} />
+          ))}
+        </span>
       </div>
 
-      {/* Concentric ring visual hint */}
-      <div style={{ display: 'flex', justifyContent: 'center', gap: 4, marginBottom: 2 }}>
-        {[1, 2, 3].map(l => (
-          <div key={l} style={{ width: 8, height: 8, borderRadius: '50%', background: level === l ? '#4a7c6f' : 'rgba(255,255,255,0.15)' }} />
-        ))}
-      </div>
+      {/* ---- The tile field ---- */}
+      <div className="ew-scroll" style={{
+        flex: 1, minHeight: 0, overflowY: 'auto', overflowX: 'hidden',
+        display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '2px 0',
+      }}>
+        <div style={{
+          display: 'flex', flexWrap: 'wrap', gap: 14,
+          justifyContent: 'center', alignItems: 'flex-start', width: '100%',
+        }}>
+          {ordered.map(word => {
+            const p = isCoreLevel ? (CORE_BY_KEY[word] ?? NEUTRAL) : rootPalette
+            const isSel = selected === word
+            const isHi = highlighted.includes(word)
+            return (
+              <div key={word} style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 4 }}>
+                <button
+                  className="ew-tile"
+                  onClick={() => drillIn(word)}
+                  disabled={!canInteract}
+                  title={canInteract ? `Explore ${labelFor(word)}` : undefined}
+                  style={{
+                    position: 'relative', boxSizing: 'border-box',
+                    width: isCoreLevel ? 150 : 162,
+                    minHeight: isCoreLevel ? 150 : 126,
+                    display: 'flex', flexDirection: 'column',
+                    alignItems: 'center', justifyContent: 'center',
+                    gap: isCoreLevel ? 10 : 8, padding: '14px 10px',
+                    borderRadius: isCoreLevel ? 20 : 18,
+                    background: p.tint,
+                    border: isSel
+                      ? `2px solid ${p.accent}`
+                      : isHi ? `2px solid ${AMBER}` : `1.5px solid ${p.ring}`,
+                    boxShadow: isSel
+                      ? `0 0 0 4px ${p.ring}, 0 6px 16px rgba(20,30,45,0.08)`
+                      : isHi ? '0 0 0 4px rgba(217,119,6,0.18)' : '0 2px 8px rgba(20,30,45,0.05)',
+                    cursor: canInteract ? 'pointer' : 'default',
+                    fontFamily: '"DM Sans", sans-serif',
+                  }}
+                >
+                  {isHi && (
+                    <span aria-label="highlighted" style={{
+                      position: 'absolute', top: 8, right: 8,
+                      width: 20, height: 20, borderRadius: '50%',
+                      display: 'flex', alignItems: 'center', justifyContent: 'center',
+                      background: '#FEF3C7', border: `1px solid ${AMBER}`,
+                      fontSize: 10, color: '#92400E', lineHeight: 1,
+                    }}>★</span>
+                  )}
 
-      {/* Options as ring segments */}
-      <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8, justifyContent: 'center', padding: '8px 0' }}>
-        {options.map(word => {
-          const isSel = selected === word
-          const isHi = highlighted.includes(word)
-          const c = colorFor(word, rootValence, isSel, isHi)
-          return (
-            <div key={word} style={{ display: 'flex', flexDirection: 'column', gap: 2, alignItems: 'center' }}>
-              <button onClick={() => drillIn(word)} disabled={!canInteract}
-                style={{
-                  padding: '12px 18px', borderRadius: 999, fontSize: level === 1 ? 14 : 13, textTransform: 'capitalize',
-                  cursor: canInteract ? 'pointer' : 'default', background: c.bg, border: `1px solid ${c.border}`, color: c.text,
-                  fontFamily: isSel ? '"DM Serif Display", serif' : '"DM Sans", sans-serif',
-                }}>
-                {word}
-              </button>
-              {isT && (
-                <button onClick={() => toggleHighlight(word)} style={{ fontSize: 9, padding: '1px 6px', borderRadius: 4, border: 'none', background: 'transparent', color: isHi ? '#f0d28a' : 'rgba(255,255,255,0.35)', cursor: 'pointer' }}>
-                  {isHi ? '★ highlighted' : 'highlight'}
+                  <span aria-hidden style={{
+                    fontSize: isCoreLevel ? 54 : 34, lineHeight: 1,
+                    filter: 'drop-shadow(0 3px 5px rgba(20,30,45,0.16))',
+                  }}>
+                    {p.emoji}
+                  </span>
+
+                  <span style={{
+                    fontSize: isCoreLevel ? 19 : 15.5, fontWeight: 800, letterSpacing: -0.2,
+                    lineHeight: 1.2, textAlign: 'center', textTransform: 'capitalize',
+                    color: p.accent,
+                  }}>
+                    {labelFor(word)}
+                  </span>
                 </button>
-              )}
-            </div>
-          )
-        })}
+
+                {/* Therapist-only marker, unchanged behaviour. */}
+                <div style={{ minHeight: 20 }}>
+                  {isT && (
+                    <button onClick={() => toggleHighlight(word)} style={{
+                      padding: '2px 9px', borderRadius: 999, cursor: 'pointer',
+                      border: `1px solid ${isHi ? AMBER : LINE}`,
+                      background: isHi ? '#FFFBEB' : '#ffffff',
+                      fontSize: 10.5, fontWeight: 700,
+                      color: isHi ? '#92400E' : INK_FAINT,
+                      fontFamily: '"DM Sans", sans-serif',
+                    }}>
+                      {isHi ? '★ highlighted' : 'highlight'}
+                    </button>
+                  )}
+                </div>
+              </div>
+            )
+          })}
+
+          {ordered.length === 0 && (
+            <span style={{ fontSize: 13, color: INK_FAINT, padding: '20px 0' }}>
+              No further shades here — this is as specific as the wheel goes.
+            </span>
+          )}
+        </div>
       </div>
 
-      {selected && (
-        <div style={{ background: 'rgba(74,124,111,0.15)', border: '1px solid rgba(74,124,111,0.35)', borderRadius: 10, padding: '12px 16px', textAlign: 'center' }}>
-          <div style={{ fontSize: 10, letterSpacing: 1, textTransform: 'uppercase', color: 'rgba(255,255,255,0.4)' }}>You named it</div>
-          <div style={{ fontFamily: '"DM Serif Display", serif', fontSize: 20, textTransform: 'capitalize', color: '#cfe6df', marginTop: 4 }}>{selected}</div>
+      {/* ---- Footer: the named emotion once we reach the leaf, otherwise the
+              lightbulb tip from the mockup. ---- */}
+      {selected ? (
+        <div style={{
+          flexShrink: 0, alignSelf: 'center', maxWidth: 620,
+          display: 'flex', alignItems: 'center', gap: 14,
+          padding: '12px 22px', borderRadius: 16,
+          background: rootPalette.tint, border: `1.5px solid ${rootPalette.accent}`,
+          boxShadow: '0 4px 14px rgba(20,30,45,0.06)',
+        }}>
+          <span aria-hidden style={{ fontSize: 30, lineHeight: 1 }}>{rootPalette.emoji}</span>
+          <span>
+            <span style={{
+              display: 'block', fontSize: 10.5, fontWeight: 800, letterSpacing: 1.3,
+              textTransform: 'uppercase', color: INK_FAINT,
+            }}>
+              You named it
+            </span>
+            <span style={{
+              display: 'block', marginTop: 2, fontSize: 24, fontWeight: 800,
+              letterSpacing: -0.3, textTransform: 'capitalize', color: rootPalette.accent,
+            }}>
+              {selected}
+            </span>
+          </span>
+        </div>
+      ) : (
+        <div style={{
+          flexShrink: 0, alignSelf: 'center', maxWidth: 620,
+          display: 'flex', alignItems: 'center', gap: 14,
+          padding: '12px 20px', borderRadius: 16,
+          background: '#ffffff', border: `1px solid ${LINE}`,
+          boxShadow: '0 4px 14px rgba(20,30,40,0.05)',
+        }}>
+          <span aria-hidden style={{
+            width: 34, height: 34, borderRadius: 12, flexShrink: 0,
+            display: 'flex', alignItems: 'center', justifyContent: 'center',
+            background: '#FEF6DF', border: '1px solid #FBE3A6',
+          }}>
+            <Lightbulb size={18} color={AMBER} fill="#FCD34D" />
+          </span>
+          <span style={{ fontSize: 14.5, fontWeight: 500, lineHeight: 1.45, color: INK_BODY }}>
+            There are many shades to every emotion.<br />
+            Let&apos;s explore them together, one layer at a time.
+          </span>
         </div>
       )}
 
-      {/* Therapist compare */}
+      {/* ---- Therapist compare tool (local-only prompt, unchanged) ---- */}
       {isT && (
-        <div style={{ display: 'flex', flexDirection: 'column', gap: 6, padding: 10, borderRadius: 10, background: 'rgba(255,255,255,0.04)', border: '1px solid rgba(255,255,255,0.08)' }}>
-          <div style={labelStyle}>Compare two emotions (body sensation)</div>
-          <div style={{ display: 'flex', gap: 6 }}>
-            <input placeholder="Emotion A" value={comparePrompt[0] || ''} onChange={e => setComparePrompt([e.target.value, comparePrompt[1] || ''])} style={inputStyle} />
-            <input placeholder="Emotion B" value={comparePrompt[1] || ''} onChange={e => setComparePrompt([comparePrompt[0] || '', e.target.value])} style={inputStyle} />
+        <div style={{
+          flexShrink: 0, display: 'flex', flexDirection: 'column', gap: 8,
+          padding: '10px 14px 12px', borderRadius: 16,
+          background: '#ffffff', border: `1px solid ${LINE}`,
+          boxShadow: '0 2px 10px rgba(20,30,45,0.05)',
+        }}>
+          <div style={{
+            fontSize: 10.5, fontWeight: 800, letterSpacing: 1.3,
+            textTransform: 'uppercase', color: INK_FAINT,
+          }}>
+            Compare two emotions (body sensation)
+          </div>
+          <div style={{ display: 'flex', gap: 8 }}>
+            <input className="ew-input" placeholder="Emotion A" value={comparePrompt[0] || ''}
+              onChange={e => setComparePrompt([e.target.value, comparePrompt[1] || ''])} style={inputStyle} />
+            <input className="ew-input" placeholder="Emotion B" value={comparePrompt[1] || ''}
+              onChange={e => setComparePrompt([comparePrompt[0] || '', e.target.value])} style={inputStyle} />
           </div>
           {comparePrompt[0] && comparePrompt[1] && (
-            <div style={{ display: 'flex', gap: 6 }}>
+            <div style={{ display: 'flex', gap: 8 }}>
               {comparePrompt.map((em, i) => (
-                <div key={i} style={{ flex: 1, padding: '10px', borderRadius: 8, background: 'rgba(255,255,255,0.05)', border: '1px solid rgba(255,255,255,0.1)', fontSize: 11, color: 'rgba(255,255,255,0.7)', textAlign: 'center' }}>
-                  Where do you feel <strong style={{ textTransform: 'capitalize' }}>{em}</strong> in your body?
+                <div key={i} style={{
+                  flex: 1, padding: '9px 12px', borderRadius: 12,
+                  background: '#F8FAFC', border: `1px solid ${LINE}`,
+                  fontSize: 12.5, lineHeight: 1.4, color: INK_BODY, textAlign: 'center',
+                }}>
+                  Where do you feel <strong style={{ textTransform: 'capitalize', color: INK }}>{em}</strong> in your body?
                 </div>
               ))}
             </div>
@@ -198,6 +415,10 @@ export default function EmotionWheel({ sessionId, role, isLocked }: EmotionWheel
   )
 }
 
-const inputStyle: React.CSSProperties = { flex: 1, background: 'rgba(255,255,255,0.06)', border: '1px solid rgba(255,255,255,0.12)', borderRadius: 7, padding: '7px 10px', fontSize: 12, color: 'rgba(255,255,255,0.9)', outline: 'none', fontFamily: '"DM Sans", sans-serif' }
-const btnStyle: React.CSSProperties = { padding: '7px 12px', borderRadius: 7, border: '1px solid rgba(255,255,255,0.12)', background: 'rgba(255,255,255,0.06)', color: 'rgba(255,255,255,0.8)', fontSize: 11, cursor: 'pointer', whiteSpace: 'nowrap', fontFamily: '"DM Sans", sans-serif' }
-const labelStyle: React.CSSProperties = { fontSize: 9, letterSpacing: 1, textTransform: 'uppercase', color: 'rgba(255,255,255,0.35)', marginBottom: 6 }
+const inputStyle: React.CSSProperties = {
+  flex: 1, minWidth: 0, boxSizing: 'border-box', outline: 'none',
+  background: '#ffffff', border: `1px solid ${LINE}`, borderRadius: 12,
+  padding: '9px 12px', fontSize: 13, color: INK_BODY,
+  fontFamily: '"DM Sans", sans-serif',
+  transition: 'border-color .15s, box-shadow .15s',
+}

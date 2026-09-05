@@ -21,13 +21,23 @@ import { X, Lock, Unlock } from 'lucide-react'
 import { RC } from './roomTheme'
 import { MODULE_CATEGORIES } from '@/lib/modules'
 
-function VideoTile({ trackRef, name }: { trackRef: TrackReference | undefined; name: string }) {
+function VideoTile({
+  trackRef,
+  name,
+  width = 140,
+  height = 70,
+}: {
+  trackRef: TrackReference | undefined
+  name: string
+  width?: number
+  height?: number
+}) {
   return (
     <div style={{ flexShrink: 0 }}>
       <div
         style={{
-          width: 140,
-          height: 70,
+          width,
+          height,
           borderRadius: 12,
           // `relative` anchors the per-tile online dot below; the tile is
           // otherwise unchanged.
@@ -66,7 +76,7 @@ function VideoTile({ trackRef, name }: { trackRef: TrackReference | undefined; n
               alignItems: 'center',
               justifyContent: 'center',
               color: 'rgba(255,255,255,0.85)',
-              fontSize: 20,
+              fontSize: Math.round(height * 0.28),
               fontWeight: 600,
             }}
           >
@@ -93,6 +103,7 @@ function moduleIdentity(moduleId: string | null) {
         catName: cat.name,
         iconBg: cat.iconBg,
         iconBorder: cat.iconBorder,
+        accent: cat.accent,
       }
     }
   }
@@ -152,14 +163,18 @@ export default function ModuleStage({
       style={{
         position: 'absolute',
         inset: 0,
-        borderRadius: 24,
+        borderRadius: 20,
         overflow: 'hidden',
         // Light canvas. Modules migrated to moduleMode have their internal
         // colours inverted to dark-on-light to match; they no longer appear in
         // the dark sidebar panel, so there is no second context to satisfy.
+        //
+        // Deliberately no heavy coloured outline here — a thin neutral border
+        // and a soft shadow, matching the top/bottom bar chrome, so the canvas
+        // reads as part of the page rather than a boxed-in card.
         background: '#ffffff',
-        border: `2px solid ${RC.green}`,
-        boxShadow: `0 0 0 5px ${RC.greenSoft}, 0 18px 44px rgba(20,40,30,0.18)`,
+        border: `1px solid ${RC.border}`,
+        boxShadow: '0 6px 18px rgba(20,30,40,0.05)',
         display: 'flex',
         flexDirection: 'column',
         // Light-theme overrides for the shared design tokens. Nine modules style
@@ -173,94 +188,110 @@ export default function ModuleStage({
         ['--glass-border' as string]: 'rgba(0,0,0,0.10)',
       } as React.CSSProperties}
     >
-      {/* ---- Shrunken video feeds: therapist left, other participant right ---- */}
+      {/* ---- Header: self video (left) · module identity (centre) · other
+          participant + controls (right). The module's own title lives here,
+          so modules render only their activity body. ---- */}
       <div
         style={{
           flexShrink: 0,
           display: 'flex',
           alignItems: 'flex-start',
-          justifyContent: 'space-between',
-          padding: '10px 14px 4px',
-        }}
-      >
-        <VideoTile trackRef={selfTrack} name={selfName} />
-        <VideoTile trackRef={otherTrack} name={otherName} />
-      </div>
-
-      {/* ---- Module header: status · identity · controls ---- */}
-      <div
-        style={{
-          flexShrink: 0,
-          display: 'flex',
-          alignItems: 'center',
-          gap: 12,
-          padding: '0 14px 8px',
+          gap: 18,
+          padding: '14px 16px 10px',
           borderBottom: `1px solid ${RC.border}`,
         }}
       >
-        {/* live + timer + online */}
-        <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexShrink: 0 }}>
-          <span style={{ width: 8, height: 8, borderRadius: '50%', background: RC.red, display: 'inline-block' }} />
-          <span style={{ fontSize: 12, fontWeight: 600, fontVariantNumeric: 'tabular-nums', color: RC.ink, fontFamily: 'monospace' }}>
-            {timerStr}
-          </span>
-          <span style={{ width: 1, height: 12, background: RC.border, display: 'inline-block' }} />
-          <span style={{ display: 'flex', alignItems: 'center', gap: 5, fontSize: 12, fontWeight: 600, color: RC.greenDark }}>
-            <span style={{ width: 7, height: 7, borderRadius: '50%', background: RC.green, display: 'inline-block' }} />
-            {onlineCount} online
-          </span>
-        </div>
+        {/* LEFT: self */}
+        <VideoTile trackRef={selfTrack} name={selfName} width={150} height={92} />
 
-        {/* module identity */}
-        <div style={{ display: 'flex', alignItems: 'center', gap: 9, minWidth: 0, flex: 1 }}>
-          <div
-            style={{
-              width: 34,
-              height: 34,
-              borderRadius: 10,
-              flexShrink: 0,
-              display: 'flex',
-              alignItems: 'center',
-              justifyContent: 'center',
-              fontSize: 17,
-              background: id?.iconBg ?? RC.tile,
-              border: `1px solid ${id?.iconBorder ?? RC.border}`,
-            }}
-          >
-            {id?.emoji ?? '🎯'}
-          </div>
-          <div style={{ minWidth: 0 }}>
-            <div style={{ fontSize: 13, fontWeight: 700, color: RC.ink, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
-              {id?.name ?? 'Activity'}
-            </div>
-            <div style={{ fontSize: 10, color: RC.inkMuted, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
-              {id ? `${id.catName} · ${id.desc}` : ''}
-            </div>
-          </div>
-        </div>
-
-        {/* controls */}
-        <div style={{ display: 'flex', alignItems: 'center', gap: 7, flexShrink: 0 }}>
-          {isTherapist && (
-            <button
-              onClick={onLockToggle}
-              title={isLocked ? 'Client interaction locked' : 'Client can interact'}
+        {/* CENTRE: title, then the live status line */}
+        <div style={{ flex: 1, minWidth: 0, display: 'flex', flexDirection: 'column', gap: 8, paddingTop: 2 }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 11, minWidth: 0 }}>
+            <div
               style={{
-                ...headerBtn,
-                background: isLocked ? RC.tile : RC.tileActive,
-                color: isLocked ? RC.inkMuted : RC.greenDark,
-                borderColor: isLocked ? RC.border : RC.green,
+                width: 42,
+                height: 42,
+                borderRadius: 14,
+                flexShrink: 0,
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                fontSize: 21,
+                background: id?.iconBg ?? RC.tile,
+                border: `1px solid ${id?.iconBorder ?? RC.border}`,
               }}
             >
-              {isLocked ? <Lock size={13} /> : <Unlock size={13} />}
-              {isLocked ? 'Locked' : 'Unlocked'}
-            </button>
-          )}
-          {isTherapist && (
-            <button onClick={onClose} title="Close activity" style={{ ...headerBtn, padding: 6 }}>
-              <X size={14} />
-            </button>
-          )}
+              {id?.emoji ?? '🎯'}
+            </div>
+            <div style={{ minWidth: 0 }}>
+              <div
+                style={{
+                  fontSize: 22,
+                  fontWeight: 800,
+                  letterSpacing: -0.4,
+                  lineHeight: 1.15,
+                  color: id?.accent ?? RC.ink,
+                  whiteSpace: 'nowrap',
+                  overflow: 'hidden',
+                  textOverflow: 'ellipsis',
+                }}
+              >
+                {id?.name ?? 'Activity'}
+              </div>
+              <div
+                style={{
+                  fontSize: 11.5,
+                  fontWeight: 600,
+                  color: RC.inkMuted,
+                  whiteSpace: 'nowrap',
+                  overflow: 'hidden',
+                  textOverflow: 'ellipsis',
+                }}
+              >
+                {id ? `${id.catName} · ${id.desc}` : ''}
+              </div>
+            </div>
+          </div>
+
+          <div style={{ display: 'flex', alignItems: 'center', gap: 9 }}>
+            <span style={{ width: 7, height: 7, borderRadius: '50%', background: RC.red, display: 'inline-block' }} />
+            <span style={{ fontSize: 11, fontWeight: 600, fontVariantNumeric: 'tabular-nums', color: RC.ink, fontFamily: 'monospace' }}>
+              {timerStr}
+            </span>
+            <span style={{ width: 1, height: 11, background: RC.border, display: 'inline-block' }} />
+            <span style={{ display: 'flex', alignItems: 'center', gap: 5, fontSize: 11, fontWeight: 600, color: RC.greenDark }}>
+              <span style={{ width: 6, height: 6, borderRadius: '50%', background: RC.green, display: 'inline-block' }} />
+              {onlineCount} online
+            </span>
+          </div>
+        </div>
+
+        {/* RIGHT: other participant */}
+        <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-end', gap: 7, flexShrink: 0 }}>
+          <VideoTile trackRef={otherTrack} name={otherName} width={196} height={116} />
+
+          <div style={{ display: 'flex', alignItems: 'center', gap: 7 }}>
+            {isTherapist && (
+              <button
+                onClick={onLockToggle}
+                title={isLocked ? 'Client interaction locked' : 'Client can interact'}
+                style={{
+                  ...headerBtn,
+                  background: isLocked ? RC.tile : RC.tileActive,
+                  color: isLocked ? RC.inkMuted : RC.greenDark,
+                  borderColor: isLocked ? RC.border : RC.green,
+                }}
+              >
+                {isLocked ? <Lock size={13} /> : <Unlock size={13} />}
+                {isLocked ? 'Locked' : 'Unlocked'}
+              </button>
+            )}
+            {isTherapist && (
+              <button onClick={onClose} title="Close activity" style={{ ...headerBtn, padding: 6 }}>
+                <X size={14} />
+              </button>
+            )}
+          </div>
         </div>
       </div>
 

@@ -2,6 +2,7 @@
 
 import { useState, useEffect, useRef, useCallback } from 'react'
 import { doc, onSnapshot, updateDoc } from 'firebase/firestore'
+import { Check, Clock, Sparkles } from 'lucide-react'
 import { db } from '@/lib/firebase'
 import { logModuleEvent } from '@/lib/sessionEvents'
 
@@ -33,6 +34,72 @@ const BREATH_OPTIONS = [
   { label: 'Fast', value: 2500 },
 ]
 
+/* ---------------------------------------------------------------------------
+   Art assets. The delivered folder names contain spaces, so each path segment
+   is encoded and the files are referenced with a plain <img> (next/image can't
+   take these paths) — the same approach WorryVault uses.
+--------------------------------------------------------------------------- */
+const A = (f: string) =>
+  `/assets/modules/${encodeURIComponent('Anxiety and depression')}/${encodeURIComponent('Asset Grounding')}/${encodeURIComponent(f)}`
+
+const ART_RING = A('progress_ring.svg')
+const ART_BADGE = A('focus_explorer_badge.svg')
+const ART_STEP_FX = A('STAAD_Grounding_Step_Complete_FX.json')
+
+/* No "touch" icon shipped in the delivered set — this flat orange hand stands
+   in for it so the sense row reads consistently. Swap the data URI for the real
+   asset the moment design supplies one. */
+const TOUCH_HAND_SVG =
+  `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 160 200">` +
+  `<g fill="#F2762A">` +
+  `<rect x="40" y="46" width="19" height="76" rx="9.5"/>` +
+  `<rect x="63" y="26" width="19" height="96" rx="9.5"/>` +
+  `<rect x="86" y="22" width="19" height="100" rx="9.5"/>` +
+  `<rect x="109" y="40" width="19" height="82" rx="9.5"/>` +
+  `<rect x="26" y="84" width="19" height="58" rx="9.5" transform="rotate(26 35.5 113)"/>` +
+  `<rect x="40" y="92" width="88" height="84" rx="36"/>` +
+  `</g>` +
+  `<g fill="none" stroke="#D95F16" stroke-width="4" stroke-linecap="round" opacity="0.35">` +
+  `<path d="M62 140 h44"/><path d="M66 156 h36"/>` +
+  `</g></svg>`
+const ART_TOUCH = `data:image/svg+xml,${encodeURIComponent(TOUCH_HAND_SVG)}`
+
+/* Confetti strip for the celebration banner — pure decoration. */
+const CONFETTI_SVG =
+  `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 240 80">` +
+  [
+    [12, 18, 8, '#F6B93B', 22], [34, 52, 7, '#7C4DE0', -18], [58, 12, 6, '#3FAE6A', 40],
+    [74, 44, 8, '#EF6E7B', 12], [96, 24, 6, '#4F86EA', -34], [112, 62, 7, '#F6B93B', 28],
+    [132, 16, 8, '#3FAE6A', -12], [150, 48, 6, '#7C4DE0', 44], [168, 26, 7, '#EF6E7B', -26],
+    [188, 58, 6, '#4F86EA', 18], [204, 14, 8, '#F6B93B', -40], [222, 40, 6, '#3FAE6A', 30],
+    [46, 30, 5, '#4F86EA', 8], [86, 66, 5, '#F6B93B', -22], [180, 8, 5, '#7C4DE0', 36],
+  ]
+    .map(([x, y, s, c, r]) => `<rect x="${x}" y="${y}" width="${s}" height="${s}" rx="1.5" fill="${c}" transform="rotate(${r} ${x} ${y})" opacity="0.85"/>`)
+    .join('') +
+  `</svg>`
+const ART_CONFETTI = `data:image/svg+xml,${encodeURIComponent(CONFETTI_SVG)}`
+
+/* Per-sense presentation. Index-aligned with STEPS — presentation only, the
+   exercise data model above is untouched. */
+const SENSE_UI = [
+  { label: 'See',   icon: A('grounding_sense_eye.svg'),            tint: '#E8F7F0', ring: '#BFE9D8', ink: '#0E9F7B' },
+  { label: 'Touch', icon: ART_TOUCH,                                tint: '#FFF1E5', ring: '#FBD3B0', ink: '#DD6A1E' },
+  { label: 'Hear',  icon: A('hear_ear_icon.svg'),                   tint: '#F2ECFE', ring: '#DCCCFA', ink: '#7040D8' },
+  { label: 'Smell', icon: A('smell_nose_icon.svg'),                 tint: '#FFECEC', ring: '#FBCFCF', ink: '#DC4E55' },
+  { label: 'Taste', icon: A('taste_tongue_icon_reference.svg'),     tint: '#E8F0FE', ring: '#C6D9FB', ink: '#1257E8' },
+] as const
+
+/* Palette — dark ink on the white ModuleStage canvas. */
+const GREEN = '#3fae6a'
+const GREEN_DEEP = '#2F7D5F'
+const INK = '#1b2a24'
+const INK_BODY = '#34423b'
+const BORDER = '#e7eaef'
+const CARD_SHADOW = '0 1px 2px rgba(20,40,30,0.04), 0 6px 18px rgba(20,40,30,0.05)'
+
+const RING_R = 112
+const RING_C = 2 * Math.PI * RING_R
+
 function initializeItems(existing?: string[][]): string[][] {
   const result: string[][] = []
   for (let i = 0; i < 5; i++) {
@@ -43,9 +110,53 @@ function initializeItems(existing?: string[][]): string[][] {
   return result
 }
 
+/** Plays the delivered step-complete Lottie once, while mounted. */
+function StepCompleteFx() {
+  const host = useRef<HTMLDivElement>(null)
+  useEffect(() => {
+    let anim: { destroy: () => void } | null = null
+    let cancelled = false
+    import('lottie-web')
+      .then(({ default: lottie }) => {
+        if (cancelled || !host.current) return
+        anim = lottie.loadAnimation({
+          container: host.current,
+          renderer: 'svg',
+          loop: false,
+          autoplay: true,
+          path: ART_STEP_FX,
+        })
+      })
+      .catch(() => {})
+    return () => {
+      cancelled = true
+      anim?.destroy()
+    }
+  }, [])
+  return <div ref={host} aria-hidden style={{ position: 'absolute', inset: '-8%', pointerEvents: 'none', zIndex: 4 }} />
+}
+
+/** Gold star medallion for the celebration banner. */
+function StarBadge({ size = 46 }: { size?: number }) {
+  return (
+    <svg width={size} height={size} viewBox="0 0 64 64" aria-hidden style={{ display: 'block', flexShrink: 0 }}>
+      <circle cx="32" cy="32" r="30" fill="#FFF7E2" stroke="#F4C33D" strokeWidth="2" />
+      <circle cx="32" cy="32" r="23" fill="#F9C council" />
+      <circle cx="32" cy="32" r="23" fill="#F8C63C" />
+      <path
+        d="M32 15 l5.2 10.9 12 1.6 -8.8 8.3 2.2 11.9 -10.6 -5.8 -10.6 5.8 2.2 -11.9 -8.8 -8.3 12 -1.6 Z"
+        fill="#FFF8D2"
+        stroke="#D98C00"
+        strokeWidth="2"
+        strokeLinejoin="round"
+      />
+    </svg>
+  )
+}
+
 export default function GroundingGame({ sessionId, role, isLocked }: GroundingGameProps) {
-  const isTherapist = role === 'therapist'
-  const canInteract = isTherapist || !isLocked
+  const isT = role === 'therapist'
+  const canInteract = isT || !isLocked
 
   const [currentStep, setCurrentStep] = useState(0)
   const [items, setItems] = useState<string[][]>(() => initializeItems())
@@ -201,16 +312,253 @@ export default function GroundingGame({ sessionId, role, isLocked }: GroundingGa
   }
 
   const pillStyle = (active: boolean) => ({
-    padding: '5px 10px',
+    padding: '4px 11px',
     borderRadius: 20,
-    border: `1px solid ${active ? 'var(--sage)' : 'var(--glass-border)'}`,
-    background: active ? 'var(--sage-light)' : 'transparent',
-    color: active ? 'var(--sage-mid)' : 'var(--ink-muted)',
+    border: `1px solid ${active ? GREEN : BORDER}`,
+    background: active ? 'rgba(63,174,106,0.12)' : '#fff',
+    color: active ? GREEN_DEEP : 'var(--ink-muted)',
     fontSize: 10,
-    fontWeight: 500,
+    fontWeight: 600,
     cursor: 'pointer',
     transition: 'all 0.15s',
   } as React.CSSProperties)
+
+  const ghostBtn: React.CSSProperties = {
+    padding: '5px 11px',
+    borderRadius: 8,
+    border: `1px solid ${BORDER}`,
+    background: '#fff',
+    color: 'var(--ink-muted)',
+    fontSize: 10,
+    fontWeight: 600,
+    cursor: 'pointer',
+  }
+
+  const sense = SENSE_UI[currentStep]
+  const pct = completed ? 100 : Math.round(((currentStep + 1) / 5) * 100)
+  const minutesLeft = Math.max(1, (4 - currentStep) * 3)
+  const arcFrac = step.count > 0 ? filledCount / step.count : 0
+
+  /* ---- shared fragments -------------------------------------------------- */
+
+  const progressRow = (
+    <div style={{ flexShrink: 0, display: 'flex', alignItems: 'center', gap: 14 }}>
+      <span style={{ fontSize: 12, fontWeight: 700, color: INK_BODY, whiteSpace: 'nowrap' }}>
+        {completed ? 'All 5 steps' : `Step ${currentStep + 1} of 5`}
+      </span>
+      <div style={{ flex: 1, minWidth: 40, height: 8, borderRadius: 999, background: '#eef1f4', overflow: 'hidden' }}>
+        <div
+          style={{
+            width: `${pct}%`,
+            height: '100%',
+            borderRadius: 999,
+            background: `linear-gradient(90deg, #2FBF9A 0%, ${GREEN} 100%)`,
+            transition: 'width 0.5s cubic-bezier(0.4,0,0.2,1)',
+          }}
+        />
+      </div>
+      <span style={{ fontSize: 12, fontWeight: 700, color: GREEN_DEEP, whiteSpace: 'nowrap' }}>{pct}% Complete</span>
+      <span
+        style={{
+          display: 'flex', alignItems: 'center', gap: 5,
+          padding: '5px 11px', borderRadius: 999,
+          border: `1px solid ${BORDER}`, background: '#f7f9fb',
+          fontSize: 11, fontWeight: 600, color: 'var(--ink-muted)', whiteSpace: 'nowrap',
+        }}
+      >
+        <Clock size={12} strokeWidth={2.4} />
+        {completed ? 'Complete' : `${minutesLeft} min left`}
+      </span>
+    </div>
+  )
+
+  const senseRow = (
+    <div style={{ flexShrink: 0, display: 'flex', justifyContent: 'center', gap: 'clamp(10px, 2.4vw, 26px)' }}>
+      {SENSE_UI.map((s, i) => {
+        const active = i === currentStep && !completed
+        const done = completed || i < currentStep
+        return (
+          <div key={s.label} style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 4 }}>
+            <div
+              style={{
+                position: 'relative',
+                width: 56,
+                height: 56,
+                borderRadius: '50%',
+                background: s.tint,
+                border: `1.5px solid ${active ? GREEN : s.ring}`,
+                boxShadow: active
+                  ? `0 0 0 3.5px rgba(63,174,106,0.22), 0 5px 14px rgba(20,40,30,0.10)`
+                  : '0 1px 3px rgba(20,40,30,0.05)',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                opacity: active || done ? 1 : 0.62,
+                transition: 'all 0.25s ease',
+              }}
+            >
+              {/* eslint-disable-next-line @next/next/no-img-element */}
+              <img src={s.icon} alt="" aria-hidden style={{ width: 27, height: 27, objectFit: 'contain', display: 'block' }} />
+              {done && !active && (
+                <span
+                  style={{
+                    position: 'absolute', right: -1, bottom: -1,
+                    width: 18, height: 18, borderRadius: '50%',
+                    background: GREEN, border: '2px solid #fff',
+                    display: 'flex', alignItems: 'center', justifyContent: 'center',
+                  }}
+                >
+                  <Check size={9} strokeWidth={4} color="#fff" />
+                </span>
+              )}
+            </div>
+            <span style={{ fontSize: 11, fontWeight: 700, color: s.ink, opacity: active || done ? 1 : 0.7 }}>
+              {s.label}
+            </span>
+            <span
+              style={{
+                width: 6, height: 6, borderRadius: '50%',
+                background: active ? GREEN : 'transparent',
+                transition: 'background 0.25s ease',
+              }}
+            />
+          </div>
+        )
+      })}
+    </div>
+  )
+
+  const senseRing = (dimmed: boolean) => (
+    <div
+      style={{
+        position: 'relative',
+        height: '100%',
+        maxHeight: 200,
+        maxWidth: '100%',
+        aspectRatio: '1 / 1',
+        flexShrink: 1,
+        minHeight: 0,
+      }}
+    >
+      {/* eslint-disable-next-line @next/next/no-img-element */}
+      <img
+        src={ART_RING}
+        alt=""
+        aria-hidden
+        style={{ position: 'absolute', inset: 0, width: '100%', height: '100%', display: 'block' }}
+      />
+      {/* Live arc, drawn over the artwork's baked-in track at identical geometry. */}
+      <svg viewBox="0 0 320 320" style={{ position: 'absolute', inset: 0, width: '100%', height: '100%' }} aria-hidden>
+        <defs>
+          <linearGradient id="ggArcGrad" x1="76" y1="72" x2="250" y2="258" gradientUnits="userSpaceOnUse">
+            <stop offset="0" stopColor="#2FBF9A" />
+            <stop offset="1" stopColor={GREEN} />
+          </linearGradient>
+        </defs>
+        <circle cx="160" cy="160" r={RING_R} stroke="#EEF5F4" strokeWidth="17" fill="none" />
+        <circle
+          cx="160"
+          cy="160"
+          r={RING_R}
+          stroke="url(#ggArcGrad)"
+          strokeWidth="14"
+          strokeLinecap="round"
+          fill="none"
+          strokeDasharray={RING_C}
+          strokeDashoffset={RING_C - RING_C * arcFrac}
+          transform="rotate(-90 160 160)"
+          style={{ transition: 'stroke-dashoffset 0.55s cubic-bezier(0.4,0,0.2,1)' }}
+        />
+      </svg>
+      {/* Active sense artwork, breathing at the therapist's chosen pace. */}
+      <div
+        style={{
+          position: 'absolute',
+          inset: '22%',
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'center',
+          animation: `ggBreathe ${breathPace}ms ease-in-out infinite`,
+          opacity: dimmed ? 0.45 : 1,
+          transition: 'opacity 0.3s ease',
+        }}
+      >
+        {/* eslint-disable-next-line @next/next/no-img-element */}
+        <img
+          src={sense.icon}
+          alt=""
+          aria-hidden
+          style={{ maxWidth: '100%', maxHeight: '100%', objectFit: 'contain', display: 'block' }}
+        />
+      </div>
+      {transitioning && <StepCompleteFx />}
+    </div>
+  )
+
+  const completedPill = (
+    <div
+      style={{
+        flexShrink: 0,
+        display: 'flex',
+        alignItems: 'center',
+        gap: 8,
+        padding: '7px 16px',
+        borderRadius: 999,
+        border: `1px solid #DCEFE6`,
+        background: '#fff',
+        boxShadow: CARD_SHADOW,
+        whiteSpace: 'nowrap',
+      }}
+    >
+      <Check size={15} strokeWidth={3.2} color={GREEN} />
+      <span style={{ fontSize: 15, fontWeight: 800, color: INK }}>{filledCount}</span>
+      <span style={{ fontSize: 14, fontWeight: 600, color: 'var(--ink-faint)' }}>/</span>
+      <span style={{ fontSize: 15, fontWeight: 800, color: INK }}>{step.count}</span>
+      <span style={{ fontSize: 12, fontWeight: 600, color: 'var(--ink-muted)' }}>completed</span>
+    </div>
+  )
+
+  const achievementBanner = (
+    <div
+      style={{
+        flexShrink: 0,
+        display: 'flex',
+        alignItems: 'center',
+        gap: 14,
+        padding: '10px 16px',
+        borderRadius: 16,
+        border: '1px solid #E4EFE4',
+        background: 'linear-gradient(100deg, #EEF9F1 0%, #F6FBF2 45%, #FEF7E8 100%)',
+        boxShadow: CARD_SHADOW,
+        overflow: 'hidden',
+      }}
+    >
+      <StarBadge />
+      <span style={{ fontSize: 12.5, fontWeight: 700, color: '#2b3b33', lineHeight: 1.4, maxWidth: 240 }}>
+        Great job! You&apos;re becoming more aware of your surroundings.
+      </span>
+      <div
+        aria-hidden
+        style={{
+          flex: 1,
+          minWidth: 0,
+          height: 46,
+          backgroundImage: `url("${ART_CONFETTI}")`,
+          backgroundRepeat: 'no-repeat',
+          backgroundPosition: 'center',
+          backgroundSize: 'contain',
+        }}
+      />
+      {/* eslint-disable-next-line @next/next/no-img-element */}
+      <img
+        src={ART_BADGE}
+        alt="Achievement unlocked: Focus Explorer"
+        style={{ height: 62, width: 'auto', display: 'block', flexShrink: 0 }}
+      />
+    </div>
+  )
+
+  /* ---- render ------------------------------------------------------------ */
 
   return (
     <div
@@ -218,405 +566,408 @@ export default function GroundingGame({ sessionId, role, isLocked }: GroundingGa
         display: 'flex',
         flexDirection: 'column',
         height: '100%',
+        minHeight: 0,
+        gap: 12,
         position: 'relative',
         overflow: 'hidden',
       }}
     >
       <style>{`
         @keyframes ggBreathe {
-          0%,100% { transform: scale(1); box-shadow: 0 0 0 0 rgba(74,124,111,0.2); }
-          50% { transform: scale(1.18); box-shadow: 0 0 0 16px rgba(74,124,111,0); }
+          0%,100% { transform: scale(1); }
+          50% { transform: scale(1.07); }
         }
         @keyframes ggPromptIn {
-          0% { opacity: 0; transform: translateY(8px); }
+          0% { opacity: 0; transform: translateY(6px); }
           100% { opacity: 1; transform: translateY(0); }
         }
-        @keyframes ggAmbience {
-          0% { opacity: 0.4; transform: scale(1); }
-          100% { opacity: 0.8; transform: scale(1.1); }
-        }
-        @keyframes ggDotPulse {
-          0%,100% { transform: scale(1); }
-          50% { transform: scale(1.15); }
-        }
-        @keyframes ggSlotPop {
-          0%,100% { border-color: rgba(74,124,111,0.3); }
-          50% { border-color: rgba(74,124,111,0.7); }
-        }
+        .gg-input::placeholder { color: #a7b0b8; font-weight: 500; }
+        .gg-scroll { scrollbar-width: thin; scrollbar-color: #d7dde3 transparent; }
+        .gg-scroll::-webkit-scrollbar { width: 6px; }
+        .gg-scroll::-webkit-scrollbar-thumb { background: #d7dde3; border-radius: 999px; }
       `}</style>
 
-      {/* Ambience background */}
-      <div style={{
-        position: 'absolute',
-        inset: 0,
-        background: 'radial-gradient(ellipse at 50% 50%, rgba(74,124,111,0.06) 0%, transparent 70%)',
-        animation: 'ggAmbience 8s ease-in-out infinite alternate',
-        pointerEvents: 'none',
-        zIndex: 0,
-      }} />
-
-      <div style={{ position: 'relative', zIndex: 1, display: 'flex', flexDirection: 'column', height: '100%' }}>
-        {/* Progress dots */}
-        <div style={{ flexShrink: 0, padding: '8px 16px 0' }}>
-          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-            {STEPS.map((s, i) => (
-              <div key={i} style={{ display: 'flex', alignItems: 'center' }}>
-                <div style={{
-                  width: 32,
-                  height: 32,
-                  borderRadius: '50%',
-                  display: 'flex',
-                  alignItems: 'center',
-                  justifyContent: 'center',
-                  fontSize: 14,
-                  background: i < currentStep ? 'rgba(74,124,111,0.5)' : i === currentStep ? 'rgba(74,124,111,0.3)' : 'rgba(255,255,255,0.08)',
-                  border: i < currentStep ? '2px solid #b8d4ce' : i === currentStep ? '2px solid #4a7c6f' : '1px solid rgba(255,255,255,0.12)',
-                  transition: 'all 0.3s ease',
-                  animation: i === currentStep && !transitioning ? 'ggDotPulse 2s ease-in-out infinite' : 'none',
-                }}>
-                  {i < currentStep ? <span style={{ color: '#b8d4ce', fontSize: 12 }}>✓</span> : s.emoji}
-                </div>
-                {i < 4 && (
-                  <div style={{
-                    width: 36,
-                    height: 2,
-                    background: i < currentStep ? '#4a7c6f' : 'rgba(255,255,255,0.1)',
-                    transition: 'background 0.5s ease',
-                  }} />
-                )}
-              </div>
-            ))}
+      {/* ---- Start-mood capture takes over the body ---- */}
+      {captureStartMood && (
+        <div style={{ flex: 1, minHeight: 0, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', gap: 18 }}>
+          <div style={{ fontSize: 20, fontWeight: 800, color: INK, letterSpacing: -0.3 }}>
+            How are you feeling right now?
           </div>
-          <div style={{ textAlign: 'center', fontSize: 11, color: '#b8d4ce', fontWeight: 500, marginTop: 6 }}>
-            {filledCount} things you {step.sense.toLowerCase()}
+          <div style={{ display: 'flex', gap: 12, justifyContent: 'center', flexWrap: 'wrap' }}>
+            {MOODS.map(m => {
+              const on = startMood === m.label
+              return (
+                <button
+                  key={m.label}
+                  onClick={() => handleMoodSelect(m.label)}
+                  disabled={!canInteract}
+                  style={{
+                    width: 74, height: 78, borderRadius: 16,
+                    border: `1.5px solid ${on ? GREEN : BORDER}`,
+                    background: on ? 'rgba(63,174,106,0.10)' : '#fff',
+                    boxShadow: CARD_SHADOW,
+                    cursor: canInteract ? 'pointer' : 'not-allowed',
+                    display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', gap: 5,
+                    fontSize: 28, transition: 'all 0.15s',
+                  }}
+                >
+                  <span>{m.emoji}</span>
+                  <span style={{ fontSize: 11, fontWeight: 700, color: on ? GREEN_DEEP : INK_BODY }}>{m.label}</span>
+                </button>
+              )
+            })}
           </div>
         </div>
+      )}
 
-        {/* Main content area */}
-        <div style={{ flex: 1, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', padding: '8px 16px', overflow: 'hidden' }}>
-          {/* Capture start mood */}
-          {captureStartMood && (
-            <div style={{ textAlign: 'center' }}>
-              <div style={{ fontFamily: "'DM Serif Display', serif", fontSize: 16, color: 'rgba(255,255,255,0.85)', marginBottom: 16 }}>
-                How are you feeling right now?
-              </div>
-              <div style={{ display: 'flex', gap: 12, justifyContent: 'center', flexWrap: 'wrap' }}>
-                {MOODS.map(m => (
-                  <button key={m.label} onClick={() => handleMoodSelect(m.label)} style={{
-                    width: 52,
-                    height: 60,
-                    borderRadius: 12,
-                    border: '1px solid rgba(255,255,255,0.12)',
-                    background: startMood === m.label ? 'rgba(74,124,111,0.3)' : 'rgba(255,255,255,0.05)',
-                    cursor: 'pointer',
-                    display: 'flex',
-                    flexDirection: 'column',
-                    alignItems: 'center',
-                    justifyContent: 'center',
-                    gap: 2,
-                    fontSize: 22,
-                    transition: 'all 0.15s',
-                  }}>
-                    <span>{m.emoji}</span>
-                    <span style={{ fontSize: 8, color: 'rgba(255,255,255,0.5)' }}>{m.label}</span>
-                  </button>
-                ))}
-              </div>
-            </div>
-          )}
+      {/* ---- Active exercise ---- */}
+      {!completed && !captureStartMood && (
+        <>
+          {progressRow}
+          {senseRow}
 
-          {/* Start mood already set message */}
-          {startMood && !captureStartMood && !completed && (
-            <div style={{ fontSize: 10, color: 'rgba(255,255,255,0.3)', marginBottom: 8, textAlign: 'center' }}>
-              Feeling: {startMood}
-            </div>
-          )}
-
-          {/* Normal step content */}
-          {!completed && !captureStartMood && (
-            <>
-              {/* Breathing circle */}
-              <div style={{
-                width: 100,
-                height: 100,
-                borderRadius: '50%',
-                background: 'radial-gradient(circle, rgba(74,124,111,0.3) 0%, rgba(74,124,111,0.08) 60%, transparent 100%)',
-                border: '1.5px solid rgba(74,124,111,0.4)',
+          <div style={{ flex: 1, minHeight: 0, display: 'flex', gap: 20, alignItems: 'stretch' }}>
+            {/* LEFT — progress ring + tally */}
+            <div
+              style={{
+                width: 'clamp(150px, 24%, 220px)',
+                flexShrink: 0,
                 display: 'flex',
+                flexDirection: 'column',
                 alignItems: 'center',
                 justifyContent: 'center',
-                animation: `ggBreathe ${breathPace}ms ease-in-out infinite`,
-                flexShrink: 0,
-                transition: 'transform 0.8s ease',
-                transform: transitioning ? 'scale(1.3)' : 'scale(1)',
-              }}>
-                <span style={{ fontSize: 32 }}>{step.emoji}</span>
-              </div>
-              <div style={{ fontSize: 10, color: 'rgba(255,255,255,0.3)', letterSpacing: 1, textTransform: 'uppercase', marginTop: 6 }}>
-                breathe slowly
-              </div>
+                gap: 12,
+                minHeight: 0,
+              }}
+            >
+              {senseRing(transitioning)}
+              {completedPill}
+            </div>
 
-              {/* Prompt */}
+            {/* RIGHT — prompt, encouragement, numbered slots */}
+            <div style={{ flex: 1, minWidth: 0, minHeight: 0, display: 'flex', flexDirection: 'column', gap: 9 }}>
               <div
                 key={currentStep}
                 style={{
-                  fontFamily: "'DM Serif Display', serif",
-                  fontStyle: 'italic',
-                  fontSize: 15,
-                  color: 'rgba(255,255,255,0.85)',
-                  textAlign: 'center',
-                  lineHeight: 1.4,
-                  padding: '12px 0',
+                  flexShrink: 0,
+                  fontSize: 'clamp(17px, 2.1vw, 24px)',
+                  fontWeight: 800,
+                  letterSpacing: -0.4,
+                  lineHeight: 1.22,
+                  color: INK,
                   animation: transitioning ? 'none' : 'ggPromptIn 0.4s ease',
                 }}
               >
                 {step.prompt}
               </div>
 
-              {/* Input slots */}
-              <div style={{ width: '100%', maxWidth: 320, display: 'flex', flexDirection: 'column', gap: 6 }}>
-                {stepItems.map((item, idx) => (
-                  <input
-                    key={idx}
-                    ref={el => { inputRefs.current[idx] = el }}
-                    type="text"
-                    value={item}
-                    onChange={e => handleItemChange(idx, e.target.value)}
-                    onKeyDown={e => handleItemKeyDown(e, idx)}
-                    onFocus={() => setFocusedIdx(idx)}
-                    onBlur={() => setFocusedIdx(null)}
-                    placeholder={step.placeholder}
-                    readOnly={!canInteract || transitioning}
-                    style={{
-                      width: '100%',
-                      height: 36,
-                      borderRadius: 8,
-                      border: `1px solid ${
-                        item.trim()
-                          ? 'rgba(74,124,111,0.3)'
-                          : focusedIdx === idx
-                            ? 'rgba(74,124,111,0.5)'
-                            : 'rgba(255,255,255,0.15)'
-                      }`,
-                      background: item.trim()
-                        ? 'rgba(74,124,111,0.15)'
-                        : focusedIdx === idx
-                          ? 'rgba(74,124,111,0.1)'
-                          : 'rgba(255,255,255,0.05)',
-                      color: item.trim() ? 'rgba(255,255,255,0.85)' : 'rgba(255,255,255,0.25)',
-                      padding: '0 12px',
-                      fontSize: 12,
-                      outline: 'none',
-                      boxSizing: 'border-box',
-                      transition: 'all 0.2s ease',
-                      animation: item.trim() && idx === stepItems.length - 1 && allFilled ? 'ggSlotPop 0.4s ease 2' : 'none',
-                    }}
-                  />
-                ))}
+              <div
+                style={{
+                  flexShrink: 0,
+                  alignSelf: 'flex-start',
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: 6,
+                  padding: '5px 12px',
+                  borderRadius: 999,
+                  border: '1px solid #CFEBDB',
+                  background: 'rgba(63,174,106,0.10)',
+                  fontSize: 12,
+                  fontWeight: 700,
+                  color: GREEN_DEEP,
+                }}
+              >
+                <Sparkles size={13} strokeWidth={2.4} />
+                You&apos;re doing great!
               </div>
 
-              {/* Advance button */}
-              {canAdvance && (
-                <button
-                  onClick={advanceStep}
-                  style={{
-                    marginTop: 12,
-                    padding: '8px 20px',
-                    borderRadius: 8,
-                    border: '1px solid rgba(74,124,111,0.5)',
-                    background: 'rgba(74,124,111,0.25)',
-                    color: '#b8d4ce',
-                    fontSize: 12,
-                    fontWeight: 600,
-                    cursor: 'pointer',
-                    transition: 'all 0.15s',
-                  }}
-                >
-                  {currentStep < 4 ? 'Next sense →' : 'Finish ✨'}
-                </button>
-              )}
-
-              {/* Locked indicator */}
-              {!canInteract && !completed && (
-                <div style={{ fontSize: 10, color: 'var(--ink-muted)', marginTop: 8 }}>
-                  Therapist is guiding
-                </div>
-              )}
-            </>
-          )}
-
-          {/* Completion screen */}
-          {completed && (
-            <div style={{ width: '100%', maxWidth: 360, display: 'flex', flexDirection: 'column', alignItems: 'center', overflow: 'hidden' }}>
-              <div style={{
-                width: 130,
-                height: 130,
-                borderRadius: '50%',
-                background: 'radial-gradient(circle, rgba(74,124,111,0.3) 0%, rgba(74,124,111,0.08) 60%, transparent 100%)',
-                border: '1.5px solid rgba(74,124,111,0.4)',
-                display: 'flex',
-                alignItems: 'center',
-                justifyContent: 'center',
-                animation: `ggBreathe ${breathPace}ms ease-in-out infinite`,
-                flexShrink: 0,
-              }}>
-                <span style={{ fontSize: 40 }}>🌱</span>
-              </div>
-              <div style={{ fontFamily: "'DM Serif Display', serif", fontSize: 20, color: 'rgba(255,255,255,0.85)', marginTop: 12 }}>
-                You did it 🌱
-              </div>
-              <div style={{ fontSize: 12, color: 'var(--ink-muted)', marginTop: 4, marginBottom: 16 }}>
-                You named 15 things around you
-              </div>
-
-              {/* Summary accordion */}
-              <div style={{ width: '100%', display: 'flex', flexDirection: 'column', gap: 4, marginBottom: 12 }}>
-                {STEPS.map((s, i) => {
-                  const stepItemsList = items[i].filter(x => x.trim())
-                  const isExpanded = expandedStep === i
+              <div
+                className="gg-scroll"
+                style={{ flex: 1, minHeight: 0, overflowY: 'auto', display: 'flex', flexDirection: 'column', gap: 7, paddingRight: 3 }}
+              >
+                {stepItems.map((item, idx) => {
+                  const focused = focusedIdx === idx
+                  const filled = !!item.trim()
                   return (
-                    <div key={i} style={{
-                      borderRadius: 8,
-                      border: '1px solid rgba(255,255,255,0.08)',
-                      overflow: 'hidden',
-                      transition: 'all 0.2s ease',
-                    }}>
-                      <button
-                        onClick={() => setExpandedStep(isExpanded ? null : i)}
+                    <div key={idx} style={{ display: 'flex', alignItems: 'center', gap: 8, flexShrink: 0 }}>
+                      <div
                         style={{
-                          width: '100%',
-                          padding: '8px 12px',
-                          background: 'rgba(255,255,255,0.03)',
-                          border: 'none',
-                          color: 'rgba(255,255,255,0.7)',
-                          fontSize: 11,
-                          cursor: 'pointer',
+                          flex: 1,
+                          minWidth: 0,
+                          height: 38,
                           display: 'flex',
                           alignItems: 'center',
-                          justifyContent: 'space-between',
+                          gap: 9,
+                          padding: '0 12px 0 6px',
+                          borderRadius: 11,
+                          border: `1px solid ${focused ? GREEN : filled ? '#CFEBDB' : BORDER}`,
+                          background: '#fff',
+                          boxShadow: focused ? `0 0 0 3px rgba(63,174,106,0.14)` : CARD_SHADOW,
+                          transition: 'all 0.18s ease',
                         }}
                       >
-                        <span>{s.emoji} {s.count} things I {s.sense.toLowerCase()}</span>
-                        <span style={{ fontSize: 10, color: 'var(--ink-muted)' }}>{isExpanded ? '−' : '+'}</span>
-                      </button>
-                      {isExpanded && (
-                        <div style={{ padding: '6px 12px 8px', fontSize: 11, color: 'rgba(255,255,255,0.5)', lineHeight: 1.6 }}>
-                          {stepItemsList.length > 0 ? stepItemsList.map((x, j) => (
-                            <div key={j} style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
-                              <span style={{ color: '#4a7c6f' }}>✓</span> {x}
-                            </div>
-                          )) : <span style={{ fontStyle: 'italic' }}>No items entered</span>}
-                        </div>
-                      )}
+                        <span
+                          style={{
+                            width: 28, height: 28, borderRadius: 9, flexShrink: 0,
+                            background: sense.tint,
+                            display: 'flex', alignItems: 'center', justifyContent: 'center',
+                          }}
+                        >
+                          {/* eslint-disable-next-line @next/next/no-img-element */}
+                          <img src={sense.icon} alt="" aria-hidden style={{ width: 16, height: 16, objectFit: 'contain', display: 'block' }} />
+                        </span>
+                        <input
+                          className="gg-input"
+                          ref={el => { inputRefs.current[idx] = el }}
+                          type="text"
+                          value={item}
+                          onChange={e => handleItemChange(idx, e.target.value)}
+                          onKeyDown={e => handleItemKeyDown(e, idx)}
+                          onFocus={() => setFocusedIdx(idx)}
+                          onBlur={() => setFocusedIdx(null)}
+                          placeholder={step.placeholder}
+                          readOnly={!canInteract || transitioning}
+                          style={{
+                            flex: 1,
+                            minWidth: 0,
+                            height: '100%',
+                            border: 'none',
+                            outline: 'none',
+                            background: 'transparent',
+                            color: INK,
+                            fontSize: 13,
+                            fontWeight: 600,
+                            padding: 0,
+                          }}
+                        />
+                      </div>
+                      <span
+                        style={{
+                          width: 40, height: 38, flexShrink: 0,
+                          borderRadius: 11,
+                          border: `1px solid ${filled ? '#CFEBDB' : BORDER}`,
+                          background: filled ? 'rgba(63,174,106,0.10)' : '#f7f9fb',
+                          display: 'flex', alignItems: 'center', justifyContent: 'center',
+                          fontSize: 13, fontWeight: 700,
+                          color: filled ? GREEN_DEEP : 'var(--ink-muted)',
+                          transition: 'all 0.18s ease',
+                        }}
+                      >
+                        {idx + 1}
+                      </span>
                     </div>
                   )
                 })}
               </div>
 
-              {/* End mood */}
-              <div style={{ textAlign: 'center', width: '100%' }}>
-                <div style={{ fontSize: 12, color: 'rgba(255,255,255,0.6)', marginBottom: 10 }}>
-                  How do you feel now?
-                </div>
-                <div style={{ display: 'flex', gap: 10, justifyContent: 'center', flexWrap: 'wrap' }}>
-                  {MOODS.map(m => (
-                    <button key={m.label} onClick={() => handleMoodSelect(m.label)} style={{
-                      width: 48,
-                      height: 56,
-                      borderRadius: 12,
-                      border: `1px solid ${endMood === m.label ? 'rgba(74,124,111,0.5)' : 'rgba(255,255,255,0.12)'}`,
-                      background: endMood === m.label ? 'rgba(74,124,111,0.3)' : 'rgba(255,255,255,0.05)',
+              <div style={{ flexShrink: 0, display: 'flex', alignItems: 'center', gap: 10, minHeight: 30 }}>
+                {!canInteract && (
+                  <span style={{ fontSize: 11, fontWeight: 600, color: 'var(--ink-muted)' }}>
+                    Therapist is guiding
+                  </span>
+                )}
+                <div style={{ flex: 1 }} />
+                {canAdvance && (
+                  <button
+                    onClick={advanceStep}
+                    style={{
+                      padding: '9px 20px',
+                      borderRadius: 11,
+                      border: 'none',
+                      background: `linear-gradient(180deg, #47bd74 0%, ${GREEN} 100%)`,
+                      color: '#fff',
+                      fontSize: 12.5,
+                      fontWeight: 700,
                       cursor: 'pointer',
-                      display: 'flex',
-                      flexDirection: 'column',
-                      alignItems: 'center',
-                      justifyContent: 'center',
-                      gap: 1,
-                      fontSize: 18,
+                      boxShadow: '0 4px 12px rgba(63,174,106,0.30)',
                       transition: 'all 0.15s',
-                    }}>
-                      <span>{m.emoji}</span>
-                      <span style={{ fontSize: 7, color: 'rgba(255,255,255,0.5)' }}>{m.label}</span>
-                    </button>
-                  ))}
-                </div>
+                    }}
+                  >
+                    {currentStep < 4 ? 'Next sense →' : 'Finish ✨'}
+                  </button>
+                )}
               </div>
-
-              {/* Start again button */}
-              <button onClick={handleReset} style={{
-                marginTop: 16,
-                padding: '8px 20px',
-                borderRadius: 8,
-                border: '1px solid var(--sage)',
-                background: 'var(--sage-light)',
-                color: 'var(--sage-mid)',
-                fontSize: 12,
-                fontWeight: 600,
-                cursor: 'pointer',
-              }}>
-                Start again
-              </button>
-            </div>
-          )}
-        </div>
-
-        {/* Therapist panel */}
-        {isTherapist && !completed && !captureStartMood && (
-          <div style={{
-            flexShrink: 0,
-            padding: '8px 12px',
-            borderTop: '1px solid rgba(255,255,255,0.06)',
-            display: 'flex',
-            flexDirection: 'column',
-            gap: 6,
-          }}>
-            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-              <span style={{ fontSize: 10, color: 'var(--ink-muted)' }}>
-                Step {currentStep + 1} of 5 · {filledCount}/{step.count} items entered
-              </span>
-              <button onClick={handleSkip} style={{
-                padding: '4px 10px',
-                borderRadius: 6,
-                border: '1px solid rgba(255,255,255,0.12)',
-                background: 'transparent',
-                color: 'var(--ink-muted)',
-                fontSize: 9,
-                cursor: 'pointer',
-              }}>
-                Skip to next step →
-              </button>
-            </div>
-            <div style={{ display: 'flex', alignItems: 'center', gap: 6, flexWrap: 'wrap' }}>
-              <span style={{ fontSize: 9, color: 'var(--ink-faint)', whiteSpace: 'nowrap' }}>Breath:</span>
-              {BREATH_OPTIONS.map(b => (
-                <button key={b.value} onClick={() => {
-                  setBreathPace(b.value)
-                  writeToFirestore({ 'moduleState.ggBreathPace': b.value })
-                }} style={pillStyle(breathPace === b.value)}>
-                  {b.label}
-                </button>
-              ))}
-              <div style={{ flex: 1 }} />
-              {!startMood && (
-                <button onClick={handleStartMoodCapture} style={{
-                  padding: '4px 10px',
-                  borderRadius: 6,
-                  border: '1px solid rgba(255,255,255,0.12)',
-                  background: 'transparent',
-                  color: 'var(--ink-muted)',
-                  fontSize: 9,
-                  cursor: 'pointer',
-                }}>
-                  Capture start mood
-                </button>
-              )}
-              {startMood && (
-                <span style={{ fontSize: 9, color: 'var(--ink-muted)' }}>Mood: {startMood}</span>
-              )}
             </div>
           </div>
-        )}
-      </div>
+
+          {achievementBanner}
+        </>
+      )}
+
+      {/* ---- Completion ---- */}
+      {completed && (
+        <div className="gg-scroll" style={{ flex: 1, minHeight: 0, overflowY: 'auto', display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 12, paddingRight: 3 }}>
+          {/* eslint-disable-next-line @next/next/no-img-element */}
+          <img
+            src={ART_BADGE}
+            alt="Achievement unlocked: Focus Explorer"
+            style={{ height: 128, width: 'auto', display: 'block', flexShrink: 0 }}
+          />
+          <div style={{ textAlign: 'center', flexShrink: 0 }}>
+            <div style={{ fontSize: 21, fontWeight: 800, color: INK, letterSpacing: -0.4 }}>You did it 🌱</div>
+            <div style={{ fontSize: 12.5, fontWeight: 600, color: 'var(--ink-muted)', marginTop: 3 }}>
+              You named 15 things around you
+            </div>
+          </div>
+
+          {/* Summary accordion */}
+          <div style={{ width: '100%', maxWidth: 460, display: 'flex', flexDirection: 'column', gap: 6, flexShrink: 0 }}>
+            {STEPS.map((s, i) => {
+              const list = items[i].filter(x => x.trim())
+              const isExpanded = expandedStep === i
+              const ui = SENSE_UI[i]
+              return (
+                <div
+                  key={i}
+                  style={{
+                    borderRadius: 12,
+                    border: `1px solid ${BORDER}`,
+                    background: '#fff',
+                    boxShadow: CARD_SHADOW,
+                    overflow: 'hidden',
+                  }}
+                >
+                  <button
+                    onClick={() => setExpandedStep(isExpanded ? null : i)}
+                    style={{
+                      width: '100%',
+                      padding: '9px 12px',
+                      background: 'transparent',
+                      border: 'none',
+                      color: INK_BODY,
+                      fontSize: 12,
+                      fontWeight: 700,
+                      cursor: 'pointer',
+                      display: 'flex',
+                      alignItems: 'center',
+                      gap: 9,
+                    }}
+                  >
+                    <span
+                      style={{
+                        width: 26, height: 26, borderRadius: 8, flexShrink: 0,
+                        background: ui.tint,
+                        display: 'flex', alignItems: 'center', justifyContent: 'center',
+                      }}
+                    >
+                      {/* eslint-disable-next-line @next/next/no-img-element */}
+                      <img src={ui.icon} alt="" aria-hidden style={{ width: 15, height: 15, objectFit: 'contain', display: 'block' }} />
+                    </span>
+                    <span>{s.count} things I {s.sense.toLowerCase()}</span>
+                    <div style={{ flex: 1 }} />
+                    <span style={{ fontSize: 14, color: 'var(--ink-muted)', fontWeight: 700 }}>{isExpanded ? '−' : '+'}</span>
+                  </button>
+                  {isExpanded && (
+                    <div style={{ padding: '2px 14px 10px 47px', fontSize: 12, color: INK_BODY, lineHeight: 1.75 }}>
+                      {list.length > 0 ? list.map((x, j) => (
+                        <div key={j} style={{ display: 'flex', alignItems: 'center', gap: 7 }}>
+                          <Check size={12} strokeWidth={3} color={GREEN} />
+                          {x}
+                        </div>
+                      )) : <span style={{ fontStyle: 'italic', color: 'var(--ink-muted)' }}>No items entered</span>}
+                    </div>
+                  )}
+                </div>
+              )
+            })}
+          </div>
+
+          {/* End mood */}
+          <div style={{ textAlign: 'center', width: '100%', flexShrink: 0 }}>
+            <div style={{ fontSize: 12.5, fontWeight: 700, color: INK_BODY, marginBottom: 9 }}>
+              How do you feel now?
+            </div>
+            <div style={{ display: 'flex', gap: 10, justifyContent: 'center', flexWrap: 'wrap' }}>
+              {MOODS.map(m => {
+                const on = endMood === m.label
+                return (
+                  <button
+                    key={m.label}
+                    onClick={() => handleMoodSelect(m.label)}
+                    disabled={!canInteract}
+                    style={{
+                      width: 64, height: 68, borderRadius: 14,
+                      border: `1.5px solid ${on ? GREEN : BORDER}`,
+                      background: on ? 'rgba(63,174,106,0.10)' : '#fff',
+                      boxShadow: CARD_SHADOW,
+                      cursor: canInteract ? 'pointer' : 'not-allowed',
+                      display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', gap: 3,
+                      fontSize: 23, transition: 'all 0.15s',
+                    }}
+                  >
+                    <span>{m.emoji}</span>
+                    <span style={{ fontSize: 10, fontWeight: 700, color: on ? GREEN_DEEP : INK_BODY }}>{m.label}</span>
+                  </button>
+                )
+              })}
+            </div>
+          </div>
+
+          <button
+            onClick={handleReset}
+            style={{
+              flexShrink: 0,
+              marginTop: 2,
+              padding: '9px 22px',
+              borderRadius: 11,
+              border: 'none',
+              background: `linear-gradient(180deg, #47bd74 0%, ${GREEN} 100%)`,
+              color: '#fff',
+              fontSize: 12.5,
+              fontWeight: 700,
+              cursor: 'pointer',
+              boxShadow: '0 4px 12px rgba(63,174,106,0.30)',
+            }}
+          >
+            Start again
+          </button>
+        </div>
+      )}
+
+      {/* ---- Therapist controls ---- */}
+      {isT && !completed && !captureStartMood && (
+        <div
+          style={{
+            flexShrink: 0,
+            paddingTop: 9,
+            borderTop: `1px solid ${BORDER}`,
+            display: 'flex',
+            alignItems: 'center',
+            gap: 8,
+            flexWrap: 'wrap',
+          }}
+        >
+          <span style={{ fontSize: 10.5, fontWeight: 600, color: 'var(--ink-muted)' }}>
+            Step {currentStep + 1} of 5 · {filledCount}/{step.count} items entered
+          </span>
+          <span style={{ width: 1, height: 12, background: BORDER }} />
+          <span style={{ fontSize: 10, fontWeight: 600, color: 'var(--ink-faint)' }}>Breath</span>
+          {BREATH_OPTIONS.map(b => (
+            <button
+              key={b.value}
+              onClick={() => {
+                setBreathPace(b.value)
+                writeToFirestore({ 'moduleState.ggBreathPace': b.value })
+              }}
+              style={pillStyle(breathPace === b.value)}
+            >
+              {b.label}
+            </button>
+          ))}
+          <div style={{ flex: 1 }} />
+          {!startMood && (
+            <button onClick={handleStartMoodCapture} style={ghostBtn}>
+              Capture start mood
+            </button>
+          )}
+          {startMood && (
+            <span style={{ fontSize: 10.5, fontWeight: 600, color: 'var(--ink-muted)' }}>Mood: {startMood}</span>
+          )}
+          <button onClick={handleSkip} style={ghostBtn}>
+            Skip to next step →
+          </button>
+        </div>
+      )}
     </div>
   )
 }

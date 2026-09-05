@@ -1,7 +1,22 @@
 'use client'
 
-import { useState, useEffect, useRef, useCallback } from 'react'
+import { useState, useEffect, useRef, useCallback, useId } from 'react'
 import { doc, onSnapshot, updateDoc } from 'firebase/firestore'
+import {
+  Leaf,
+  Waves,
+  Moon,
+  Timer,
+  Box,
+  Flag,
+  Ban,
+  Footprints,
+  ArrowUp,
+  ArrowDown,
+  ArrowLeft,
+  ArrowRight,
+  Lock,
+} from 'lucide-react'
 import { db } from '@/lib/firebase'
 import { logModuleEvent } from '@/lib/sessionEvents'
 import { staadPraise } from '@/lib/voice/staadVoice'
@@ -28,63 +43,54 @@ const DIFFICULTY_MAP: Record<Difficulty, number> = {
   hard: 15,
 }
 
-const DIFFICULTY_LABELS: { key: Difficulty; label: string }[] = [
-  { key: 'easy', label: 'Easy (7×7)' },
-  { key: 'medium', label: 'Medium (11×11)' },
-  { key: 'hard', label: 'Hard (15×15)' },
+/* Segmented control copy: bold name stacked over the muted grid size. */
+const DIFFICULTY_LABELS: { key: Difficulty; label: string; size: string }[] = [
+  { key: 'easy', label: 'Easy', size: '7 × 7' },
+  { key: 'medium', label: 'Medium', size: '11 × 11' },
+  { key: 'hard', label: 'Hard', size: '15 × 15' },
 ]
 
-const THEME_LIST: { key: ThemeName; label: string }[] = [
-  { key: 'calm', label: '🌿 Calm' },
-  { key: 'ocean', label: '🌊 Ocean' },
-  { key: 'night', label: '🌙 Night' },
+const THEME_LIST: { key: ThemeName; label: string; Icon: typeof Leaf; tint: string }[] = [
+  { key: 'calm', label: 'Calm', Icon: Leaf, tint: '#3fae6a' },
+  { key: 'ocean', label: 'Ocean', Icon: Waves, tint: '#2563EB' },
+  { key: 'night', label: 'Night', Icon: Moon, tint: '#6d5bd0' },
 ]
 
+/* ---- Design tokens for the light module canvas (#ffffff) ----
+   Dark ink on light surfaces everywhere; white only ever sits on a solid
+   saturated fill (navy walls, coral start marker, the green player sprite). */
+const UI = {
+  card: '#ffffff',
+  border: '#e7eaef',
+  shadow: '0 6px 18px rgba(20,30,40,0.05)',
+  shadowKey: '0 6px 16px rgba(20,30,40,0.10)',
+  ink: '#1e2a3a',
+  inkSoft: '#4b5563',
+  muted: '#8b9096',
+  blue: '#2563EB',
+  blueSoft: 'rgba(37,99,235,0.07)',
+  coral: '#ff5a5f',
+  coralInk: '#e0393f',
+  coralSoft: 'rgba(255,90,95,0.10)',
+  green: '#3fae6a',
+  greenInk: '#2f7d4f',
+  greenSoft: 'rgba(63,174,106,0.12)',
+} as const
+
+/* Theme now only re-tints the maze surfaces — the trail, start marker and goal
+   keep the reference palette (coral / green) so contrast never regresses. */
 const THEME_COLORS: Record<ThemeName, {
   wall: string
-  path: string
-  player: string
-  playerBorder: string
-  goal: string
-  goalBorder: string
-  visited: string
-  playerEmoji: string
-  goalEmoji: string
+  wallEdge: string
+  board: string
+  corridor: string
 }> = {
-  calm: {
-    wall: '#2d4a42',
-    path: 'rgba(0,0,0,0.04)',
-    player: '#4a7c6f',
-    playerBorder: '#2f6d5e',
-    goal: 'rgba(200,96,42,0.18)',
-    goalBorder: 'rgba(200,96,42,0.6)',
-    visited: 'rgba(74,124,111,0.12)',
-    playerEmoji: '🧩',
-    goalEmoji: '⭐',
-  },
-  ocean: {
-    wall: '#1a3045',
-    path: 'rgba(30,80,120,0.15)',
-    player: '#2a7ab5',
-    playerBorder: '#7ec8e3',
-    goal: 'rgba(255,200,50,0.3)',
-    goalBorder: 'rgba(255,200,50,0.6)',
-    visited: 'rgba(42,122,181,0.15)',
-    playerEmoji: '🐠',
-    goalEmoji: '🐚',
-  },
-  night: {
-    wall: '#1a1a2e',
-    path: 'rgba(100,80,180,0.1)',
-    player: '#4a3f8a',
-    playerBorder: '#9d8fe0',
-    goal: 'rgba(255,220,100,0.25)',
-    goalBorder: 'rgba(255,220,100,0.6)',
-    visited: 'rgba(74,63,138,0.15)',
-    playerEmoji: '🌟',
-    goalEmoji: '🌙',
-  },
+  calm: { wall: '#1e2a3a', wallEdge: '#33415a', board: '#f4f7f5', corridor: '#ffffff' },
+  ocean: { wall: '#16324c', wallEdge: '#2b5478', board: '#f1f6fb', corridor: '#ffffff' },
+  night: { wall: '#1c1b30', wallEdge: '#37345c', board: '#f5f3fb', corridor: '#ffffff' },
 }
+
+const START: Pos = { row: 0, col: 0 }
 
 const TIME_LIMITS = [60, 90, 120]
 
@@ -458,420 +464,647 @@ export default function VirtualMaze({ sessionId, role, isLocked }: VirtualMazePr
     }
   }, [])
 
-  const pillStyle = (active: boolean) => ({
-    padding: '6px 12px',
-    borderRadius: 20,
-    border: `1px solid ${active ? 'var(--sage)' : 'var(--glass-border)'}`,
-    background: active ? 'var(--sage-light)' : 'transparent',
-    color: active ? 'var(--sage-mid)' : 'var(--ink-muted)',
-    fontSize: 11,
-    fontWeight: 500,
+  /* ===================== Presentation ===================== */
+
+  /** White pill with a 1px hairline border; `accent` drives the selected look. */
+  const pill = (active: boolean, accent: string, tint: string): React.CSSProperties => ({
+    display: 'flex',
+    alignItems: 'center',
+    gap: 7,
+    padding: '9px 14px',
+    borderRadius: 14,
+    border: `1.5px solid ${active ? accent : UI.border}`,
+    background: active ? tint : UI.card,
+    color: active ? accent : UI.ink,
+    fontSize: 12.5,
+    fontWeight: 600,
+    letterSpacing: -0.1,
     cursor: 'pointer',
     whiteSpace: 'nowrap',
-    transition: 'all 0.15s',
-  } as React.CSSProperties)
+    boxShadow: UI.shadow,
+    transition: 'border-color 0.15s, background 0.15s, box-shadow 0.15s, transform 0.12s',
+  })
 
-  const statsRow = (
-    <div style={{ fontSize: 10, color: '#7c8188', display: 'flex', gap: 16, justifyContent: 'center', padding: '6px 0' }}>
-      <span>⏱️ {formatTime(elapsed)}</span>
-      <span>🚫 {wrongMoves} wrong</span>
-      <span>📍 {visited.length} cells</span>
+  const microLabel: React.CSSProperties = {
+    fontSize: 9.5,
+    fontWeight: 700,
+    letterSpacing: 0.7,
+    textTransform: 'uppercase',
+    color: UI.muted,
+  }
+
+  /* ---- Settings row: segmented difficulty · theme · timer · new maze ---- */
+  const settingsRow = (
+    <div
+      style={{
+        flexShrink: 0,
+        display: 'flex',
+        alignItems: 'center',
+        justifyContent: 'center',
+        flexWrap: 'wrap',
+        gap: 10,
+        paddingBottom: 8,
+      }}
+    >
+      {/* Difficulty — one segmented card, name stacked over grid size */}
+      <div
+        style={{
+          display: 'flex',
+          background: UI.card,
+          border: `1px solid ${UI.border}`,
+          borderRadius: 16,
+          padding: 3,
+          gap: 3,
+          boxShadow: UI.shadow,
+        }}
+      >
+        {DIFFICULTY_LABELS.map((d) => {
+          const active = difficulty === d.key
+          return (
+            <button
+              key={d.key}
+              className="vm-pill"
+              onClick={() => handleDifficultyChange(d.key)}
+              style={{
+                display: 'flex',
+                flexDirection: 'column',
+                alignItems: 'center',
+                gap: 1,
+                minWidth: 78,
+                padding: '7px 14px',
+                borderRadius: 13,
+                border: `1.5px solid ${active ? UI.coral : 'transparent'}`,
+                background: active ? UI.coralSoft : 'transparent',
+                cursor: 'pointer',
+                transition: 'all 0.15s',
+              }}
+            >
+              <span style={{ fontSize: 13, fontWeight: 700, color: active ? UI.coralInk : UI.ink, letterSpacing: -0.2 }}>
+                {d.label}
+              </span>
+              <span style={{ fontSize: 10.5, fontWeight: 600, color: active ? UI.coral : UI.muted }}>
+                {d.size}
+              </span>
+            </button>
+          )
+        })}
+      </div>
+
+      {/* Theme — selected pill takes a blue outline */}
+      <div style={{ display: 'flex', gap: 8 }}>
+        {THEME_LIST.map((t) => {
+          const active = themeName === t.key
+          const { Icon } = t
+          return (
+            <button
+              key={t.key}
+              className="vm-pill"
+              onClick={() => handleThemeChange(t.key)}
+              style={pill(active, UI.blue, UI.blueSoft)}
+            >
+              <Icon size={15} strokeWidth={2.2} color={active ? UI.blue : t.tint} />
+              <span style={{ color: active ? UI.blue : UI.ink }}>{t.label}</span>
+            </button>
+          )
+        })}
+      </div>
+
+      {/* Timer toggle (+ limit chips once enabled) */}
+      <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+        <button
+          className="vm-pill"
+          onClick={() => {
+            const next = !timerMode
+            setTimerMode(next)
+            writeToFirestore({ 'moduleState.vmTimerMode': next })
+          }}
+          style={pill(timerMode, UI.blue, UI.blueSoft)}
+        >
+          <Timer size={15} strokeWidth={2.2} color={timerMode ? UI.blue : UI.inkSoft} />
+          Timer {timerMode ? 'On' : 'Off'}
+        </button>
+        {timerMode && TIME_LIMITS.map((t) => (
+          <button
+            key={t}
+            className="vm-pill"
+            onClick={() => {
+              setTimeLimit(t)
+              writeToFirestore({ 'moduleState.vmTimeLimit': t })
+              setTimeRemaining(t)
+            }}
+            style={{ ...pill(timeLimit === t, UI.blue, UI.blueSoft), padding: '9px 12px' }}
+          >
+            {t}s
+          </button>
+        ))}
+      </div>
+
+      {/* New maze */}
+      <button className="vm-pill" onClick={handleNewMaze} style={pill(false, UI.blue, UI.blueSoft)}>
+        <Box size={15} strokeWidth={2.2} color={UI.inkSoft} />
+        New Maze
+      </button>
     </div>
   )
 
-  const renderCell = (idx: number) => {
-    const row = Math.floor(idx / gridSize)
-    const col = idx % gridSize
-    const isPlayerCell = playerPos.row === row && playerPos.col === col
-    const isGoalCell = goalPos.row === row && goalPos.col === col && !isPlayerCell
-    const isWall = maze[idx] === 1
-    const isVisited = visited.includes(`${row}-${col}`) && !isPlayerCell
-    const isBumping = bumpCell === `${row}-${col}`
+  /* ---- Compact stats line ---- */
+  const statItem = (icon: React.ReactNode, text: string, tone: string = UI.inkSoft) => (
+    <span style={{ display: 'flex', alignItems: 'center', gap: 6, color: tone, fontSize: 12, fontWeight: 600 }}>
+      {icon}
+      <span style={{ fontVariantNumeric: 'tabular-nums' }}>{text}</span>
+    </span>
+  )
 
-    let bg = theme.path
-    let border = 'none'
-    let emoji = ''
-    let extraStyle: React.CSSProperties = {}
+  const divider = <span style={{ width: 1, height: 12, background: UI.border, display: 'inline-block' }} />
 
-    if (isWall) {
-      bg = theme.wall
-      border = '0.5px solid rgba(0,0,0,0.2)'
-    } else if (isPlayerCell) {
-      bg = theme.player
-      border = `2px solid ${theme.playerBorder}`
-      emoji = theme.playerEmoji
-      extraStyle.borderRadius = 6
-      extraStyle.transition = 'all 0.15s ease'
-    } else if (isGoalCell) {
-      bg = theme.goal
-      border = `2px solid ${theme.goalBorder}`
-      emoji = theme.goalEmoji
-    } else if (isVisited) {
-      bg = theme.visited
-    }
+  const statsRow = (
+    <div
+      style={{
+        flexShrink: 0,
+        display: 'flex',
+        alignItems: 'center',
+        justifyContent: 'center',
+        gap: 14,
+        padding: '2px 0 10px',
+      }}
+    >
+      {statItem(<Timer size={14} strokeWidth={2.2} color={UI.muted} />, formatTime(elapsed))}
+      {divider}
+      {statItem(<Ban size={14} strokeWidth={2.2} color={UI.muted} />, `${wrongMoves} wrong`)}
+      {divider}
+      {statItem(<Footprints size={14} strokeWidth={2.2} color={UI.muted} />, `${visited.length} cells`)}
+      {timerMode && !completed && !timeUp && (
+        <>
+          {divider}
+          <span
+            style={{
+              display: 'flex',
+              alignItems: 'center',
+              gap: 6,
+              padding: '4px 11px',
+              borderRadius: 999,
+              border: `1px solid ${timeRemaining <= 10 ? UI.coral : UI.border}`,
+              background: timeRemaining <= 10 ? UI.coralSoft : UI.card,
+              color: timeRemaining <= 10 ? UI.coralInk : UI.ink,
+              fontSize: 12,
+              fontWeight: 700,
+              fontVariantNumeric: 'tabular-nums',
+              animation: timeRemaining <= 10 ? 'vmTimerPulse 1s ease infinite' : 'none',
+            }}
+          >
+            <Timer size={13} strokeWidth={2.4} color={timeRemaining <= 10 ? UI.coralInk : UI.inkSoft} />
+            {formatTime(timeRemaining)}
+          </span>
+        </>
+      )}
+    </div>
+  )
 
-    if (isBumping) {
-      extraStyle.animation = 'vmWallBump 0.25s ease'
-    }
+  /* ---- The board, drawn as one SVG so it always scales to fit its box ----
+     viewBox is gridSize×gridSize user units (1 unit = 1 cell) and
+     preserveAspectRatio="xMidYMid meet" guarantees it letterboxes rather than
+     overflowing, whatever shape the remaining canvas ends up. */
+  const trailPoints = [...visited, `${playerPos.row}-${playerPos.col}`].map((k) => {
+    const [r, c] = k.split('-').map(Number)
+    return { r, c }
+  }).filter((p) => Number.isFinite(p.r) && Number.isFinite(p.c))
 
-    const cellSize = Math.min(360 / gridSize, 42)
+  const trailPath = trailPoints.length > 1
+    ? trailPoints.map((p, i) => `${i === 0 ? 'M' : 'L'}${p.c + 0.5} ${p.r + 0.5}`).join(' ')
+    : ''
 
-    return (
-      <div
-        key={idx}
+  const isBumping = bumpCell === `${playerPos.row}-${playerPos.col}`
+  const playerOnGoal = playerPos.row === goalPos.row && playerPos.col === goalPos.col
+
+  const board = (
+    <svg
+      viewBox={`0 0 ${gridSize} ${gridSize}`}
+      preserveAspectRatio="xMidYMid meet"
+      style={{ width: '100%', height: '100%', display: 'block', overflow: 'visible' }}
+    >
+      <defs>
+        <radialGradient id="vmGoalGlow">
+          <stop offset="0%" stopColor={UI.green} stopOpacity="0.45" />
+          <stop offset="55%" stopColor={UI.green} stopOpacity="0.16" />
+          <stop offset="100%" stopColor={UI.green} stopOpacity="0" />
+        </radialGradient>
+        <radialGradient id="vmStartGlow">
+          <stop offset="0%" stopColor={UI.coral} stopOpacity="0.40" />
+          <stop offset="55%" stopColor={UI.coral} stopOpacity="0.14" />
+          <stop offset="100%" stopColor={UI.coral} stopOpacity="0" />
+        </radialGradient>
+      </defs>
+
+      {/* Corridor surface */}
+      <rect x={0} y={0} width={gridSize} height={gridSize} rx={0.34} fill={theme.corridor} />
+
+      {/* Walls — each cell its own rounded navy block, leaving hairline seams */}
+      {maze.map((cell, idx) => {
+        if (cell !== 1) return null
+        const r = Math.floor(idx / gridSize)
+        const c = idx % gridSize
+        return (
+          <rect
+            key={idx}
+            x={c + 0.03}
+            y={r + 0.03}
+            width={0.94}
+            height={0.94}
+            rx={0.2}
+            fill={theme.wall}
+            stroke={theme.wallEdge}
+            strokeWidth={0.015}
+          />
+        )
+      })}
+
+      {/* Traversed trail — soft continuous underlay + coral dots on top */}
+      {trailPath && (
+        <>
+          <path
+            d={trailPath}
+            fill="none"
+            stroke="rgba(255,90,95,0.20)"
+            strokeWidth={0.10}
+            strokeLinecap="round"
+            strokeLinejoin="round"
+          />
+          <path
+            d={trailPath}
+            fill="none"
+            stroke={UI.coral}
+            strokeWidth={0.13}
+            strokeLinecap="round"
+            strokeDasharray="0.001 0.26"
+          />
+        </>
+      )}
+
+      {/* Start marker */}
+      <g transform={`translate(${START.col} ${START.row})`}>
+        <circle cx={0.5} cy={0.5} r={0.95} fill="url(#vmStartGlow)" />
+        <rect x={0.08} y={0.08} width={0.84} height={0.84} rx={0.25} fill={UI.coral} />
+        <rect x={0.35} y={0.35} width={0.3} height={0.3} rx={0.09} fill="#ffffff" />
+      </g>
+
+      {/* Goal — glowing green flag cell */}
+      <g transform={`translate(${goalPos.col} ${goalPos.row})`}>
+        <circle cx={0.5} cy={0.5} r={1} fill="url(#vmGoalGlow)" />
+        <rect
+          x={0.06}
+          y={0.06}
+          width={0.88}
+          height={0.88}
+          rx={0.25}
+          fill="rgba(63,174,106,0.22)"
+          stroke={UI.green}
+          strokeWidth={0.045}
+        />
+        <path d="M0.36 0.24 L0.36 0.78" stroke={UI.greenInk} strokeWidth={0.075} strokeLinecap="round" />
+        <path d="M0.4 0.27 L0.72 0.4 L0.4 0.53 Z" fill={UI.green} />
+      </g>
+
+      {/* Player — cheerful sprite; glides between cells, squashes on a wall bump */}
+      <g
         style={{
-          width: '100%',
-          height: '100%',
-          background: bg,
-          border,
-          display: 'flex',
-          alignItems: 'center',
-          justifyContent: 'center',
-          fontSize: Math.max(cellSize * 0.35, 10),
-          boxSizing: 'border-box',
-          ...extraStyle,
+          transform: `translate(${playerPos.col}px, ${playerPos.row}px)`,
+          transition: 'transform 0.14s ease',
         }}
       >
-        {emoji}
+        <g className={isBumping ? 'vm-bump' : undefined} style={{ transformOrigin: '0.5px 0.5px' }}>
+          <rect
+            x={0.14}
+            y={0.14}
+            width={0.72}
+            height={0.72}
+            rx={0.22}
+            fill={playerOnGoal ? '#2f9457' : UI.green}
+            stroke="#ffffff"
+            strokeWidth={0.06}
+          />
+          <circle cx={0.38} cy={0.42} r={0.075} fill="#ffffff" />
+          <circle cx={0.62} cy={0.42} r={0.075} fill="#ffffff" />
+          <path
+            d="M0.37 0.60 Q0.5 0.72 0.63 0.60"
+            fill="none"
+            stroke="#ffffff"
+            strokeWidth={0.055}
+            strokeLinecap="round"
+          />
+        </g>
+      </g>
+    </svg>
+  )
+
+  /* ---- D-pad: large white keys with soft shadows ---- */
+  const KEY = 62
+  const arrowFor = (d: Direction) => {
+    const props = { size: 24, strokeWidth: 2.4, color: UI.ink } as const
+    if (d === 'up') return <ArrowUp {...props} />
+    if (d === 'down') return <ArrowDown {...props} />
+    if (d === 'left') return <ArrowLeft {...props} />
+    return <ArrowRight {...props} />
+  }
+
+  const dpad = (
+    <div style={{ flexShrink: 0, position: 'relative' }}>
+      <div
+        style={{
+          display: 'grid',
+          gridTemplateColumns: `repeat(3, ${KEY}px)`,
+          gridTemplateRows: `repeat(3, ${KEY}px)`,
+          gap: 12,
+        }}
+      >
+        {(['', 'up', '', 'left', '', 'right', '', 'down', ''] as const).map((dir, i) => {
+          const d = dir as Direction | ''
+          if (!d) return <div key={i} />
+          return (
+            <button
+              key={i}
+              className="vm-key"
+              aria-label={d}
+              disabled={!canInteract}
+              onMouseDown={() => movePlayer(d)}
+              onTouchStart={(e) => { e.preventDefault(); movePlayer(d) }}
+              style={{
+                width: KEY,
+                height: KEY,
+                borderRadius: 18,
+                background: UI.card,
+                border: `1px solid ${UI.border}`,
+                boxShadow: UI.shadowKey,
+                cursor: canInteract ? 'pointer' : 'not-allowed',
+                opacity: canInteract ? 1 : 0.45,
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                padding: 0,
+                outline: 'none',
+                transition: 'transform 0.1s ease, box-shadow 0.15s ease',
+              }}
+            >
+              {arrowFor(d)}
+            </button>
+          )
+        })}
       </div>
-    )
+
+      {/* Light lock scrim — dark text on a light surface, never the reverse */}
+      {!canInteract && mazeReady && !completed && !timeUp && (
+        <div
+          style={{
+            position: 'absolute',
+            inset: -6,
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            zIndex: 5,
+            borderRadius: 20,
+            background: 'rgba(255,255,255,0.72)',
+            backdropFilter: 'blur(2px)',
+          }}
+        >
+          <span
+            style={{
+              display: 'flex',
+              alignItems: 'center',
+              gap: 6,
+              padding: '8px 12px',
+              borderRadius: 12,
+              background: UI.card,
+              border: `1px solid ${UI.border}`,
+              boxShadow: UI.shadow,
+              fontSize: 11,
+              fontWeight: 700,
+              color: UI.inkSoft,
+              textAlign: 'center',
+              maxWidth: 150,
+              lineHeight: 1.3,
+            }}
+          >
+            <Lock size={13} strokeWidth={2.4} color={UI.muted} />
+            Therapist is controlling
+          </span>
+        </div>
+      )}
+    </div>
+  )
+
+  /* ---- Result overlays: a white card on a light scrim ---- */
+  const overlayShell = (children: React.ReactNode) => (
+    <div
+      style={{
+        position: 'absolute',
+        inset: 0,
+        display: 'flex',
+        alignItems: 'center',
+        justifyContent: 'center',
+        zIndex: 10,
+        padding: 20,
+        borderRadius: 20,
+        background: 'rgba(255,255,255,0.82)',
+        backdropFilter: 'blur(3px)',
+      }}
+    >
+      <div
+        style={{
+          background: UI.card,
+          border: `1px solid ${UI.border}`,
+          borderRadius: 20,
+          boxShadow: '0 14px 40px rgba(20,30,40,0.12)',
+          padding: '22px 30px',
+          textAlign: 'center',
+          maxWidth: 340,
+        }}
+      >
+        {children}
+      </div>
+    </div>
+  )
+
+  const solidBtn = (bg: string): React.CSSProperties => ({
+    padding: '10px 18px',
+    borderRadius: 12,
+    border: 'none',
+    background: bg,
+    color: '#ffffff',
+    fontSize: 12.5,
+    fontWeight: 700,
+    cursor: 'pointer',
+    boxShadow: UI.shadowKey,
+  })
+
+  const ghostBtn: React.CSSProperties = {
+    padding: '10px 18px',
+    borderRadius: 12,
+    border: `1px solid ${UI.border}`,
+    background: UI.card,
+    color: UI.ink,
+    fontSize: 12.5,
+    fontWeight: 700,
+    cursor: 'pointer',
+    boxShadow: UI.shadow,
   }
 
   return (
-    <div style={{ display: 'flex', flexDirection: 'column', height: '100%' }}>
+    <div style={{ display: 'flex', flexDirection: 'column', height: '100%', minHeight: 0 }}>
       <style>{`
-        @keyframes vmWallBump {
+        @keyframes vmBump {
           0%, 100% { transform: scale(1); }
-          40% { transform: scale(0.85); }
-          70% { transform: scale(1.05); }
-        }
-        @keyframes vmFloatUp {
-          0% { opacity: 1; transform: translateY(0) scale(1); }
-          100% { opacity: 0; transform: translateY(-60px) scale(1.5); }
+          40% { transform: scale(0.82); }
+          70% { transform: scale(1.06); }
         }
         @keyframes vmTimerPulse {
           0%, 100% { opacity: 1; }
-          50% { opacity: 0.4; }
+          50% { opacity: 0.45; }
         }
+        .vm-bump { animation: vmBump 0.25s ease; }
+        .vm-pill:hover { transform: translateY(-1px); }
+        .vm-key:hover:not(:disabled) { transform: translateY(-2px); box-shadow: 0 10px 22px rgba(20,30,40,0.14); }
+        .vm-key:active:not(:disabled) { transform: translateY(1px); box-shadow: 0 3px 8px rgba(20,30,40,0.12); }
       `}</style>
 
-      {/* Therapist controls */}
-      {isTherapist && (
-        <div style={{
-          flexShrink: 0,
-          padding: '0 0 8px 0',
-          width: '100%',
-          maxWidth: 1000,
-          alignSelf: 'center',
-          display: 'flex',
-          alignItems: 'center',
-          flexWrap: 'wrap',
-          gap: 12,
-        }}>
-          {/* Difficulty */}
-          <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
-            {DIFFICULTY_LABELS.map((d) => (
-              <button key={d.key} onClick={() => handleDifficultyChange(d.key)} style={pillStyle(difficulty === d.key)}>
-                {d.label}
-              </button>
-            ))}
-          </div>
-
-          {/* Theme */}
-          <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
-            {THEME_LIST.map((t) => (
-              <button key={t.key} onClick={() => handleThemeChange(t.key)} style={pillStyle(themeName === t.key)}>
-                {t.label}
-              </button>
-            ))}
-          </div>
-
-          {/* Timer */}
-          <div style={{ display: 'flex', gap: 6, alignItems: 'center', flexWrap: 'wrap' }}>
-            <button onClick={() => {
-              const next = !timerMode
-              setTimerMode(next)
-              writeToFirestore({ 'moduleState.vmTimerMode': next })
-            }} style={pillStyle(timerMode)}>
-              ⏱ Timer {timerMode ? 'On' : 'Off'}
-            </button>
-            {timerMode && TIME_LIMITS.map((t) => (
-              <button key={t} onClick={() => {
-                setTimeLimit(t)
-                writeToFirestore({ 'moduleState.vmTimeLimit': t })
-                setTimeRemaining(t)
-              }} style={pillStyle(timeLimit === t)}>
-                {t}s
-              </button>
-            ))}
-          </div>
-
-          {/* New Maze */}
-          <div style={{ display: 'flex', gap: 6 }}>
-            <button onClick={handleNewMaze} style={{
-              ...pillStyle(false),
-              background: 'var(--sage-light)',
-              color: 'var(--sage-mid)',
-              fontWeight: 600,
-            }}>
-              🗺️ New Maze
-            </button>
-          </div>
-
-        </div>
-      )}
-
-      {/* Stats bar — its own row, below the control band. */}
-      {isTherapist && mazeReady && !completed && (
-        <div style={{ flexShrink: 0 }}>{statsRow}</div>
-      )}
+      {isTherapist && settingsRow}
+      {mazeReady && statsRow}
 
       {/* No maze yet */}
       {!mazeReady && (
-        <div style={{ flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-          {isTherapist ? (
-            <button onClick={() => handleGenerateMaze()} style={{
-              padding: '10px 24px',
-              borderRadius: 10,
-              border: '1px solid var(--sage)',
-              background: 'var(--sage-light)',
-              color: 'var(--sage-mid)',
-              fontSize: 13,
-              fontWeight: 600,
-              cursor: 'pointer',
-            }}>
-              🗺️ Generate Maze
-            </button>
-          ) : (
-            <div style={{ textAlign: 'center', fontSize: 12, color: 'var(--ink-muted)' }}>
-              Waiting for therapist to set up the maze...
-            </div>
-          )}
+        <div style={{ flex: 1, minHeight: 0, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+          <div
+            style={{
+              background: UI.card,
+              border: `1px solid ${UI.border}`,
+              borderRadius: 20,
+              boxShadow: UI.shadow,
+              padding: '26px 32px',
+              textAlign: 'center',
+            }}
+          >
+            <div style={{ ...microLabel, marginBottom: 10 }}>Virtual Maze</div>
+            {isTherapist ? (
+              <>
+                <div style={{ fontSize: 14, fontWeight: 700, color: UI.ink, marginBottom: 14 }}>
+                  Pick a difficulty, then build the board.
+                </div>
+                <button onClick={() => handleGenerateMaze()} style={solidBtn(UI.ink)}>
+                  Generate Maze
+                </button>
+              </>
+            ) : (
+              <div style={{ fontSize: 13, fontWeight: 600, color: UI.inkSoft }}>
+                Waiting for your therapist to set up the maze…
+              </div>
+            )}
+          </div>
         </div>
       )}
 
-      {/* Maze content */}
+      {/* Play area: board card on the left, D-pad alongside. The canvas is wide
+          and short, so keeping the controls beside the board gives the maze the
+          full remaining height. */}
       {mazeReady && (
-        <div style={{ flex: 1, display: 'flex', flexDirection: 'column', overflow: 'hidden' }}>
-          {/* Timer countdown */}
-          {timerMode && !completed && (
-            <div style={{
-              textAlign: 'center',
-              padding: '4px 0',
-              fontFamily: "'DM Serif Display', serif",
-              fontSize: 20,
-              color: timeRemaining <= 10 ? '#c8602a' : '#3d4348',
-              animation: timeRemaining <= 10 ? 'vmTimerPulse 1s ease infinite' : 'none',
-              flexShrink: 0,
-            }}>
-              {formatTime(timeRemaining)}
-            </div>
-          )}
-
-          {/* Play row: maze on the left, D-pad beside it. The wide canvas has
-              horizontal room to spare and very little vertical room, so putting
-              the controls alongside gives the maze the full remaining height. */}
-          <div style={{
+        <div
+          style={{
             flex: 1,
             minHeight: 0,
             display: 'flex',
             alignItems: 'center',
             justifyContent: 'center',
-            gap: 24,
-          }}>
-          {/* Maze grid area */}
-          <div style={{
-            height: '100%',
-            display: 'flex',
-            alignItems: 'center',
-            justifyContent: 'center',
-            overflow: 'hidden',
-            padding: '0 4px',
-          }}>
-            {completed && !timeUp ? (
-              /* Completion overlay */
-              <div style={{
-                position: 'absolute',
-                inset: 0,
-                background: 'rgba(0,0,0,0.7)',
-                display: 'flex',
-                alignItems: 'center',
-                justifyContent: 'center',
-                zIndex: 10,
-                padding: 20,
-              }}>
-                <div style={{ textAlign: 'center' }}>
-                  <div style={{ fontFamily: "'DM Serif Display', serif", fontSize: 20, color: '#2b2f33', marginBottom: 12 }}>
-                    🎉 Maze Complete!
-                  </div>
-                  <div style={{ fontSize: 11, color: '#5b6169', marginBottom: 4 }}>
-                    Time: {formatTime(completionTime)}
-                  </div>
-                  <div style={{ fontSize: 11, color: '#5b6169', marginBottom: 8 }}>
-                    Wrong moves: {wrongMoves}
-                  </div>
-                  <div style={{ fontSize: 14, color: '#2b2f33', marginBottom: 16 }}>
-                    {getRating(wrongMoves).stars} {getRating(wrongMoves).text}
-                  </div>
-                  {isTherapist && (
-                    <div style={{ display: 'flex', gap: 8, justifyContent: 'center' }}>
-                      <button onClick={() => { handleGenerateMaze() }} style={{
-                        padding: '8px 16px',
-                        borderRadius: 8,
-                        border: '1px solid var(--sage)',
-                        background: 'var(--sage-light)',
-                        color: 'var(--sage-mid)',
-                        fontSize: 11,
-                        fontWeight: 600,
-                        cursor: 'pointer',
-                      }}>
-                        New Maze
-                      </button>
-                      {difficulty !== 'hard' && (
-                        <button onClick={handleHarder} style={{
-                          padding: '8px 16px',
-                          borderRadius: 8,
-                          border: '1px solid var(--glass-border)',
-                          background: 'rgba(0,0,0,0.06)',
-                          color: '#2b2f33',
-                          fontSize: 11,
-                          fontWeight: 600,
-                          cursor: 'pointer',
-                        }}>
-                          Harder
-                        </button>
-                      )}
-                    </div>
-                  )}
-                </div>
-              </div>
-            ) : null}
+            gap: 28,
+          }}
+        >
+          <div
+            onTouchStart={handleTouchStart}
+            onTouchEnd={handleTouchEnd}
+            style={{
+              position: 'relative',
+              height: '100%',
+              aspectRatio: '1',
+              maxWidth: '100%',
+              minWidth: 0,
+              boxSizing: 'border-box',
+              background: theme.board,
+              border: `1px solid ${UI.border}`,
+              borderRadius: 20,
+              boxShadow: UI.shadow,
+              padding: 14,
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+            }}
+          >
+            {board}
 
-            {timeUp ? (
-              /* Time's up overlay */
-              <div style={{
-                position: 'absolute',
-                inset: 0,
-                background: 'rgba(0,0,0,0.7)',
-                display: 'flex',
-                alignItems: 'center',
-                justifyContent: 'center',
-                zIndex: 10,
-                padding: 20,
-              }}>
-                <div style={{ textAlign: 'center' }}>
-                  <div style={{ fontFamily: "'DM Serif Display', serif", fontSize: 20, color: '#c8602a', marginBottom: 12 }}>
-                    ⏰ Time's Up!
+            {completed && !timeUp && overlayShell(
+              <>
+                <div style={{ fontSize: 20, fontWeight: 800, color: UI.ink, letterSpacing: -0.4, marginBottom: 4 }}>
+                  Maze complete
+                </div>
+                <div style={{ fontSize: 18, marginBottom: 8 }}>{getRating(wrongMoves).stars}</div>
+                <div style={{ fontSize: 13, fontWeight: 700, color: UI.greenInk, marginBottom: 12 }}>
+                  {getRating(wrongMoves).text}
+                </div>
+                <div style={{ display: 'flex', justifyContent: 'center', gap: 14, marginBottom: 18 }}>
+                  <div>
+                    <div style={microLabel}>Time</div>
+                    <div style={{ fontSize: 15, fontWeight: 800, color: UI.ink, fontVariantNumeric: 'tabular-nums' }}>
+                      {formatTime(completionTime)}
+                    </div>
                   </div>
-                  <div style={{ fontSize: 11, color: '#5b6169', marginBottom: 4 }}>
-                    Wrong moves: {wrongMoves}
+                  <div style={{ width: 1, background: UI.border }} />
+                  <div>
+                    <div style={microLabel}>Wrong moves</div>
+                    <div style={{ fontSize: 15, fontWeight: 800, color: UI.ink, fontVariantNumeric: 'tabular-nums' }}>
+                      {wrongMoves}
+                    </div>
                   </div>
-                  <div style={{ fontSize: 11, color: '#5b6169', marginBottom: 16 }}>
-                    Cells visited: {visited.length}
+                </div>
+                {isTherapist && (
+                  <div style={{ display: 'flex', gap: 8, justifyContent: 'center' }}>
+                    <button onClick={() => { handleGenerateMaze() }} style={solidBtn(UI.green)}>
+                      New Maze
+                    </button>
+                    {difficulty !== 'hard' && (
+                      <button onClick={handleHarder} style={ghostBtn}>
+                        Harder
+                      </button>
+                    )}
                   </div>
-                  <button onClick={() => {
-                    handleGenerateMaze()
-                  }} style={{
-                    padding: '8px 20px',
-                    borderRadius: 8,
-                    border: '1px solid var(--sage)',
-                    background: 'var(--sage-light)',
-                    color: 'var(--sage-mid)',
-                    fontSize: 11,
-                    fontWeight: 600,
-                    cursor: 'pointer',
-                  }}>
+                )}
+              </>
+            )}
+
+            {timeUp && overlayShell(
+              <>
+                <div style={{ fontSize: 20, fontWeight: 800, color: UI.coralInk, letterSpacing: -0.4, marginBottom: 12 }}>
+                  Time&rsquo;s up
+                </div>
+                <div style={{ display: 'flex', justifyContent: 'center', gap: 14, marginBottom: 18 }}>
+                  <div>
+                    <div style={microLabel}>Wrong moves</div>
+                    <div style={{ fontSize: 15, fontWeight: 800, color: UI.ink, fontVariantNumeric: 'tabular-nums' }}>
+                      {wrongMoves}
+                    </div>
+                  </div>
+                  <div style={{ width: 1, background: UI.border }} />
+                  <div>
+                    <div style={microLabel}>Cells visited</div>
+                    <div style={{ fontSize: 15, fontWeight: 800, color: UI.ink, fontVariantNumeric: 'tabular-nums' }}>
+                      {visited.length}
+                    </div>
+                  </div>
+                </div>
+                {isTherapist && (
+                  <button onClick={() => { handleGenerateMaze() }} style={solidBtn(UI.ink)}>
                     Try Again
                   </button>
-                </div>
-              </div>
-            ) : null}
-
-            <div
-              onTouchStart={handleTouchStart}
-              onTouchEnd={handleTouchEnd}
-              style={{
-                display: 'grid',
-                gridTemplateColumns: `repeat(${gridSize}, 1fr)`,
-                gridTemplateRows: `repeat(${gridSize}, 1fr)`,
-                // Square sized from AVAILABLE HEIGHT, not width. Driving it from
-                // width (maxWidth: 380) made the grid taller than the canvas, and
-                // the parent's overflow:hidden clipped every row but the first.
-                height: '100%',
-                aspectRatio: '1',
-                maxWidth: '100%',
-                gap: 0,
-                border: '1px solid rgba(0,0,0,0.05)',
-                borderRadius: 4,
-                overflow: 'hidden',
-                position: 'relative',
-              }}
-            >
-              {maze.map((_, idx) => renderCell(idx))}
-            </div>
-          </div>
-
-          {/* Direction buttons + lock overlay */}
-          <div style={{ flexShrink: 0, position: 'relative' }}>
-            {!canInteract && mazeReady && !completed && !timeUp && (
-              <div style={{
-                position: 'absolute',
-                inset: 0,
-                display: 'flex',
-                alignItems: 'center',
-                justifyContent: 'center',
-                zIndex: 5,
-                fontSize: 11,
-                color: 'var(--ink-muted)',
-                background: 'rgba(0,0,0,0.3)',
-                borderRadius: 10,
-              }}>
-                Therapist is controlling
-              </div>
+                )}
+              </>
             )}
-            <div style={{
-              display: 'grid',
-              gridTemplateColumns: 'repeat(3, 38px)',
-              gridTemplateRows: 'repeat(3, 38px)',
-              gap: 4,
-              justifyContent: 'center',
-              padding: '4px 0',
-            }}>
-              {['', 'up', '', 'left', '', 'right', '', 'down', ''].map((dir, i) => {
-                const d = dir as Direction | ''
-                if (!d) return <div key={i} style={{ width: 44, height: 44 }} />
-                return (
-                  <button
-                    key={i}
-                    onMouseDown={() => movePlayer(d)}
-                    onTouchStart={(e) => { e.preventDefault(); movePlayer(d) }}
-                    style={{
-                      width: 44,
-                      height: 44,
-                      borderRadius: 10,
-                      background: 'rgba(0,0,0,0.05)',
-                      border: '1px solid rgba(0,0,0,0.07)',
-                      color: '#2b2f33',
-                      fontSize: 18,
-                      cursor: canInteract ? 'pointer' : 'not-allowed',
-                      transition: 'all 0.15s',
-                      opacity: canInteract ? 1 : 0.3,
-                      display: 'flex',
-                      alignItems: 'center',
-                      justifyContent: 'center',
-                      outline: 'none',
-                    }}
-                  >
-                    {d === 'up' && '↑'}
-                    {d === 'down' && '↓'}
-                    {d === 'left' && '←'}
-                    {d === 'right' && '→'}
-                  </button>
-                )
-              })}
-            </div>
           </div>
-          </div>
+
+          {dpad}
         </div>
       )}
     </div>

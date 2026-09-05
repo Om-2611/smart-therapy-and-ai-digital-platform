@@ -396,30 +396,30 @@ export default function DragDropSorting({ sessionId, role, isLocked }: DragDropS
               <button key={s.id} onClick={() => handleSetChange(s.id)}
                 style={{
                   whiteSpace: 'nowrap', padding: '3px 8px', borderRadius: 10, cursor: 'pointer', fontSize: 10,
-                  border: setId === s.id ? '1px solid rgba(74,124,111,0.6)' : '1px solid rgba(255,255,255,0.08)',
+                  border: setId === s.id ? '1px solid rgba(74,124,111,0.6)' : '1px solid rgba(0,0,0,0.08)',
                   background: setId === s.id ? 'rgba(74,124,111,0.2)' : 'transparent',
-                  color: setId === s.id ? 'rgba(255,255,255,0.85)' : 'rgba(255,255,255,0.4)',
+                  color: setId === s.id ? 'rgba(0,0,0,0.85)' : 'rgba(0,0,0,0.4)',
                 }}
               >{s.name}</button>
             ))}
           </div>
           <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
-            <span style={{ color: 'rgba(255,255,255,0.4)' }}>Difficulty:</span>
+            <span style={{ color: 'rgba(0,0,0,0.4)' }}>Difficulty:</span>
             {['easy', 'medium', 'hard'].map(d => (
               <button key={d} onClick={() => handleDifficultyChange(d)}
                 style={{
                   padding: '2px 10px', borderRadius: 4, cursor: 'pointer', fontSize: 10, textTransform: 'capitalize',
-                  border: difficulty === d ? '1px solid rgba(74,124,111,0.6)' : '1px solid rgba(255,255,255,0.08)',
+                  border: difficulty === d ? '1px solid rgba(74,124,111,0.6)' : '1px solid rgba(0,0,0,0.08)',
                   background: difficulty === d ? 'rgba(74,124,111,0.15)' : 'transparent',
-                  color: difficulty === d ? 'rgba(255,255,255,0.8)' : 'rgba(255,255,255,0.35)',
+                  color: difficulty === d ? 'rgba(0,0,0,0.8)' : 'rgba(0,0,0,0.35)',
                 }}
               >{d === 'easy' ? 'Easy' : d === 'medium' ? 'Medium' : 'Hard'}</button>
             ))}
-            <span style={{ marginLeft: 4, color: 'rgba(255,255,255,0.4)' }}>Show:</span>
+            <span style={{ marginLeft: 4, color: 'rgba(0,0,0,0.4)' }}>Show:</span>
             <button onClick={() => write({ 'moduleState.ddDisplayMode': displayMode === 'emoji+label' ? 'emoji' : 'emoji+label' })}
-              style={{ padding: '2px 8px', borderRadius: 4, cursor: 'pointer', fontSize: 10, border: '1px solid rgba(255,255,255,0.1)', background: 'transparent', color: 'rgba(255,255,255,0.5)' }}
+              style={{ padding: '2px 8px', borderRadius: 4, cursor: 'pointer', fontSize: 10, border: '1px solid rgba(0,0,0,0.1)', background: 'transparent', color: 'rgba(0,0,0,0.5)' }}
             >{displayMode === 'emoji+label' ? 'Emoji+Label' : 'Emoji'}</button>
-            <button onClick={handleShuffle} style={{ marginLeft: 'auto', padding: '2px 8px', borderRadius: 4, cursor: 'pointer', fontSize: 10, border: '1px solid rgba(255,255,255,0.1)', background: 'transparent', color: 'rgba(255,255,255,0.5)' }}>🔀 Shuffle</button>
+            <button onClick={handleShuffle} style={{ marginLeft: 'auto', padding: '2px 8px', borderRadius: 4, cursor: 'pointer', fontSize: 10, border: '1px solid rgba(0,0,0,0.1)', background: 'transparent', color: 'rgba(0,0,0,0.5)' }}>🔀 Shuffle</button>
             <button onClick={handleReset} style={{ padding: '2px 8px', borderRadius: 4, cursor: 'pointer', fontSize: 10, border: '1px solid rgba(200,60,60,0.3)', background: 'transparent', color: 'rgba(200,80,80,0.7)' }}>↺ Reset</button>
             <VoiceLanguageToggle sessionId={sessionId} language={voiceLanguage} />
           </div>
@@ -431,8 +431,8 @@ export default function DragDropSorting({ sessionId, role, isLocked }: DragDropS
 
         {/* Item pool */}
         <div style={{
-          background: 'rgba(255,255,255,0.03)', borderRadius: 10, padding: 10,
-          minHeight: 80, border: '1px dashed rgba(255,255,255,0.08)',
+          background: 'rgba(0,0,0,0.03)', borderRadius: 10, padding: 10,
+          minHeight: 80, border: '1px dashed rgba(0,0,0,0.08)',
           display: 'flex', flexWrap: 'wrap', gap: 6, alignContent: 'flex-start',
         }}>
           {unsortedItems.map(id => {
@@ -450,8 +450,8 @@ export default function DragDropSorting({ sessionId, role, isLocked }: DragDropS
                 className={isShaking ? 'ws-a fb-a' : ''}
                 style={{
                   width: 60, height: 60, borderRadius: 12,
-                  background: dragItem === id ? 'rgba(74,124,111,0.15)' : 'rgba(255,255,255,0.08)',
-                  border: `1.5px solid ${dragItem === id ? 'rgba(74,124,111,0.4)' : 'rgba(255,255,255,0.12)'}`,
+                  background: dragItem === id ? 'rgba(74,124,111,0.15)' : 'rgba(0,0,0,0.08)',
+                  border: `1.5px solid ${dragItem === id ? 'rgba(74,124,111,0.4)' : 'rgba(0,0,0,0.12)'}`,
                   display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', gap: 2,
                   cursor: canInteract ? 'grab' : 'default',
                   transition: 'all 0.15s',
@@ -463,13 +463,13 @@ export default function DragDropSorting({ sessionId, role, isLocked }: DragDropS
               >
                 <span style={{ fontSize: 26, lineHeight: 1 }}>{item.emoji}</span>
                 {displayMode === 'emoji+label' && (
-                  <span style={{ fontSize: 8, color: 'rgba(255,255,255,0.7)', textAlign: 'center', lineHeight: 1.2 }}>{item.label}</span>
+                  <span style={{ fontSize: 8, color: 'rgba(0,0,0,0.7)', textAlign: 'center', lineHeight: 1.2 }}>{item.label}</span>
                 )}
               </div>
             )
           })}
           {unsortedItems.length === 0 && !allDone && (
-            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', width: '100%', color: 'rgba(255,255,255,0.2)', fontSize: 11 }}>
+            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', width: '100%', color: 'rgba(0,0,0,0.2)', fontSize: 11 }}>
               {totalItems > 0 ? 'All items sorted!' : 'Loading items...'}
             </div>
           )}
@@ -491,14 +491,14 @@ export default function DragDropSorting({ sessionId, role, isLocked }: DragDropS
                   flex: 1, borderRadius: 12, minHeight: 80, padding: 6,
                   display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 4,
                   transition: 'all 0.2s', overflowY: 'auto',
-                  background: isFlash ? 'rgba(200,96,42,0.2)' : isHover ? 'rgba(74,124,111,0.12)' : 'rgba(255,255,255,0.04)',
-                  border: isFlash ? '1.5px solid rgba(200,96,42,0.5)' : isHover ? '1.5px solid rgba(74,124,111,0.5)' : '1.5px dashed rgba(255,255,255,0.12)',
+                  background: isFlash ? 'rgba(200,96,42,0.2)' : isHover ? 'rgba(74,124,111,0.12)' : 'rgba(0,0,0,0.04)',
+                  border: isFlash ? '1.5px solid rgba(200,96,42,0.5)' : isHover ? '1.5px solid rgba(74,124,111,0.5)' : '1.5px dashed rgba(0,0,0,0.12)',
                   borderStyle: isHover ? 'solid' : 'dashed',
                   transform: isHover ? 'scale(1.02)' : 'scale(1)',
                 }}
               >
                 <span style={{ fontSize: 22 }}>{bin.emoji}</span>
-                <span style={{ fontSize: 11, fontWeight: 500, color: 'rgba(255,255,255,0.8)', textAlign: 'center' }}>{bin.label}</span>
+                <span style={{ fontSize: 11, fontWeight: 500, color: 'rgba(0,0,0,0.8)', textAlign: 'center' }}>{bin.label}</span>
                 <div style={{ display: 'flex', flexWrap: 'wrap', gap: 4, justifyContent: 'center' }}>
                   {binItems.map(([itemId]) => {
                     const item = itemMap.get(itemId)
@@ -507,7 +507,7 @@ export default function DragDropSorting({ sessionId, role, isLocked }: DragDropS
                       <div key={itemId} className="bi-a"
                         style={{
                           width: 44, height: 44, borderRadius: 8,
-                          background: 'rgba(255,255,255,0.06)', border: '1px solid rgba(255,255,255,0.08)',
+                          background: 'rgba(0,0,0,0.06)', border: '1px solid rgba(0,0,0,0.08)',
                           display: 'flex', alignItems: 'center', justifyContent: 'center', position: 'relative',
                           animation: 'bi 0.4s ease',
                         }}
@@ -525,11 +525,11 @@ export default function DragDropSorting({ sessionId, role, isLocked }: DragDropS
 
         {/* Score bar */}
         <div style={{ flexShrink: 0 }}>
-          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', fontSize: 11, color: 'rgba(255,255,255,0.5)', marginBottom: 3 }}>
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', fontSize: 11, color: 'rgba(0,0,0,0.5)', marginBottom: 3 }}>
             <span>✓ {correct} sorted correctly</span>
             <span>{remaining} left</span>
           </div>
-          <div style={{ width: '100%', height: 3, borderRadius: 2, background: 'rgba(255,255,255,0.08)', overflow: 'hidden' }}>
+          <div style={{ width: '100%', height: 3, borderRadius: 2, background: 'rgba(0,0,0,0.08)', overflow: 'hidden' }}>
             <div style={{ width: `${pct}%`, height: '100%', background: '#4a7c6f', borderRadius: 2, transition: 'width 0.3s ease' }} />
           </div>
         </div>
@@ -547,7 +547,7 @@ export default function DragDropSorting({ sessionId, role, isLocked }: DragDropS
         }}>
           <span style={{ fontSize: 26, lineHeight: 1 }}>{itemMap.get(dragId.current)!.emoji}</span>
           {displayMode === 'emoji+label' && (
-            <span style={{ fontSize: 8, color: 'rgba(255,255,255,0.7)', textAlign: 'center', lineHeight: 1.2 }}>{itemMap.get(dragId.current)!.label}</span>
+            <span style={{ fontSize: 8, color: 'rgba(0,0,0,0.7)', textAlign: 'center', lineHeight: 1.2 }}>{itemMap.get(dragId.current)!.label}</span>
           )}
         </div>
       )}
@@ -559,14 +559,14 @@ export default function DragDropSorting({ sessionId, role, isLocked }: DragDropS
           background: 'rgba(74,124,111,0.2)', backdropFilter: 'blur(6px)', zIndex: 50, padding: 20,
         }}>
           <div style={{ fontSize: 36, animation: 'cf 0.5s ease' }}>🎉</div>
-          <div style={{ fontSize: 18, fontFamily: '"DM Serif Display", serif', color: '#fff', textAlign: 'center' }}>All sorted! 🎉</div>
-          <div style={{ fontSize: 12, color: 'rgba(255,255,255,0.6)', textAlign: 'center', lineHeight: 1.6 }}>
+          <div style={{ fontSize: 18, fontFamily: '"DM Serif Display", serif', color: '#2b2f33', textAlign: 'center' }}>All sorted! 🎉</div>
+          <div style={{ fontSize: 12, color: 'rgba(0,0,0,0.6)', textAlign: 'center', lineHeight: 1.6 }}>
             Correct: {correct} | Wrong attempts: {wrong}
             <br />{starText}
           </div>
           <div style={{ display: 'flex', gap: 8 }}>
             <button onClick={handleReset}
-              style={{ padding: '8px 20px', borderRadius: 8, border: '1px solid rgba(255,255,255,0.12)', background: 'rgba(255,255,255,0.07)', color: 'rgba(255,255,255,0.8)', cursor: 'pointer', fontSize: 12 }}
+              style={{ padding: '8px 20px', borderRadius: 8, border: '1px solid rgba(0,0,0,0.12)', background: 'rgba(0,0,0,0.07)', color: 'rgba(0,0,0,0.8)', cursor: 'pointer', fontSize: 12 }}
             >Same set again</button>
             <button onClick={handleNewSet}
               style={{ padding: '8px 20px', borderRadius: 8, border: '1px solid rgba(74,124,111,0.4)', background: 'rgba(74,124,111,0.2)', color: '#b8d4ce', cursor: 'pointer', fontSize: 12 }}

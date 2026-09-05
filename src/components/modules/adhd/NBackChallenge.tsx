@@ -4,6 +4,101 @@ import { doc, onSnapshot, updateDoc } from 'firebase/firestore'
 import { db } from '@/lib/firebase'
 import { logModuleEvent } from '@/lib/sessionEvents'
 
+/* ── Art assets ───────────────────────────────────────────────────────────────
+   The delivered folder name contains spaces, so every segment is encoded and the
+   files are referenced with plain <img>/background-image rather than next/image
+   (same pattern as SimonSays and GroundingGame). */
+const A = (f: string) =>
+  `/assets/modules/ADHD/${encodeURIComponent('N back challenge Assets')}/${encodeURIComponent(f)}`
+
+const ART_HITS = A('hits-icon.svg')
+const ART_MISSES = A('misses-icon.svg')
+const ART_ACCURACY = A('accuracy-icon.svg')
+const ART_PING = A('match-ping.wav')
+const ART_MATCH_FX = A('match_feedback_flash.lottie.json')
+
+/* ── Letter stimulus sheets ───────────────────────────────────────────────────
+   The delivered letter art ships as three contact sheets of white cards. Each
+   card is a fixed 180x180 box on a regular grid, so a single letter is lifted
+   out with a percentage crop: the inner 150x150 of a card is pure white with the
+   designer's coloured glyph on it, which drops seamlessly onto the white
+   stimulus card below. Percentages keep the crop correct at any rendered size.
+
+     background-size-x%     = sheetW / crop
+     background-position-x% = cropX / (sheetW - crop)
+
+   The delivered position-grid sheet is NOT used: its viewBox (1000x800) clips
+   the bottom row of cards (y 610 + 220 = 830), so three of the nine positions
+   are cut off. The 3x3 grid is drawn natively instead, in the same palette the
+   sheet uses (#3d35ff active on #ebe9f7). */
+interface Sheet { file: string; w: number; h: number }
+const SHEET_AJ: Sheet = { file: 'N_Back_Letters_Stimulus_Set.svg', w: 1200, h: 800 }
+const SHEET_KT: Sheet = { file: 'N_Back_Letters_K_to_T_Stimulus_Set.svg', w: 1200, h: 600 }
+const SHEET_UZ: Sheet = { file: 'N_Back_Letters_U_to_Z_Stimulus_Set.svg', w: 1400, h: 350 }
+
+const CROP = 150 // inner white square of a 180px card
+const CROP_DX = 15
+const CROP_DY = 10 // the glyph sits a touch high in its card
+
+function letterCrop(letter: string): { sheet: Sheet; x: number; y: number } | null {
+  if (!letter || letter.length !== 1) return null
+  const code = letter.toUpperCase().charCodeAt(0) - 65
+  if (code < 0 || code > 25) return null
+  if (code < 10) return { sheet: SHEET_AJ, x: 80 + (code % 5) * 220, y: 80 + Math.floor(code / 5) * 240 }
+  if (code < 20) {
+    const i = code - 10
+    return { sheet: SHEET_KT, x: 80 + (i % 5) * 220, y: 80 + Math.floor(i / 5) * 240 }
+  }
+  return { sheet: SHEET_UZ, x: [80, 290, 500, 710, 920, 1130][code - 20], y: 80 }
+}
+
+function letterArt(letter: string): React.CSSProperties | null {
+  const c = letterCrop(letter)
+  if (!c) return null
+  const cx = c.x + CROP_DX
+  const cy = c.y + CROP_DY
+  return {
+    backgroundImage: `url("${A(c.sheet.file)}")`,
+    backgroundRepeat: 'no-repeat',
+    backgroundSize: `${(c.sheet.w / CROP) * 100}% ${(c.sheet.h / CROP) * 100}%`,
+    backgroundPosition: `${(cx / (c.sheet.w - CROP)) * 100}% ${(cy / (c.sheet.h - CROP)) * 100}%`,
+  }
+}
+
+/* ── Design tokens (white canvas — dark ink everywhere but solid fills) ─────── */
+const INDIGO = '#3730D8'
+const INDIGO_DEEP = '#2A23A6'
+const VIOLET = '#4C3FBF'
+const SURFACE = '#F5F3FF'
+const BORDER = '#e7eaef'
+const CARD_SHADOW = '0 6px 18px rgba(20,30,40,0.05)'
+const INK = '#1d2430'
+const INK_BODY = '#414b5c'
+const INK_MUTED = '#7b8494'
+const GREEN = '#15A34A'
+const GREEN_SOFT = '#ECFDF3'
+const RED = '#E11D48'
+const RED_SOFT = '#FEF2F5'
+const INDIGO_SOFT = '#EEF0FE'
+const TRACK = '#F2F3F8'
+const POS_ON = '#3d35ff'
+const POS_OFF = '#ebe9f7'
+
+const card: React.CSSProperties = {
+  background: '#ffffff',
+  border: `1px solid ${BORDER}`,
+  borderRadius: 16,
+  boxShadow: CARD_SHADOW,
+}
+
+const microLabel: React.CSSProperties = {
+  fontSize: 9.5,
+  fontWeight: 800,
+  letterSpacing: 0.7,
+  color: INDIGO,
+  textTransform: 'uppercase',
+}
+
 interface NBackChallengeProps {
   sessionId: string
   role: 'therapist' | 'client'
@@ -15,6 +110,13 @@ type StimulusType = 'colors' | 'shapes' | 'letters' | 'position'
 const COLORS = ['🔴', '🔵', '🟡', '🟢', '🟣', '🟠']
 const SHAPES = ['⬛', '⭕', '🔺', '⬟', '★', '♦']
 const LETTERS = ['B', 'D', 'F', 'G', 'H', 'K']
+
+function poolFor(stimulusType: StimulusType): string[] {
+  if (stimulusType === 'colors') return COLORS
+  if (stimulusType === 'shapes') return SHAPES
+  if (stimulusType === 'letters') return LETTERS
+  return Array.from({ length: 9 }, (_, i) => `pos-${i}`)
+}
 
 function generateSequence(n: number, stimulusType: StimulusType, length: number): string[] {
   let pool: string[]
@@ -95,6 +197,130 @@ function formatPosition(pos: string): { row: number; col: number } {
   return { row: Math.floor(idx / 3), col: idx % 3 }
 }
 
+/* ── Presentation-only building blocks ─────────────────────────────────────── */
+
+/** Renders one stimulus item, whatever the category, at a caller-given size. */
+function Stimulus({ item, type, size }: { item: string; type: StimulusType; size: number | string }) {
+  if (type === 'position') {
+    const { row, col } = formatPosition(item)
+    return (
+      <div
+        style={{
+          display: 'grid',
+          gridTemplateColumns: 'repeat(3, 1fr)',
+          gridTemplateRows: 'repeat(3, 1fr)',
+          gap: '9%',
+          width: size,
+          height: size,
+        }}
+      >
+        {Array.from({ length: 9 }, (_, i) => (
+          <div
+            key={i}
+            style={{
+              borderRadius: '18%',
+              background: row * 3 + col === i ? POS_ON : POS_OFF,
+              transition: 'background 0.15s',
+            }}
+          />
+        ))}
+      </div>
+    )
+  }
+  const art = type === 'letters' ? letterArt(item) : null
+  if (art) {
+    return <div role="img" aria-label={item} style={{ width: size, height: size, ...art }} />
+  }
+  return (
+    <div
+      style={{
+        width: size,
+        height: size,
+        display: 'flex',
+        alignItems: 'center',
+        justifyContent: 'center',
+        fontSize: `calc(${typeof size === 'number' ? `${size}px` : size} * 0.72)`,
+        lineHeight: 1,
+      }}
+    >
+      {item}
+    </div>
+  )
+}
+
+/** Segmented pill group — white text only ever lands on the solid indigo fill. */
+function PillGroup({
+  options,
+  value,
+  onSelect,
+  disabled,
+}: {
+  options: { key: string; label: string }[]
+  value: string
+  onSelect: (key: string) => void
+  disabled: boolean
+}) {
+  return (
+    <div style={{ display: 'flex', gap: 2, background: TRACK, borderRadius: 999, padding: 3 }}>
+      {options.map((o) => {
+        const on = value === o.key
+        return (
+          <button
+            key={o.key}
+            type="button"
+            disabled={disabled}
+            onClick={() => { if (!disabled) onSelect(o.key) }}
+            style={{
+              flex: 1,
+              minWidth: 0,
+              padding: '6px 7px',
+              borderRadius: 999,
+              border: 'none',
+              cursor: disabled ? 'default' : 'pointer',
+              fontSize: 11,
+              fontWeight: 700,
+              lineHeight: 1.2,
+              whiteSpace: 'nowrap',
+              background: on ? INDIGO : 'transparent',
+              color: on ? '#ffffff' : INK_MUTED,
+              boxShadow: on ? '0 2px 6px rgba(40,32,150,0.24)' : 'none',
+              transition: 'background 0.15s, color 0.15s',
+            }}
+          >
+            {o.label}
+          </button>
+        )
+      })}
+    </div>
+  )
+}
+
+/** Plays the delivered match Lottie once over the stimulus card. */
+function MatchFlash() {
+  const host = useRef<HTMLDivElement>(null)
+  useEffect(() => {
+    let anim: { destroy: () => void } | null = null
+    let cancelled = false
+    import('lottie-web')
+      .then(({ default: lottie }) => {
+        if (cancelled || !host.current) return
+        anim = lottie.loadAnimation({
+          container: host.current,
+          renderer: 'svg',
+          loop: false,
+          autoplay: true,
+          path: ART_MATCH_FX,
+        })
+      })
+      .catch(() => {})
+    return () => {
+      cancelled = true
+      anim?.destroy()
+    }
+  }, [])
+  return <div ref={host} aria-hidden style={{ position: 'absolute', inset: '-18%', pointerEvents: 'none', zIndex: 6 }} />
+}
+
 export default function NBackChallenge({ sessionId, role, isLocked }: NBackChallengeProps) {
   const isTherapist = role === 'therapist'
   const canInteract = isTherapist || !isLocked
@@ -107,13 +333,12 @@ export default function NBackChallenge({ sessionId, role, isLocked }: NBackChall
   const [sequence, setSequence] = useState<string[]>([])
   const [currentIndex, setCurrentIndex] = useState(-1)
   const [hits, setHits] = useState(0)
-  // Onboarding is local-only (never written to Firestore) so each participant
-  // dismisses it for themselves and the clinical state is untouched.
-  const [showHowTo, setShowHowTo] = useState(true)
   const [misses, setMisses] = useState(0)
   const [feedback, setFeedback] = useState<{ type: 'correct' | 'wrong' | 'missed'; text: string } | null>(null)
   const [complete, setComplete] = useState(false)
   const [animKey, setAnimKey] = useState(0)
+  // Local-only flash counter so the Lottie remounts on every caught match.
+  const [flashKey, setFlashKey] = useState(0)
 
   /* Practice-round state. practiceActive/practiceIdx mirror the two non-clinical
      Firestore fields; the score and feedback stay local and are never persisted. */
@@ -128,6 +353,22 @@ export default function NBackChallenge({ sessionId, role, isLocked }: NBackChall
   const timerRef = useRef<ReturnType<typeof setInterval>>()
   const gameRef = useRef({ isPlaying, sequence, currentIndex, n, hits, misses })
   gameRef.current = { isPlaying, sequence, currentIndex, n, hits, misses }
+
+  /* Match chime — a side effect of the existing hit path only. */
+  const pingRef = useRef<HTMLAudioElement | null>(null)
+  const playPing = useCallback(() => {
+    try {
+      if (typeof window === 'undefined') return
+      if (!pingRef.current) {
+        const a = new Audio(ART_PING)
+        a.volume = 0.5
+        pingRef.current = a
+      }
+      pingRef.current.currentTime = 0
+      pingRef.current.play()?.catch(() => {})
+    } catch { /* audio is decorative */ }
+  }, [])
+  useEffect(() => () => { try { pingRef.current?.pause() } catch { /* noop */ } }, [])
 
   const writeToFirestore = useCallback(async (data: Record<string, unknown>) => {
     try {
@@ -287,6 +528,8 @@ export default function NBackChallenge({ sessionId, role, isLocked }: NBackChall
     if (practiceIsMatch) {
       setPracticeHits((h) => h + 1)
       setPracticeFeedback({ ok: true, text: "Yes! That one came back — nice spotting." })
+      playPing()
+      setFlashKey((k) => k + 1)
     } else {
       setPracticeFeedback({ ok: false, text: "Not this one — keep watching, you'll see a repeat soon." })
     }
@@ -303,6 +546,8 @@ export default function NBackChallenge({ sessionId, role, isLocked }: NBackChall
     if (isMatch) {
       setFeedback({ type: 'correct', text: '✓ Correct!' })
       setTimeout(() => setFeedback(null), 800)
+      playPing()
+      setFlashKey((k) => k + 1)
       writeToFirestore({ 'moduleState.nbHits': hits + 1 })
     } else {
       setFeedback({ type: 'wrong', text: '✗ Not a match' })
@@ -393,16 +638,6 @@ export default function NBackChallenge({ sessionId, role, isLocked }: NBackChall
 
   const currentStimulus = currentIndex >= 0 && currentIndex < sequence.length ? sequence[currentIndex] : null
   const isMatchable = currentIndex >= n && isPlaying
-  const isCurrentMatch = isMatchable && currentStimulus && sequence[currentIndex - n] === currentStimulus
-
-  // History trail
-  const historyStart = Math.max(0, currentIndex - n)
-  const historyItems: { item: string; idx: number }[] = []
-  for (let i = historyStart; i < currentIndex && i < sequence.length; i++) {
-    historyItems.push({ item: sequence[i], idx: i })
-  }
-  const matchRefIdx = currentIndex - n
-  const matchRefItem = matchRefIdx >= 0 && matchRefIdx < sequence.length ? sequence[matchRefIdx] : null
 
   const stimTypeLabel = { colors: 'Colors', shapes: 'Shapes', letters: 'Letters', position: 'Position' }[stimulusType]
   const accuracy = hits + misses > 0 ? Math.round((hits / (hits + misses)) * 100) : 0
@@ -432,813 +667,791 @@ export default function NBackChallenge({ sessionId, role, isLocked }: NBackChall
     handleStart()
   }
 
+  /* ── Derived presentation values (no new state, no new Firestore fields) ─── */
+  const settingsDisabled = !isTherapist
+  const progressPct = sequence.length > 0
+    ? Math.max(0, Math.min(100, Math.round((Math.min(currentIndex, sequence.length) / sequence.length) * 100)))
+    : 0
+  const secondsLabel = speed % 1000 === 0 ? `${speed / 1000} sec` : `${(speed / 1000).toFixed(1)} sec`
+
+  // Worked example for the HOW TO PLAY card: n + 2 tiles drawn from the live
+  // pool, where the last one repeats the tile n places earlier.
+  const examplePool = poolFor(stimulusType)
+  const exampleTiles: string[] = []
+  for (let i = 0; i < n + 2; i++) {
+    exampleTiles.push(i === n + 1 ? exampleTiles[i - n] : examplePool[i % examplePool.length])
+  }
+  const exampleTileSize = n >= 3 ? 36 : n === 2 ? 44 : 52
+
+  const tapEnabled = canInteract && isMatchable && isPlaying && !complete
+
+  const HOW_TO_STEPS = [
+    { icon: '👀', tint: '#EEF0FE', title: 'Watch', body: 'A symbol appears one at a time.' },
+    { icon: '🧠', tint: '#FDECF3', title: 'Remember', body: `Compare the current symbol with the one shown ${n === 1 ? 'just before it' : `${n} turns earlier`}.` },
+    { icon: '👆', tint: '#FFF4E5', title: 'Tap', body: `Tap when the current symbol is the same as ${n === 1 ? 'the previous one (nothing in between)' : `${n} turns ago`}.` },
+  ]
+
   return (
     <>
       <style>{`
         @keyframes nbStimulusIn {
-          0%   { transform: scale(0.6); opacity: 0 }
-          70%  { transform: scale(1.1); opacity: 1 }
+          0%   { transform: scale(0.7); opacity: 0 }
+          70%  { transform: scale(1.06); opacity: 1 }
           100% { transform: scale(1);   opacity: 1 }
         }
-        @keyframes nbFadeUp {
-          0% { opacity: 0; transform: translateY(6px) }
-          100% { opacity: 1; transform: translateY(0) }
-        }
-        @keyframes nbFeedbackOut {
-          0% { opacity: 1 }
-          100% { opacity: 0 }
+        @keyframes nbPop {
+          0% { transform: translate(-50%, -50%) scale(0.85); opacity: 0 }
+          100% { transform: translate(-50%, -50%) scale(1); opacity: 1 }
         }
       `}</style>
 
+      {/* Root fills the stage and never scrolls itself — ModuleStage's body is
+          overflow:hidden and expects `height:100%` with internal flex:1 regions.
+          Every glyph sits as dark ink on white or pale violet; white text only
+          appears on the solid indigo fills. */}
       <div
         style={{
+          height: '100%',
+          minHeight: 0,
+          maxWidth: '100%',
           display: 'flex',
           flexDirection: 'column',
-          height: '100%',
+          color: INK,
           userSelect: 'none',
         }}
       >
-        {/* TOP — Therapist Controls */}
-        {isTherapist && (
-          <div style={{
-            flexShrink: 0,
-            paddingBottom: 8,
-            marginBottom: 8,
-            borderBottom: '1px solid rgba(0,0,0,0.05)',
-            width: '100%',
-            maxWidth: 1000,
-            alignSelf: 'center',
-            display: 'flex',
-            alignItems: 'center',
-            flexWrap: 'wrap',
-            gap: 12,
-          }}>
-            {/* N Level */}
-            <div className="flex items-center" style={{ gap: 6, flex: '1 1 170px' }}>
-              {[1, 2, 3].map((val) => (
-                <button
-                  key={val}
-                  onClick={() => handleNChange(val)}
-                  style={{
-                    flex: 1,
-                    padding: '3px 0',
-                    borderRadius: 12,
-                    border: 'none',
-                    fontSize: 8,
-                    fontWeight: 500,
-                    cursor: 'pointer',
-                    background: n === val ? 'rgba(74,124,111,0.18)' : 'rgba(0,0,0,0.05)',
-                    color: n === val ? '#2f6d5e' : '#6b7280',
-                    transition: 'all 0.15s',
-                  }}
-                >
-                  {val}-Back
-                </button>
-              ))}
-            </div>
+        <div style={{ flex: 1, minHeight: 0, display: 'flex', alignItems: 'stretch', gap: 12 }}>
 
-            {/* Stimulus type */}
-            <div className="flex items-center" style={{ gap: 6, flex: '1 1 170px' }}>
-              {[
-                { key: 'colors' as StimulusType, label: '🎨 Colors' },
-                { key: 'shapes' as StimulusType, label: '🔷 Shapes' },
-                { key: 'letters' as StimulusType, label: '🔤 Letters' },
-                { key: 'position' as StimulusType, label: '📍 Position' },
-              ].map((st) => (
-                <button
-                  key={st.key}
-                  onClick={() => handleStimulusTypeChange(st.key)}
-                  style={{
-                    flex: 1,
-                    padding: '3px 0',
-                    borderRadius: 12,
-                    border: 'none',
-                    fontSize: 7,
-                    fontWeight: 500,
-                    cursor: 'pointer',
-                    background: stimulusType === st.key ? 'rgba(74,124,111,0.18)' : 'rgba(0,0,0,0.05)',
-                    color: stimulusType === st.key ? '#2f6d5e' : '#6b7280',
-                    transition: 'all 0.15s',
-                  }}
-                >
-                  {st.label}
-                </button>
-              ))}
-            </div>
-
-            {/* Speed */}
-            <div className="flex items-center" style={{ gap: 6, flex: '1 1 170px' }}>
-              {[
-                { key: 3000, label: 'Slow' },
-                { key: 2000, label: 'Normal' },
-                { key: 1200, label: 'Fast' },
-              ].map((sp) => (
-                <button
-                  key={sp.key}
-                  onClick={() => handleSpeedChange(sp.key)}
-                  style={{
-                    flex: 1,
-                    padding: '3px 0',
-                    borderRadius: 12,
-                    border: 'none',
-                    fontSize: 8,
-                    fontWeight: 500,
-                    cursor: 'pointer',
-                    background: speed === sp.key ? 'rgba(74,124,111,0.18)' : 'rgba(0,0,0,0.05)',
-                    color: speed === sp.key ? '#2f6d5e' : '#6b7280',
-                    transition: 'all 0.15s',
-                  }}
-                >
-                  {sp.label}
-                </button>
-              ))}
-            </div>
-
-            {/* Sequence length */}
-            <div className="flex items-center" style={{ gap: 6, flex: '1 1 170px' }}>
-              {[
-                { key: 10, label: 'Short (10)' },
-                { key: 15, label: 'Medium (15)' },
-                { key: 20, label: 'Long (20)' },
-              ].map((len) => (
-                <button
-                  key={len.key}
-                  onClick={() => handleLengthChange(len.key)}
-                  style={{
-                    flex: 1,
-                    padding: '3px 0',
-                    borderRadius: 12,
-                    border: 'none',
-                    fontSize: 8,
-                    fontWeight: 500,
-                    cursor: 'pointer',
-                    background: seqLength === len.key ? 'rgba(74,124,111,0.18)' : 'rgba(0,0,0,0.05)',
-                    color: seqLength === len.key ? '#2f6d5e' : '#6b7280',
-                    transition: 'all 0.15s',
-                  }}
-                >
-                  {len.label}
-                </button>
-              ))}
-            </div>
-
-            {/* Start / Pause / Reset */}
-            <div className="flex items-center" style={{ gap: 6, flex: '0 0 auto' }}>
-              {isPlaying ? (
-                <button
-                  onClick={handlePause}
-                  style={{
-                    flex: 1,
-                    padding: '6px 16px',
-                    borderRadius: 12,
-                    border: 'none',
-                    fontSize: 11,
-                    fontWeight: 600,
-                    cursor: 'pointer',
-                    background: 'rgba(200,96,42,0.16)',
-                    color: '#c8602a',
-                  }}
-                >
-                  ⏸ Pause
-                </button>
-              ) : (
-                <button
-                  onClick={handleStart}
-                  disabled={complete}
-                  style={{
-                    flex: 1,
-                    padding: '6px 16px',
-                    borderRadius: 12,
-                    border: 'none',
-                    fontSize: 11,
-                    fontWeight: 600,
-                    cursor: complete ? 'default' : 'pointer',
-                    opacity: complete ? 0.4 : 1,
-                    background: 'rgba(74,124,111,0.18)',
-                    color: '#2f6d5e',
-                  }}
-                >
-                  ▶ Start
-                </button>
-              )}
-              <button
-                onClick={handleReset}
-                style={{
-                  flex: 1,
-                  padding: '5px 0',
-                  borderRadius: 8,
-                  border: 'none',
-                  fontSize: 9,
-                  fontWeight: 600,
-                  cursor: 'pointer',
-                  background: 'rgba(0,0,0,0.05)',
-                  color: '#6b7280',
-                }}
-              >
-                🔄 Reset
-              </button>
-            </div>
-          </div>
-        )}
-
-        {/* Locked notice */}
-        {!canInteract && (
-          <div style={{ flexShrink: 0, fontSize: 9, color: '#8b9096', textAlign: 'center', paddingBottom: 4 }}>
-            Therapist is controlling
-          </div>
-        )}
-
-        {/* Waiting / N Level Indicator */}
-        {!isPlaying && !currentStimulus && !complete && (
-          <div style={{ flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center', flexDirection: 'column', gap: 10 }}>
-            <div
-              style={{
-                fontSize: 14,
-                fontFamily: "'DM Serif Display', serif",
-                color: '#2f6d5e',
-                background: 'rgba(74,124,111,0.15)',
-                border: '1px solid rgba(74,124,111,0.18)',
-                borderRadius: 20,
-                padding: '4px 14px',
-              }}
-            >
-              {n}-Back
-            </div>
-            <span style={{ fontSize: 11, color: '#8b9096' }}>
-              {isTherapist ? 'Configure and press Start' : 'Waiting for therapist to start...'}
-            </span>
-          </div>
-        )}
-
-        {/* HOW TO PLAY — shown before the first round.
-            N-Back is abstract by nature, and the module previously started with no
-            explanation of the task at all: a shape appeared, an unlabelled "MATCH
-            (Space)" button sat below it, and nothing said what to compare against.
-            This is a plain-language walkthrough with a worked example. It changes
-            no clinical parameter — purely an explanation shown before play. */}
-        {showHowTo && !isPlaying && !complete && !practiceActive && (
+          {/* ── LEFT: How to play ─────────────────────────────────────────── */}
           <div
             style={{
+              ...card,
               flexShrink: 0,
-              // The idle "Configure and press Start" block is flex: 1 and would
-              // push this below the fold; order pulls the explanation to the top
-              // of the column where it is actually read.
-              order: -1,
-              margin: '0 auto 8px',
-              width: '100%',
-              maxWidth: 760,
-              maxHeight: '100%',
+              width: 262,
+              minHeight: 0,
+              display: 'flex',
+              flexDirection: 'column',
+              gap: 9,
+              padding: '12px 13px 13px',
               overflowY: 'auto',
-              padding: '10px 14px',
-              borderRadius: 12,
-              background: 'rgba(74,124,111,0.12)',
-              border: '1px solid rgba(74,124,111,0.18)',
             }}
           >
-            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 6 }}>
-              <span style={{ fontSize: 12, fontWeight: 600, color: '#2f6d5e' }}>How to play</span>
-              <button
-                onClick={() => setShowHowTo(false)}
-                style={{ background: 'none', border: 'none', color: '#7c8188', cursor: 'pointer', fontSize: 10, padding: 0 }}
-              >
-                Hide ✕
-              </button>
-            </div>
-
-            <div style={{ fontSize: 11, color: '#43484f', lineHeight: 1.6, marginBottom: 8 }}>
-              {stimulusType === 'position' ? 'A square lights up' : 'One picture shows'} one at a time.
-              <br />
-              Tap <strong style={{ color: '#2f6d5e' }}>Same as before!</strong> whenever it matches the one{' '}
-              {n === 1 ? 'right before it' : `${n} turns earlier`}.
-            </div>
-
-            {/* Worked example: four turns, with the match called out. */}
-            <div style={{ fontSize: 9, color: '#6b7280', marginBottom: 4 }}>
-              Example ({n}-back):
-            </div>
-            <div style={{ display: 'flex', alignItems: 'flex-end', gap: 6 }}>
-              {(() => {
-                // Build a tiny illustration where turn 3 repeats turn (3 - n).
-                const demo = ['🍎', '⭐', '🍎', '🌙']
-                const matchAt = 2
-                return demo.map((g, i) => (
-                  <div key={i} style={{ textAlign: 'center' }}>
-                    <div
-                      style={{
-                        width: 30,
-                        height: 30,
-                        borderRadius: 8,
-                        display: 'flex',
-                        alignItems: 'center',
-                        justifyContent: 'center',
-                        fontSize: 15,
-                        background: i === matchAt ? 'rgba(74,124,111,0.22)' : 'rgba(0,0,0,0.05)',
-                        border: i === matchAt ? '1.5px solid #4a7c6f' : '1px solid rgba(0,0,0,0.08)',
-                      }}
-                    >
-                      {g}
-                    </div>
-                    <div style={{ fontSize: 7, marginTop: 2, color: i === matchAt ? '#2f6d5e' : 'rgba(0,0,0,0.22)' }}>
-                      {i === matchAt ? 'TAP!' : `turn ${i + 1}`}
-                    </div>
-                  </div>
-                ))
-              })()}
-              <div style={{ fontSize: 9, color: '#6b7280', paddingBottom: 12, lineHeight: 1.4 }}>
-                🍎 came back, so tap on turn 3.
-              </div>
-            </div>
-
-            <div style={{ fontSize: 9, color: '#8b9096', marginTop: 8, lineHeight: 1.5 }}>
-              The first {n} turn{n > 1 ? 's' : ''} {n > 1 ? 'have' : 'has'} nothing to compare with yet —
-              just watch. Nothing bad happens if you miss one.
-            </div>
-
-            {!practiceActive && (
-              <button
-                onClick={startPractice}
-                disabled={!canInteract || isPlaying}
-                style={{
-                  width: '100%',
-                  marginTop: 9,
-                  padding: '8px 0',
-                  borderRadius: 10,
-                  border: '1px solid rgba(247,201,72,0.5)',
-                  background: 'rgba(247,201,72,0.16)',
-                  color: '#f7c948',
-                  fontSize: 12,
-                  fontWeight: 600,
-                  cursor: canInteract && !isPlaying ? 'pointer' : 'default',
-                  opacity: canInteract && !isPlaying ? 1 : 0.45,
-                }}
-              >
-                Let&apos;s practice first! (doesn&apos;t count)
-              </button>
-            )}
-          </div>
-        )}
-
-        {/* ============ PRACTICE ROUND — separate from the exercise ============
-            Own fixed 1-back sequence, own local score, amber dashed styling and
-            explicit "does not count" labelling so it cannot be mistaken for the
-            real thing. Nothing in this block writes a clinical field. */}
-        {practiceActive && (
-          <div
-            style={{
-              flexShrink: 0,
-              order: -1,
-              margin: '0 0 8px',
-              padding: '10px 12px',
-              borderRadius: 12,
-              background: 'rgba(247,201,72,0.10)',
-              border: '1px dashed rgba(247,201,72,0.55)',
-            }}
-          >
-            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 8 }}>
-              <span style={{ fontSize: 12, fontWeight: 600, color: '#f7c948' }}>
-                Practice round · 1-back
-              </span>
-              <span style={{ fontSize: 9, color: 'rgba(247,201,72,0.75)' }}>
-                does not count towards results
-              </span>
-            </div>
-
-            {!practiceFinished ? (
-              <>
-                <div style={{ fontSize: 10, color: '#5b6169', marginBottom: 8, lineHeight: 1.5 }}>
-                  Tap the button when the picture is the same as the one right before it.
-                </div>
-
-                <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 6, marginBottom: 8 }}>
-                  {practiceItem ? (
-                    stimulusType === 'position' ? (
-                      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 30px)', gridTemplateRows: 'repeat(3, 30px)', gap: 3 }}>
-                        {Array.from({ length: 9 }, (_, i) => {
-                          const { row, col } = formatPosition(practiceItem)
-                          const active = row * 3 + col === i
-                          return (
-                            <div
-                              key={i}
-                              style={{
-                                borderRadius: 6,
-                                background: active ? 'rgba(247,201,72,0.55)' : 'rgba(0,0,0,0.05)',
-                                border: active ? '2px solid #f7c948' : '1px solid rgba(0,0,0,0.08)',
-                              }}
-                            />
-                          )
-                        })}
-                      </div>
-                    ) : (
-                      <div
-                        key={practiceIdx}
-                        style={{
-                          width: 74,
-                          height: 74,
-                          borderRadius: 14,
-                          background: 'rgba(0,0,0,0.06)',
-                          border: '2px solid rgba(247,201,72,0.45)',
-                          display: 'flex',
-                          alignItems: 'center',
-                          justifyContent: 'center',
-                          fontSize: 38,
-                          animation: 'nbStimulusIn 0.3s ease',
-                        }}
-                      >
-                        {practiceItem}
-                      </div>
-                    )
-                  ) : (
-                    <div style={{ fontSize: 11, color: 'rgba(0,0,0,0.24)', height: 74, display: 'flex', alignItems: 'center' }}>
-                      Get ready…
-                    </div>
-                  )}
-
-                  <div style={{ fontSize: 9, color: '#7c8188' }}>
-                    {practiceRefItem
-                      ? stimulusType === 'position'
-                        ? 'compare with the square before'
-                        : `the one before was ${practiceRefItem}`
-                      : 'first one — nothing to compare yet'}
-                  </div>
-                </div>
-
-                <button
-                  onClick={handlePracticePress}
-                  disabled={!canInteract || !practiceItem || practiceTapped.includes(practiceIdx)}
-                  style={{
-                    width: '100%',
-                    height: 44,
-                    borderRadius: 12,
-                    background: practiceFeedback
-                      ? practiceFeedback.ok
-                        ? 'rgba(74,124,111,0.45)'
-                        : 'rgba(200,96,42,0.35)'
-                      : 'rgba(247,201,72,0.2)',
-                    border: `2px solid ${practiceFeedback ? (practiceFeedback.ok ? 'rgba(74,124,111,0.7)' : 'rgba(200,96,42,0.6)') : 'rgba(247,201,72,0.5)'}`,
-                    color: practiceFeedback ? (practiceFeedback.ok ? '#6ba395' : '#e8a87c') : '#f7c948',
-                    fontSize: 14,
-                    fontWeight: 600,
-                    cursor: canInteract && practiceItem ? 'pointer' : 'default',
-                  }}
-                >
-                  Same as before!
-                </button>
-
-                {practiceFeedback && (
-                  <div style={{ marginTop: 6, fontSize: 10, textAlign: 'center', color: practiceFeedback.ok ? '#6ba395' : '#e8a87c' }}>
-                    {practiceFeedback.text}
-                  </div>
-                )}
-              </>
-            ) : (
-              <div style={{ textAlign: 'center' }}>
-                <div style={{ fontSize: 13, fontWeight: 600, color: '#f7c948', marginBottom: 4 }}>
-                  Practice done — you spotted {practiceHits} of 2
-                </div>
-                <div style={{ fontSize: 10, color: '#646a72', lineHeight: 1.5, marginBottom: 8 }}>
-                  {practiceHits >= 2
-                    ? 'You have got it. The real round works exactly the same way.'
-                    : 'That is fine — the real round works the same way, and there is no rush.'}
-                </div>
-                <div style={{ display: 'flex', gap: 6 }}>
-                  <button
-                    onClick={startPractice}
-                    style={{
-                      flex: 1, padding: '7px 0', borderRadius: 10,
-                      border: '1px solid rgba(0,0,0,0.10)', background: 'transparent',
-                      color: '#5b6169', fontSize: 11, cursor: 'pointer',
-                    }}
-                  >
-                    Practice again
-                  </button>
-                  <button
-                    onClick={endPractice}
-                    style={{
-                      flex: 1, padding: '7px 0', borderRadius: 10,
-                      border: '1px solid rgba(74,124,111,0.6)', background: 'rgba(74,124,111,0.25)',
-                      color: '#2f6d5e', fontSize: 11, fontWeight: 600, cursor: 'pointer',
-                    }}
-                  >
-                    I&apos;m ready
-                  </button>
-                </div>
-              </div>
-            )}
-
-            {!practiceFinished && (
-              <button
-                onClick={endPractice}
-                style={{
-                  width: '100%', marginTop: 7, padding: '5px 0', borderRadius: 8,
-                  border: 'none', background: 'transparent',
-                  color: '#8b9096', fontSize: 9, cursor: 'pointer',
-                }}
-              >
-                Skip practice
-              </button>
-            )}
-          </div>
-        )}
-
-        {/* Game active */}
-        {(isPlaying || currentStimulus) && !complete && (
-          <>
-            {/* N indicator */}
-            <div style={{ flexShrink: 0, display: 'flex', justifyContent: 'center', marginBottom: 8 }}>
+            <div style={{ display: 'flex', justifyContent: 'center' }}>
               <div
                 style={{
-                  fontSize: 14,
-                  fontFamily: "'DM Serif Display', serif",
-                  color: '#2f6d5e',
-                  background: 'rgba(74,124,111,0.15)',
-                  border: '1px solid rgba(74,124,111,0.18)',
-                  borderRadius: 20,
-                  padding: '4px 14px',
-                  display: 'inline-block',
+                  background: INDIGO,
+                  color: '#ffffff',
+                  borderRadius: 999,
+                  padding: '6px 18px',
+                  fontSize: 11.5,
+                  fontWeight: 800,
+                  letterSpacing: 0.9,
+                  boxShadow: '0 4px 12px rgba(40,32,150,0.28)',
+                  whiteSpace: 'nowrap',
                 }}
               >
-                {n}-Back
+                ✦ HOW TO PLAY ✦
               </div>
             </div>
 
-            {/* MIDDLE — Stimulus Display */}
-            <div style={{ flex: 1, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', gap: 8, minHeight: 0 }}>
-              {/* Main stimulus */}
-              {currentStimulus && (
+            {HOW_TO_STEPS.map((s, i) => (
+              <div
+                key={s.title}
+                style={{
+                  display: 'flex',
+                  gap: 9,
+                  alignItems: 'flex-start',
+                  paddingBottom: i < 2 ? 9 : 0,
+                  borderBottom: i < 2 ? `1px solid ${BORDER}` : 'none',
+                }}
+              >
                 <div
-                  key={animKey}
+                  aria-hidden
                   style={{
-                    animation: 'nbStimulusIn 0.3s ease',
-                  }}
-                >
-                  {stimulusType === 'position' ? (
-                    <div
-                      style={{
-                        display: 'grid',
-                        gridTemplateColumns: 'repeat(3, clamp(56px, 7vh, 68px))',
-                        gridTemplateRows: 'repeat(3, clamp(56px, 7vh, 68px))',
-                        gap: 4,
-                      }}
-                    >
-                      {Array.from({ length: 9 }, (_, i) => {
-                        const { row, col } = formatPosition(`pos-${i}`)
-                        const isActive = currentStimulus === `pos-${i}`
-                        return (
-                          <div
-                            key={i}
-                            style={{
-                              width: '100%',
-                              height: '100%',
-                              borderRadius: 8,
-                              background: isActive ? 'rgba(74,124,111,0.25)' : 'rgba(0,0,0,0.05)',
-                              border: isActive ? '2px solid #4a7c6f' : '1px solid rgba(0,0,0,0.08)',
-                              transition: 'all 0.15s',
-                            }}
-                          />
-                        )
-                      })}
-                    </div>
-                  ) : (
-                    <div
-                      style={{
-                        // Scales with the canvas: on the wide stage a fixed
-                        // 120px box left the task tiny in a large empty area.
-                        width: 'clamp(120px, 22vh, 210px)',
-                        height: 'clamp(120px, 22vh, 210px)',
-                        borderRadius: 20,
-                        background: 'rgba(0,0,0,0.06)',
-                        border: '2px solid rgba(0,0,0,0.10)',
-                        display: 'flex',
-                        alignItems: 'center',
-                        justifyContent: 'center',
-                        fontSize: 'clamp(64px, 12vh, 110px)',
-                      }}
-                    >
-                      {currentStimulus}
-                    </div>
-                  )}
-                </div>
-              )}
-
-              {/* Is it a match? */}
-              {!currentStimulus && (
-                <div style={{ fontSize: 11, color: 'rgba(0,0,0,0.22)' }}>
-                  Get ready...
-                </div>
-              )}
-
-              {/* History trail */}
-              {historyItems.length > 0 && (
-                <div
-                  style={{
+                    flexShrink: 0,
+                    width: 34,
+                    height: 34,
+                    borderRadius: 11,
+                    background: s.tint,
+                    border: `1px solid ${BORDER}`,
                     display: 'flex',
                     alignItems: 'center',
-                    gap: 6,
-                    flexWrap: 'wrap',
                     justifyContent: 'center',
-                    padding: '6px 8px',
-                    background: 'rgba(255,255,255,0.03)',
-                    borderRadius: 10,
-                    maxWidth: '100%',
+                    fontSize: 17,
                   }}
                 >
-                  {historyItems.map((h, i) => {
-                    const isRef = h.idx === matchRefIdx
-                    return (
-                      <div
-                        key={h.idx}
-                        style={{
-                          width: 28,
-                          height: 28,
-                          borderRadius: '50%',
-                          background: 'rgba(0,0,0,0.05)',
-                          display: 'flex',
-                          alignItems: 'center',
-                          justifyContent: 'center',
-                          fontSize: stimulusType === 'position' ? 0 : 12,
-                          opacity: isRef ? 0.55 : 0.3,
-                          border: isRef ? '1.5px solid rgba(74,124,111,0.25)' : 'none',
-                          transition: 'all 0.15s',
-                        }}
-                      >
-                        {stimulusType === 'position' ? '' : h.item}
-                      </div>
-                    )
-                  })}
+                  {s.icon}
                 </div>
-              )}
-
-              {/* Hint text */}
-              {matchRefItem && (
-                <div style={{ fontSize: 10, color: '#7c8188', textAlign: 'center', lineHeight: 1.4 }}>
-                  Is this the same as {n === 1 ? 'the one just before' : `${n} turns ago`}?
-                  <br />
-                  <span style={{ opacity: 0.65 }}>
-                    (the circled one below is the one to compare with)
-                  </span>
+                <div style={{ flex: 1, minWidth: 0 }}>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginBottom: 1 }}>
+                    <span
+                      aria-hidden
+                      style={{
+                        width: 17,
+                        height: 17,
+                        borderRadius: '50%',
+                        background: INDIGO,
+                        color: '#ffffff',
+                        fontSize: 10,
+                        fontWeight: 800,
+                        display: 'flex',
+                        alignItems: 'center',
+                        justifyContent: 'center',
+                        flexShrink: 0,
+                      }}
+                    >
+                      {i + 1}
+                    </span>
+                    <span style={{ fontSize: 13, fontWeight: 800, color: INDIGO }}>{s.title}</span>
+                  </div>
+                  <div style={{ fontSize: 11, lineHeight: 1.45, color: INK_BODY }}>{s.body}</div>
                 </div>
-              )}
-            </div>
-
-            {/* BOTTOM — Match Button + Score */}
-            <div style={{ flexShrink: 0, width: '100%', maxWidth: 760, margin: '0 auto' }}>
-              {/* Match button */}
-              {/* Previously client-only, so a therapist demonstrating the task
-                  saw no button at all and nothing to explain. */}
-              {(
-                <button
-                  onClick={handleMatchPress}
-                  disabled={!canInteract || !isMatchable || !isPlaying}
-                  style={{
-                    width: '100%',
-                    height: 52,
-                    borderRadius: 14,
-                    background: feedback?.type === 'correct'
-                      ? 'rgba(74,124,111,0.25)'
-                      : feedback?.type === 'wrong'
-                        ? 'rgba(200,96,42,0.4)'
-                        : 'rgba(74,124,111,0.25)',
-                    border: feedback?.type === 'correct'
-                      ? '2px solid rgba(74,124,111,0.7)'
-                      : feedback?.type === 'wrong'
-                        ? '2px solid rgba(200,96,42,0.6)'
-                        : '2px solid rgba(74,124,111,0.22)',
-                    color: feedback?.type === 'correct' ? '#6ba395' : feedback?.type === 'wrong' ? '#c8602a' : '#2f6d5e',
-                    fontSize: 16,
-                    fontWeight: 500,
-                    cursor: canInteract && isMatchable && isPlaying ? 'pointer' : 'default',
-                    opacity: canInteract && isMatchable && isPlaying ? 1 : 0.3,
-                    transition: 'all 0.15s',
-                    marginBottom: 8,
-                  }}
-                >
-                  {isMatchable ? 'Same as before!' : 'Watch and wait…'}
-                </button>
-              )}
-
-              {/* Feedback */}
-              {feedback && (
-                <div
-                  style={{
-                    textAlign: 'center',
-                    fontSize: 12,
-                    fontWeight: 500,
-                    color: feedback.type === 'correct' ? '#6ba395' : feedback.type === 'wrong' ? '#c8602a' : '#f7c948',
-                    marginBottom: 4,
-                    animation: 'nbFeedbackOut 0.8s ease forwards',
-                  }}
-                >
-                  {feedback.text}
-                </div>
-              )}
-
-              {/* Score panel */}
-              <div
-                style={{
-                  display: 'flex',
-                  alignItems: 'center',
-                  justifyContent: 'space-around',
-                  paddingTop: 6,
-                  borderTop: '1px solid rgba(0,0,0,0.05)',
-                }}
-              >
-                <span style={{ fontSize: 11, color: 'rgba(74,124,111,0.9)' }}>
-                  ✓ {hits} Hits
-                </span>
-                <span style={{ fontSize: 11, color: 'rgba(200,96,42,0.8)' }}>
-                  ✗ {misses} Misses
-                </span>
-                <span style={{ fontSize: 11, color: '#5b6169' }}>
-                  % {accuracy} Accuracy
-                </span>
               </div>
-            </div>
-          </>
-        )}
+            ))}
 
-        {/* Session Complete */}
-        {complete && (
-          <div style={{ flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center', flexDirection: 'column', gap: 10 }}>
+            <div style={{ ...microLabel, marginTop: 1 }}>Example ({n}-Back)</div>
+
+            <div style={{ display: 'flex', alignItems: 'center', gap: 4, flexWrap: 'nowrap' }}>
+              {exampleTiles.map((t, i) => {
+                const isMatchTile = i === exampleTiles.length - 1
+                return (
+                  <div key={i} style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
+                    {i > 0 && <span aria-hidden style={{ fontSize: 11, color: INK_MUTED }}>→</span>}
+                    <div
+                      style={{
+                        width: exampleTileSize,
+                        height: exampleTileSize,
+                        borderRadius: 11,
+                        background: isMatchTile ? GREEN_SOFT : '#ffffff',
+                        border: isMatchTile ? `2px solid ${GREEN}` : `1px solid ${BORDER}`,
+                        boxShadow: '0 2px 6px rgba(20,30,40,0.05)',
+                        display: 'flex',
+                        alignItems: 'center',
+                        justifyContent: 'center',
+                        flexShrink: 0,
+                      }}
+                    >
+                      <Stimulus item={t} type={stimulusType} size={exampleTileSize - 14} />
+                    </div>
+                  </div>
+                )
+              })}
+            </div>
+
             <div
               style={{
-                background: 'rgba(0,0,0,0.06)',
-                border: '1px solid rgba(0,0,0,0.07)',
-                borderRadius: 16,
-                padding: '20px 24px',
-                textAlign: 'center',
-                maxWidth: 260,
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                gap: 6,
+                padding: '9px 10px',
+                borderRadius: 12,
+                background: GREEN_SOFT,
+                border: `1px solid #BBF0CD`,
+                fontSize: 12.5,
+                fontWeight: 800,
+                color: '#0F7A38',
               }}
             >
-              <div style={{ fontSize: 16, fontWeight: 600, color: '#2b2f33', marginBottom: 8 }}>
-                Session Complete!
-              </div>
-              <div style={{ fontSize: 13, color: '#4a5057', marginBottom: 12 }}>
-                {n}-Back · {stimTypeLabel} · {seqLength} items
-              </div>
-              <div
+              <span aria-hidden>✨</span> MATCH! <span aria-hidden style={{ color: INK_MUTED }}>→</span> Tap
+            </div>
+
+            {!practiceActive && !isPlaying && !complete && (
+              <button
+                type="button"
+                onClick={startPractice}
+                disabled={!canInteract}
                 style={{
-                  display: 'flex',
-                  justifyContent: 'center',
-                  gap: 16,
-                  marginBottom: 12,
+                  marginTop: 'auto',
+                  width: '100%',
+                  padding: '8px 0',
+                  borderRadius: 11,
+                  border: `1px solid ${BORDER}`,
+                  background: SURFACE,
+                  color: VIOLET,
+                  fontSize: 11.5,
+                  fontWeight: 700,
+                  cursor: canInteract ? 'pointer' : 'default',
+                  opacity: canInteract ? 1 : 0.5,
                 }}
               >
-                <div>
-                  <div style={{ fontSize: 20, fontWeight: 700, color: 'rgba(74,124,111,0.9)' }}>{hits}</div>
-                  <div style={{ fontSize: 10, color: '#8b9096' }}>Hits</div>
-                </div>
-                <div>
-                  <div style={{ fontSize: 20, fontWeight: 700, color: 'rgba(200,96,42,0.8)' }}>{misses}</div>
-                  <div style={{ fontSize: 10, color: '#8b9096' }}>Misses</div>
-                </div>
-                <div>
-                  <div style={{ fontSize: 20, fontWeight: 700, color: '#3d4348' }}>{accuracy}%</div>
-                  <div style={{ fontSize: 10, color: '#8b9096' }}>Accuracy</div>
-                </div>
+                Practice first — doesn&apos;t count
+              </button>
+            )}
+          </div>
+
+          {/* ── CENTRE: settings row + stimulus stage ─────────────────────── */}
+          <div style={{ flex: 1, minWidth: 0, minHeight: 0, display: 'flex', flexDirection: 'column', gap: 10 }}>
+
+            {/* Settings row */}
+            <div style={{ flexShrink: 0, display: 'flex', gap: 10, alignItems: 'stretch', flexWrap: 'wrap' }}>
+              {/* Cards keep a content-sized floor so a narrow stage wraps the row
+                  instead of clipping the pill labels. */}
+              <div style={{ ...card, flex: '1 1 250px', minWidth: 250, padding: '7px 10px 9px' }}>
+                <div style={{ textAlign: 'center', fontSize: 11, fontWeight: 800, color: INDIGO, marginBottom: 5 }}>Category</div>
+                <PillGroup
+                  value={stimulusType}
+                  disabled={settingsDisabled}
+                  options={[
+                    { key: 'colors', label: 'Colors' },
+                    { key: 'shapes', label: 'Shapes' },
+                    { key: 'letters', label: 'Letters' },
+                    { key: 'position', label: 'Position' },
+                  ]}
+                  onSelect={(v) => handleStimulusTypeChange(v as StimulusType)}
+                />
               </div>
-              <div style={{ fontSize: 13, color: '#5b6169' }}>
-                {accuracy >= 70 ? 'Well done! 🎉' : 'Keep practising 💪'}
+
+              <div style={{ ...card, flex: '1 1 165px', minWidth: 165, padding: '7px 10px 9px' }}>
+                <div style={{ textAlign: 'center', fontSize: 11, fontWeight: 800, color: INDIGO, marginBottom: 5 }}>Speed</div>
+                <PillGroup
+                  value={String(speed)}
+                  disabled={settingsDisabled}
+                  options={[
+                    { key: '3000', label: 'Slow' },
+                    { key: '2000', label: 'Normal' },
+                    { key: '1200', label: 'Fast' },
+                  ]}
+                  onSelect={(v) => handleSpeedChange(Number(v))}
+                />
+              </div>
+
+              <div style={{ ...card, flex: '1 1 235px', minWidth: 235, padding: '7px 10px 9px' }}>
+                <div style={{ textAlign: 'center', fontSize: 11, fontWeight: 800, color: INDIGO, marginBottom: 5 }}>Sequence Length</div>
+                <PillGroup
+                  value={String(seqLength)}
+                  disabled={settingsDisabled}
+                  options={[
+                    { key: '10', label: 'Short (10)' },
+                    { key: '15', label: 'Medium (15)' },
+                    { key: '20', label: 'Long (20)' },
+                  ]}
+                  onSelect={(v) => handleLengthChange(Number(v))}
+                />
               </div>
             </div>
 
-            {isTherapist && (
-              <div className="flex items-center" style={{ gap: 6 }}>
-                <button
-                  onClick={handleTryAgain}
+            {/* Stimulus stage */}
+            <div
+              style={{
+                flex: 1,
+                minHeight: 0,
+                position: 'relative',
+                borderRadius: 20,
+                background: SURFACE,
+                border: '1px solid #E6E1FA',
+                display: 'flex',
+                flexDirection: 'column',
+                alignItems: 'center',
+                justifyContent: 'center',
+                gap: 12,
+                padding: '14px 16px',
+                overflow: 'hidden',
+              }}
+            >
+              {/* n-Back badge */}
+              <div
+                style={{
+                  position: 'absolute',
+                  top: 10,
+                  left: 12,
+                  padding: '3px 11px',
+                  borderRadius: 999,
+                  background: '#ffffff',
+                  border: `1px solid ${BORDER}`,
+                  fontSize: 10.5,
+                  fontWeight: 800,
+                  color: VIOLET,
+                  letterSpacing: 0.3,
+                }}
+              >
+                {n}-Back · {stimTypeLabel}
+              </div>
+
+              {!canInteract && (
+                <div
                   style={{
-                    padding: '6px 16px',
-                    borderRadius: 10,
-                    border: 'none',
-                    fontSize: 9,
-                    fontWeight: 600,
-                    cursor: 'pointer',
-                    background: 'rgba(74,124,111,0.18)',
-                    color: '#2f6d5e',
+                    position: 'absolute',
+                    top: 10,
+                    right: 12,
+                    fontSize: 10,
+                    fontWeight: 700,
+                    color: INK_MUTED,
                   }}
                 >
-                  Try Again
-                </button>
-                {n < 3 && (
-                  <button
-                    onClick={handleIncreaseN}
+                  Therapist is controlling
+                </div>
+              )}
+
+              {/* ---- Session complete ---- */}
+              {complete ? (
+                <div
+                  style={{
+                    ...card,
+                    borderRadius: 20,
+                    padding: '20px 26px',
+                    textAlign: 'center',
+                    maxWidth: 340,
+                  }}
+                >
+                  <div style={{ fontSize: 18, fontWeight: 800, color: INDIGO, marginBottom: 4 }}>Session Complete!</div>
+                  <div style={{ fontSize: 12, fontWeight: 600, color: INK_MUTED, marginBottom: 14 }}>
+                    {n}-Back · {stimTypeLabel} · {seqLength} items
+                  </div>
+                  <div style={{ display: 'flex', justifyContent: 'center', gap: 22, marginBottom: 14 }}>
+                    <div>
+                      <div style={{ fontSize: 22, fontWeight: 800, color: GREEN }}>{hits}</div>
+                      <div style={{ fontSize: 10.5, fontWeight: 700, color: INK_MUTED }}>Hits</div>
+                    </div>
+                    <div>
+                      <div style={{ fontSize: 22, fontWeight: 800, color: RED }}>{misses}</div>
+                      <div style={{ fontSize: 10.5, fontWeight: 700, color: INK_MUTED }}>Misses</div>
+                    </div>
+                    <div>
+                      <div style={{ fontSize: 22, fontWeight: 800, color: INDIGO }}>{accuracy}%</div>
+                      <div style={{ fontSize: 10.5, fontWeight: 700, color: INK_MUTED }}>Accuracy</div>
+                    </div>
+                  </div>
+                  <div style={{ fontSize: 13, fontWeight: 700, color: INK_BODY, marginBottom: isTherapist ? 14 : 0 }}>
+                    {accuracy >= 70 ? 'Well done! 🎉' : 'Keep practising 💪'}
+                  </div>
+                  {isTherapist && (
+                    <div style={{ display: 'flex', gap: 8, justifyContent: 'center' }}>
+                      <button
+                        type="button"
+                        onClick={handleTryAgain}
+                        style={{
+                          padding: '8px 18px',
+                          borderRadius: 999,
+                          border: 'none',
+                          cursor: 'pointer',
+                          background: INDIGO,
+                          color: '#ffffff',
+                          fontSize: 12,
+                          fontWeight: 800,
+                          boxShadow: '0 4px 12px rgba(40,32,150,0.26)',
+                        }}
+                      >
+                        Try Again
+                      </button>
+                      {n < 3 && (
+                        <button
+                          type="button"
+                          onClick={handleIncreaseN}
+                          style={{
+                            padding: '8px 18px',
+                            borderRadius: 999,
+                            border: `1px solid ${BORDER}`,
+                            cursor: 'pointer',
+                            background: '#ffffff',
+                            color: VIOLET,
+                            fontSize: 12,
+                            fontWeight: 800,
+                          }}
+                        >
+                          Increase N ({n + 1}-Back)
+                        </button>
+                      )}
+                    </div>
+                  )}
+                </div>
+              ) : (
+                <>
+                  {/* Practice ribbon */}
+                  {practiceActive && (
+                    <div
+                      style={{
+                        position: 'absolute',
+                        top: 10,
+                        left: '50%',
+                        transform: 'translateX(-50%)',
+                        padding: '4px 13px',
+                        borderRadius: 999,
+                        background: '#FFF6E3',
+                        border: '1px solid #F3D79A',
+                        color: '#8A5A06',
+                        fontSize: 10.5,
+                        fontWeight: 800,
+                        letterSpacing: 0.3,
+                        whiteSpace: 'nowrap',
+                        zIndex: 8,
+                      }}
+                    >
+                      Practice round · 1-Back · does not count
+                    </div>
+                  )}
+
+                  {/* ---- Card stack ---- */}
+                  <div
                     style={{
-                      padding: '6px 16px',
-                      borderRadius: 10,
-                      border: '1px solid rgba(74,124,111,0.18)',
-                      fontSize: 9,
-                      fontWeight: 600,
-                      cursor: 'pointer',
-                      background: 'transparent',
-                      color: 'rgba(74,124,111,0.7)',
+                      position: 'relative',
+                      height: 'clamp(132px, 23vh, 216px)',
+                      aspectRatio: '1',
+                      maxWidth: '100%',
+                      flexShrink: 0,
                     }}
                   >
-                    Increase N ({n + 1}-Back)
-                  </button>
-                )}
-              </div>
-            )}
+                    {[3, 2, 1].map((i) => (
+                      <div
+                        key={i}
+                        aria-hidden
+                        style={{
+                          position: 'absolute',
+                          inset: 0,
+                          borderRadius: 22,
+                          background: '#ffffff',
+                          border: `1px solid ${BORDER}`,
+                          boxShadow: '0 5px 14px rgba(35,25,90,0.06)',
+                          transform: `translate(${i * 7}px, ${i * 5}px)`,
+                          zIndex: 1,
+                        }}
+                      />
+                    ))}
+                    <div
+                      style={{
+                        position: 'relative',
+                        zIndex: 4,
+                        width: '100%',
+                        height: '100%',
+                        borderRadius: 22,
+                        background: '#ffffff',
+                        border: practiceActive ? '2px solid #F3D79A' : `1px solid ${BORDER}`,
+                        boxShadow: '0 10px 26px rgba(35,25,90,0.10)',
+                        display: 'flex',
+                        alignItems: 'center',
+                        justifyContent: 'center',
+                        overflow: 'hidden',
+                      }}
+                    >
+                      {practiceActive ? (
+                        practiceFinished ? (
+                          <div style={{ textAlign: 'center', padding: 12 }}>
+                            <div style={{ fontSize: 14, fontWeight: 800, color: '#8A5A06', marginBottom: 4 }}>
+                              Practice done
+                            </div>
+                            <div style={{ fontSize: 12, fontWeight: 700, color: INK_BODY }}>
+                              You spotted {practiceHits} of 2
+                            </div>
+                          </div>
+                        ) : practiceItem ? (
+                          <div key={practiceIdx} style={{ animation: 'nbStimulusIn 0.3s ease' }}>
+                            <Stimulus item={practiceItem} type={stimulusType} size="clamp(78px, 14vh, 130px)" />
+                          </div>
+                        ) : (
+                          <span style={{ fontSize: 12, fontWeight: 700, color: INK_MUTED }}>Get ready…</span>
+                        )
+                      ) : currentStimulus ? (
+                        <div key={animKey} style={{ animation: 'nbStimulusIn 0.3s ease' }}>
+                          <Stimulus item={currentStimulus} type={stimulusType} size="clamp(78px, 14vh, 130px)" />
+                        </div>
+                      ) : (
+                        <div style={{ textAlign: 'center', padding: 14 }}>
+                          <div style={{ fontSize: 13, fontWeight: 800, color: VIOLET, marginBottom: 3 }}>
+                            {isPlaying ? 'Get ready…' : `${n}-Back`}
+                          </div>
+                          <div style={{ fontSize: 11, fontWeight: 600, color: INK_MUTED, lineHeight: 1.4 }}>
+                            {isTherapist ? 'Configure and press Start' : 'Waiting for your therapist…'}
+                          </div>
+                        </div>
+                      )}
+
+                      {(feedback?.type === 'correct' || (practiceActive && practiceFeedback?.ok)) && (
+                        <MatchFlash key={flashKey} />
+                      )}
+                    </div>
+                  </div>
+
+                  {/* ---- Tap bar ---- */}
+                  <div style={{ width: '100%', maxWidth: 430, flexShrink: 0 }}>
+                    <button
+                      type="button"
+                      onClick={practiceActive ? handlePracticePress : handleMatchPress}
+                      disabled={
+                        practiceActive
+                          ? !canInteract || !practiceItem || practiceTapped.includes(practiceIdx)
+                          : !tapEnabled
+                      }
+                      style={{
+                        width: '100%',
+                        height: 58,
+                        borderRadius: 16,
+                        background: '#ffffff',
+                        border:
+                          feedback?.type === 'correct'
+                            ? `2px solid ${GREEN}`
+                            : feedback?.type === 'wrong'
+                              ? `2px solid ${RED}`
+                              : `1px solid ${BORDER}`,
+                        boxShadow: CARD_SHADOW,
+                        display: 'flex',
+                        alignItems: 'center',
+                        justifyContent: 'center',
+                        gap: 12,
+                        padding: '0 16px',
+                        cursor:
+                          (practiceActive ? canInteract && !!practiceItem : tapEnabled) ? 'pointer' : 'default',
+                        opacity: (practiceActive ? canInteract && !!practiceItem : tapEnabled) ? 1 : 0.62,
+                        transition: 'border-color 0.15s, opacity 0.15s',
+                      }}
+                    >
+                      <span aria-hidden style={{ fontSize: 22, lineHeight: 1 }}>✋</span>
+                      <span
+                        style={{
+                          fontSize: 20,
+                          fontWeight: 800,
+                          color:
+                            feedback?.type === 'correct'
+                              ? '#0F7A38'
+                              : feedback?.type === 'wrong'
+                                ? '#A8123A'
+                                : INK,
+                        }}
+                      >
+                        {feedback ? feedback.text : practiceActive || isMatchable ? 'Tap' : 'Watch and wait…'}
+                      </span>
+                      <span
+                        style={{
+                          marginLeft: 'auto',
+                          display: 'flex',
+                          alignItems: 'center',
+                          gap: 5,
+                          padding: '6px 12px',
+                          borderRadius: 999,
+                          background: INDIGO_SOFT,
+                          color: VIOLET,
+                          fontSize: 12,
+                          fontWeight: 800,
+                          whiteSpace: 'nowrap',
+                        }}
+                      >
+                        <span aria-hidden>⏱</span>
+                        {practiceActive ? '2.6 sec' : secondsLabel}
+                      </span>
+                    </button>
+
+                    {practiceActive && (
+                      <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginTop: 8 }}>
+                        <div
+                          style={{
+                            flex: 1,
+                            minWidth: 0,
+                            fontSize: 11,
+                            fontWeight: 600,
+                            lineHeight: 1.4,
+                            color: practiceFeedback ? (practiceFeedback.ok ? '#0F7A38' : '#A8123A') : INK_MUTED,
+                          }}
+                        >
+                          {practiceFinished
+                            ? practiceHits >= 2
+                              ? 'You have got it — the real round works exactly the same way.'
+                              : 'That is fine — the real round works the same way, and there is no rush.'
+                            : practiceFeedback
+                              ? practiceFeedback.text
+                              : practiceRefItem
+                                ? 'Tap if this is the same as the one right before it.'
+                                : 'First one — nothing to compare with yet.'}
+                        </div>
+                        {practiceFinished ? (
+                          <>
+                            <button
+                              type="button"
+                              onClick={startPractice}
+                              style={{
+                                flexShrink: 0, padding: '6px 13px', borderRadius: 999,
+                                border: `1px solid ${BORDER}`, background: '#ffffff',
+                                color: INK_BODY, fontSize: 11, fontWeight: 700, cursor: 'pointer',
+                              }}
+                            >
+                              Practice again
+                            </button>
+                            <button
+                              type="button"
+                              onClick={endPractice}
+                              style={{
+                                flexShrink: 0, padding: '6px 13px', borderRadius: 999, border: 'none',
+                                background: INDIGO, color: '#ffffff', fontSize: 11, fontWeight: 800, cursor: 'pointer',
+                              }}
+                            >
+                              I&apos;m ready
+                            </button>
+                          </>
+                        ) : (
+                          <button
+                            type="button"
+                            onClick={endPractice}
+                            style={{
+                              flexShrink: 0, padding: '6px 13px', borderRadius: 999,
+                              border: `1px solid ${BORDER}`, background: '#ffffff',
+                              color: INK_MUTED, fontSize: 11, fontWeight: 700, cursor: 'pointer',
+                            }}
+                          >
+                            Skip practice
+                          </button>
+                        )}
+                      </div>
+                    )}
+                  </div>
+                </>
+              )}
+            </div>
           </div>
-        )}
+
+          {/* ── RIGHT: transport + performance ────────────────────────────── */}
+          <div style={{ flexShrink: 0, width: 246, minHeight: 0, display: 'flex', flexDirection: 'column', gap: 10 }}>
+
+            {isTherapist && (
+              <>
+                <div style={{ ...card, flexShrink: 0, padding: '7px 10px 9px' }}>
+                  <div style={{ textAlign: 'center', fontSize: 11, fontWeight: 800, color: INDIGO, marginBottom: 5 }}>N-Level</div>
+                  <PillGroup
+                    value={String(n)}
+                    disabled={false}
+                    options={[
+                      { key: '1', label: '1-Back' },
+                      { key: '2', label: '2-Back' },
+                      { key: '3', label: '3-Back' },
+                    ]}
+                    onSelect={(v) => handleNChange(Number(v))}
+                  />
+                </div>
+
+                <div style={{ flexShrink: 0, display: 'flex', flexDirection: 'column', gap: 8 }}>
+                  {isPlaying ? (
+                    <button
+                      type="button"
+                      onClick={handlePause}
+                      style={{
+                        width: '100%',
+                        padding: '12px 0',
+                        borderRadius: 14,
+                        border: `1px solid ${BORDER}`,
+                        background: '#ffffff',
+                        color: '#8A5A06',
+                        fontSize: 14,
+                        fontWeight: 800,
+                        cursor: 'pointer',
+                        boxShadow: CARD_SHADOW,
+                      }}
+                    >
+                      ⏸ Pause
+                    </button>
+                  ) : (
+                    <button
+                      type="button"
+                      onClick={handleStart}
+                      disabled={complete}
+                      style={{
+                        width: '100%',
+                        padding: '12px 0',
+                        borderRadius: 14,
+                        border: 'none',
+                        background: `linear-gradient(180deg, ${INDIGO}, ${INDIGO_DEEP})`,
+                        color: '#ffffff',
+                        fontSize: 15,
+                        fontWeight: 800,
+                        cursor: complete ? 'default' : 'pointer',
+                        opacity: complete ? 0.45 : 1,
+                        boxShadow: '0 6px 16px rgba(40,32,150,0.30)',
+                      }}
+                    >
+                      ▶ Start
+                    </button>
+                  )}
+                  <button
+                    type="button"
+                    onClick={handleReset}
+                    style={{
+                      width: '100%',
+                      padding: '11px 0',
+                      borderRadius: 14,
+                      border: `1px solid ${BORDER}`,
+                      background: '#ffffff',
+                      color: INK_BODY,
+                      fontSize: 13.5,
+                      fontWeight: 800,
+                      cursor: 'pointer',
+                      boxShadow: CARD_SHADOW,
+                    }}
+                  >
+                    ↻ Reset
+                  </button>
+                </div>
+              </>
+            )}
+
+            {/* Performance */}
+            <div
+              style={{
+                ...card,
+                flex: 1,
+                minHeight: 0,
+                borderRadius: 18,
+                padding: '11px 12px 13px',
+                display: 'flex',
+                flexDirection: 'column',
+                gap: 11,
+              }}
+            >
+              <div style={{ textAlign: 'center', fontSize: 11.5, fontWeight: 800, letterSpacing: 0.8, color: INDIGO, textTransform: 'uppercase' }}>
+                Your Performance
+              </div>
+
+              <div style={{ display: 'flex', gap: 7 }}>
+                {[
+                  { icon: ART_HITS, alt: 'Hits', value: String(hits), label: 'Hits', bg: GREEN_SOFT, ink: GREEN, border: '#CDEFDB' },
+                  { icon: ART_MISSES, alt: 'Misses', value: String(misses), label: 'Misses', bg: RED_SOFT, ink: RED, border: '#F7D3DC' },
+                  { icon: ART_ACCURACY, alt: 'Accuracy', value: `${accuracy}%`, label: 'Accuracy', bg: INDIGO_SOFT, ink: INDIGO, border: '#D8DBFB' },
+                ].map((t) => (
+                  <div
+                    key={t.label}
+                    style={{
+                      flex: 1,
+                      minWidth: 0,
+                      background: t.bg,
+                      border: `1px solid ${t.border}`,
+                      borderRadius: 14,
+                      padding: '10px 4px 9px',
+                      display: 'flex',
+                      flexDirection: 'column',
+                      alignItems: 'center',
+                      gap: 5,
+                    }}
+                  >
+                    <img src={t.icon} alt="" aria-hidden width={26} height={26} style={{ display: 'block' }} />
+                    <div style={{ fontSize: 20, fontWeight: 800, color: t.ink, lineHeight: 1.1 }}>{t.value}</div>
+                    <div style={{ fontSize: 10.5, fontWeight: 700, color: t.ink }}>{t.label}</div>
+                  </div>
+                ))}
+              </div>
+
+              <div style={{ marginTop: 'auto' }}>
+                <div style={{ ...microLabel, marginBottom: 7 }}>Session Progress</div>
+                <div style={{ display: 'flex', alignItems: 'center', gap: 9 }}>
+                  <div
+                    style={{
+                      flex: 1,
+                      height: 9,
+                      borderRadius: 999,
+                      background: '#EBE7FB',
+                      overflow: 'hidden',
+                    }}
+                  >
+                    <div
+                      style={{
+                        width: `${progressPct}%`,
+                        height: '100%',
+                        borderRadius: 999,
+                        background: 'linear-gradient(90deg, #7C5CF0, #5B34E8)',
+                        transition: 'width 0.35s cubic-bezier(.4,0,.2,1)',
+                      }}
+                    />
+                  </div>
+                  <span style={{ fontSize: 14, fontWeight: 800, color: INDIGO, flexShrink: 0 }}>{progressPct}%</span>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
       </div>
     </>
   )

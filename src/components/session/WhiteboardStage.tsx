@@ -25,13 +25,23 @@ import { RC } from './roomTheme'
 // via useTracks() on the surrounding room context. No connection or track logic
 // is touched here; only the size and position of the video elements.
 
-function VideoTile({ trackRef, name }: { trackRef: TrackReference | undefined; name: string }) {
+function VideoTile({
+  trackRef,
+  name,
+  width = 120,
+  height = 82,
+}: {
+  trackRef: TrackReference | undefined
+  name: string
+  width?: number
+  height?: number
+}) {
   return (
     <div style={{ flexShrink: 0 }}>
       <div
         style={{
-          width: 120,
-          height: 82,
+          width,
+          height,
           borderRadius: 12,
           overflow: 'hidden',
           background: '#1a2a25',
@@ -50,7 +60,7 @@ function VideoTile({ trackRef, name }: { trackRef: TrackReference | undefined; n
               alignItems: 'center',
               justifyContent: 'center',
               color: 'rgba(255,255,255,0.75)',
-              fontSize: 22,
+              fontSize: Math.round(height * 0.27),
               fontWeight: 600,
             }}
           >
@@ -194,11 +204,13 @@ export default function WhiteboardStage({
       style={{
         position: 'absolute',
         inset: 0,
-        borderRadius: 24,
+        borderRadius: 20,
         overflow: 'hidden',
+        // Thin neutral border + soft shadow, matching ModuleStage's canvas
+        // chrome and the top/bottom bars — no heavy coloured outline.
         background: RC.panel,
-        border: `2px solid ${RC.green}`,
-        boxShadow: `0 0 0 5px ${RC.greenSoft}, 0 18px 44px rgba(20,40,30,0.18)`,
+        border: `1px solid ${RC.border}`,
+        boxShadow: '0 6px 18px rgba(20,30,40,0.05)',
       }}
     >
       {/* Drawing surface. `children` is the real Excalidraw canvas; without it
@@ -225,8 +237,8 @@ export default function WhiteboardStage({
 
       {/* Shrunken video feeds — side by side, top-left */}
       <div style={{ position: 'absolute', top: 14, left: 14, zIndex: 30, display: 'flex', gap: 8 }}>
-        <VideoTile trackRef={selfTrack} name={selfName} />
-        <VideoTile trackRef={otherTrack} name={otherName} />
+        <VideoTile trackRef={selfTrack} name={selfName} width={140} height={96} />
+        <VideoTile trackRef={otherTrack} name={otherName} width={140} height={96} />
       </div>
 
       {/* Top-right controls */}
