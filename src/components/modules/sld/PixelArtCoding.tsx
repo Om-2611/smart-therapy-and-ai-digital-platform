@@ -1,10 +1,55 @@
 'use client'
 import { useState, useEffect, useRef, useCallback, useMemo } from 'react'
 import { doc, onSnapshot, updateDoc } from 'firebase/firestore'
+import { ChevronLeft, ChevronRight, Target, Wand2 } from 'lucide-react'
 import { db } from '@/lib/firebase'
 import { logModuleEvent } from '@/lib/sessionEvents'
 import { staadPraise, staadCancel } from '@/lib/voice/staadVoice'
 import { useVoiceLanguage } from '@/lib/voice/useVoiceLanguage'
+
+/* ---------------------------------------------------------------------------
+   Art assets. The delivered folder name contains a space, so every path
+   segment is encoded individually (encodeURI would leave the raw space in).
+   Plain <img>/background-image only — next/image chokes on these paths.
+--------------------------------------------------------------------------- */
+const A = (f: string) =>
+  `/assets/modules/SLD/${encodeURIComponent('Pixel art assets')}/${encodeURIComponent(f)}`
+
+/* Pale-mint games ground with faint line-art motifs (controller, sword,
+   castle, trophy, trees) — painted cover so the motifs always reach the
+   canvas edges however wide the stage gets. */
+const PAC_SCENE = `/assets/modules/Background/${encodeURIComponent('pixel art coding.png')}`
+
+const TOOL_ICON = {
+  paint: A('tool-paint.svg'),
+  undo: A('tool-undo.svg'),
+  clear: A('tool-clear.svg'),
+  reset: A('tool-reset.svg'),
+}
+
+/* ---------------------------------------------------------------------------
+   Palette — dark ink on every pale surface. The stage canvas is WHITE, so
+   nothing here is ever light-on-light; white text appears only on the solid
+   saturated green / coral fills.
+--------------------------------------------------------------------------- */
+const INK = '#1f3b2c'
+const INK_DEEP = '#16281e'
+const MUTED = '#63736b'
+const GREEN = '#16A34A'
+const GREEN_DEEP = '#15803D'
+const MINT = '#F0FDF4'
+const MINT_2 = '#DCFCE7'
+const BORDER = '#e7eaef'
+const CELL_BORDER = '#E6E9EE'
+const CORAL = '#EF4444'
+const FONT = '"DM Sans", sans-serif'
+
+const CARD: React.CSSProperties = {
+  background: '#ffffff',
+  border: `1px solid ${BORDER}`,
+  borderRadius: 16,
+  boxShadow: '0 4px 16px rgba(31,59,44,0.07)',
+}
 
 interface PixelArtCodingProps {
   sessionId: string
@@ -15,16 +60,22 @@ interface PixelArtCodingProps {
 type PacMode = 'paint' | 'code'
 type GridSize = 6 | 8 | 10
 
-const GRID_SIZES: { key: GridSize; label: string }[] = [
-  { key: 6, label: '6×6 Easy' },
-  { key: 8, label: '8×8 Normal' },
-  { key: 10, label: '10×10 Hard' },
+const GRID_SIZES: { key: GridSize; size: string; label: string }[] = [
+  { key: 6, size: '6×6', label: 'Easy' },
+  { key: 8, size: '8×8', label: 'Normal' },
+  { key: 10, size: '10×10', label: 'Hard' },
 ]
 
+/* The delivered colour_palette_svg swatch set, as paint values. The
+   blue/violet chip is drawn as the artwork's split fill; the value painted
+   into a cell is its blue half. */
 const COLORS = [
-  '#4a7c6f', '#c8602a', '#f7c948',
-  '#5b8dd9', '#e86d8a', '#2b2f33',
+  '#E53935', '#F7931E', '#FFC627',
+  '#1F9D68', '#2F80ED', '#25272B',
 ]
+const SWATCH_FILL: Record<string, string> = {
+  '#2F80ED': 'linear-gradient(90deg, #2F80ED 0 50%, #9B51E0 50% 100%)',
+}
 
 const COMMANDS = [
   { key: 'up', label: '⬆', name: 'Up' },
@@ -137,18 +188,29 @@ const PATTERNS: Record<string, number[][]> = {
   ],
 }
 
-const PATTERN_NAMES: { key: string; label: string }[] = [
-  { key: 'heart', label: '❤️ Heart' },
-  { key: 'house', label: '🏠 House' },
-  { key: 'star', label: '⭐ Star' },
-  { key: 'tree', label: '🌲 Tree' },
-  { key: 'fish', label: '🐟 Fish' },
-  { key: 'smiley', label: '😊 Smiley' },
-  { key: 'arrow', label: '➡️ Arrow' },
+/* Carousel cards. `art` is the delivered pixel-art SVG for the shape and
+   `tint` is that artwork's own fill, reused for the Your Target preview so the
+   card and the goal read as the same object. The art is decoration only — the
+   grid is still graded against PATTERNS above.
+   (The mockup also shows Butterfly and Car cards; both ship art but no pattern
+   data, and inventing pattern data is out of scope for a visual pass.) */
+const SHAPE_CARDS: { key: string; label: string; tint: string }[] = [
+  { key: 'heart', label: 'Heart', tint: '#E24C4C' },
+  { key: 'star', label: 'Star', tint: '#F2B138' },
+  { key: 'tree', label: 'Tree', tint: '#3F9142' },
+  { key: 'fish', label: 'Fish', tint: '#4C9DE2' },
+  { key: 'smiley', label: 'Smiley', tint: '#F2C338' },
+  { key: 'arrow', label: 'Arrow', tint: '#8A6FD1' },
+  { key: 'house', label: 'House', tint: '#E28C3F' },
+]
+const LETTER_CARDS: { key: string; label: string }[] = [
   { key: 'letter-a', label: 'A' },
   { key: 'letter-b', label: 'B' },
   { key: 'letter-c', label: 'C' },
 ]
+const TINT_BY_KEY: Record<string, string> = Object.fromEntries(
+  SHAPE_CARDS.map((s) => [s.key, s.tint])
+)
 
 /**
  * Resample a pattern to the selected grid size (nearest neighbour).
@@ -179,9 +241,13 @@ function scalePattern(pattern: number[][], size: number): number[][] {
   return out
 }
 
-function calcMatchPercent(cells: Record<string, string>, pattern: number[][], gridSize: number): number {
-  // Grade the whole visible board: required cells come from the scaled pattern,
-  // and anything painted outside it still counts against the match.
+/**
+ * Cells that already agree with the target — the numerator of the match score,
+ * and the "N / M cells completed" readout under the progress bar. Grades the
+ * whole visible board: required cells come from the scaled pattern, and
+ * anything painted outside it still counts against the match.
+ */
+function countMatchedCells(cells: Record<string, string>, pattern: number[][], gridSize: number): number {
   const target = scalePattern(pattern, gridSize)
   let matched = 0
   for (let r = 0; r < gridSize; r++) {
@@ -192,12 +258,17 @@ function calcMatchPercent(cells: Record<string, string>, pattern: number[][], gr
       if (isFilled === shouldBeFilled) matched++
     }
   }
-  return Math.round((matched / (gridSize * gridSize)) * 100)
+  return matched
+}
+
+function calcMatchPercent(cells: Record<string, string>, pattern: number[][], gridSize: number): number {
+  return Math.round((countMatchedCells(cells, pattern, gridSize) / (gridSize * gridSize)) * 100)
 }
 
 export default function PixelArtCoding({ sessionId, role, isLocked }: PixelArtCodingProps) {
-  const isTherapist = role === 'therapist'
-  const canInteract = isTherapist || !isLocked
+  const isT = role === 'therapist'
+  const isTherapist = isT
+  const canInteract = isT || !isLocked
 
   const voiceLanguage = useVoiceLanguage(sessionId)
   const voiceLangRef = useRef(voiceLanguage)
@@ -206,7 +277,7 @@ export default function PixelArtCoding({ sessionId, role, isLocked }: PixelArtCo
   const [mode, setMode] = useState<PacMode>('paint')
   const [gridSize, setGridSize] = useState<GridSize>(8)
   const [targetPattern, setTargetPattern] = useState('heart')
-  const [activeColor, setActiveColor] = useState('#4a7c6f')
+  const [activeColor, setActiveColor] = useState('#E53935')
   const [cells, setCells] = useState<Record<string, string>>({})
   const [cursorPos, setCursorPos] = useState({ row: 0, col: 0 })
   const [program, setProgram] = useState<string[]>([])
@@ -218,6 +289,10 @@ export default function PixelArtCoding({ sessionId, role, isLocked }: PixelArtCo
   const [celebEmojis, setCelebEmojis] = useState<{ id: number; x: number; emoji: string }[]>([])
   const [perfectCells, setPerfectCells] = useState<Set<string>>(new Set())
   const [showCodeHelp, setShowCodeHelp] = useState(true)
+  /* Local stroke history behind the tool card's Undo entry. Snapshots of the
+     same `cells` map, nothing new in Firestore — an undo republishes
+     moduleState.pacCells exactly like a stroke does. */
+  const [history, setHistory] = useState<Record<string, string>[]>([])
 
   const isDragging = useRef(false)
   const celebIdRef = useRef(0)
@@ -229,6 +304,7 @@ export default function PixelArtCoding({ sessionId, role, isLocked }: PixelArtCo
   cursorRef.current = cursorPos
   const gridSizeRef = useRef(gridSize)
   gridSizeRef.current = gridSize
+  const stripRef = useRef<HTMLDivElement>(null)
 
   const writeToFirestore = useCallback(async (data: Record<string, unknown>) => {
     try {
@@ -306,6 +382,7 @@ export default function PixelArtCoding({ sessionId, role, isLocked }: PixelArtCo
       setMatched(false)
       setPerfectCells(new Set())
       setCells({})
+      setHistory([])
       writeToFirestore({ 'moduleState.pacCells': {} })
     }, 2000)
   }, [targetPattern, writeToFirestore])
@@ -333,8 +410,15 @@ export default function PixelArtCoding({ sessionId, role, isLocked }: PixelArtCo
     })
   }
 
+  /** Snapshot taken at stroke start, so one Undo reverts one whole drag. */
+  const pushHistory = () => {
+    const snapshot = cellsRef.current
+    setHistory((h) => [...h.slice(-19), snapshot])
+  }
+
   const handleCellMouseDown = (row: number, col: number) => {
     if (!canInteract || mode !== 'paint' || isRunning) return
+    pushHistory()
     isDragging.current = true
     paintCell(row, col)
   }
@@ -359,6 +443,7 @@ export default function PixelArtCoding({ sessionId, role, isLocked }: PixelArtCo
   const handleCellTouchStart = (e: React.TouchEvent, row: number, col: number) => {
     if (!canInteract || mode !== 'paint' || isRunning) return
     e.preventDefault()
+    pushHistory()
     isDragging.current = true
     paintCell(row, col)
   }
@@ -380,6 +465,14 @@ export default function PixelArtCoding({ sessionId, role, isLocked }: PixelArtCo
     }
   }, [writeToFirestore])
 
+  const handleUndo = () => {
+    if (!canInteract || isRunning || history.length === 0) return
+    const prev = history[history.length - 1]
+    setHistory((h) => h.slice(0, -1))
+    setCells(prev)
+    writeToFirestore({ 'moduleState.pacCells': prev })
+  }
+
   const handleColorChange = (color: string) => {
     setActiveColor(color)
     writeToFirestore({ 'moduleState.pacActiveColor': color })
@@ -394,6 +487,7 @@ export default function PixelArtCoding({ sessionId, role, isLocked }: PixelArtCo
   const handleGridSizeChange = (size: GridSize) => {
     setGridSize(size)
     setCells({})
+    setHistory([])
     setCursorPos({ row: 0, col: 0 })
     setProgram([])
     setProgramStatus('idle')
@@ -409,6 +503,7 @@ export default function PixelArtCoding({ sessionId, role, isLocked }: PixelArtCo
   const handlePatternChange = (name: string) => {
     setTargetPattern(name)
     setCells({})
+    setHistory([])
     setMatched(false)
     writeToFirestore({
       'moduleState.pacTargetPattern': name,
@@ -418,6 +513,7 @@ export default function PixelArtCoding({ sessionId, role, isLocked }: PixelArtCo
 
   const handleReset = () => {
     setCells({})
+    setHistory([])
     setMatched(false)
     setCursorPos({ row: 0, col: 0 })
     setProgram([])
@@ -530,6 +626,7 @@ export default function PixelArtCoding({ sessionId, role, isLocked }: PixelArtCo
   const handleResetProgram = () => {
     handleStop()
     setCells({})
+    setHistory([])
     setCursorPos({ row: 0, col: 0 })
     setProgram([])
     setProgramStatus('idle')
@@ -580,12 +677,33 @@ export default function PixelArtCoding({ sessionId, role, isLocked }: PixelArtCo
     }
     return { path, paint, end: { row, col }, blocked }
   }, [mode, isRunning, program, cursorPos.row, cursorPos.col, gridSize])
+
   const matchPct = pattern && mode === 'paint' && !celebrating
     ? calcMatchPercent(cells, pattern, gridSize)
     : null
+  const matchedCells = pattern && mode === 'paint' && !celebrating
+    ? countMatchedCells(cells, pattern, gridSize)
+    : null
+  const totalCells = gridSize * gridSize
 
-  const gridGap = gridSize >= 10 ? 1 : 2
-  const previewCellSize = `calc(56px / ${gridSize})`
+  const gridGap = gridSize >= 10 ? 3 : 4
+  const targetTint = TINT_BY_KEY[targetPattern] ?? GREEN
+  const shapeLabel =
+    SHAPE_CARDS.find((s) => s.key === targetPattern)?.label ??
+    LETTER_CARDS.find((l) => l.key === targetPattern)?.label ??
+    'Shape'
+
+  const scrollStrip = (dir: number) => stripRef.current?.scrollBy({ left: dir * 240, behavior: 'smooth' })
+
+  /* Tool card rows. `Paint` and `Reset Grid` are therapist settings (mode +
+     board reset); `Undo` and `Clear` are painting actions, so they follow
+     canInteract like the grid itself does. */
+  const tools: { key: string; label: string; icon: string; active: boolean; enabled: boolean; onClick: () => void }[] = [
+    { key: 'paint', label: 'Paint', icon: TOOL_ICON.paint, active: mode === 'paint', enabled: isT, onClick: () => handleModeChange('paint') },
+    { key: 'undo', label: 'Undo', icon: TOOL_ICON.undo, active: false, enabled: canInteract && !isRunning && history.length > 0, onClick: handleUndo },
+    { key: 'clear', label: 'Clear', icon: TOOL_ICON.clear, active: false, enabled: canInteract && !isRunning, onClick: handleReset },
+    { key: 'reset', label: 'Reset Grid', icon: TOOL_ICON.reset, active: false, enabled: isT && !isRunning, onClick: handleReset },
+  ]
 
   return (
     <>
@@ -595,8 +713,8 @@ export default function PixelArtCoding({ sessionId, role, isLocked }: PixelArtCo
           100% { opacity: 0; transform: translateY(-90px) scale(1.5) }
         }
         @keyframes pacPulseGreen {
-          0%, 100% { box-shadow: inset 0 0 0 0 rgba(74,124,111,0) }
-          50% { box-shadow: inset 0 0 12px 3px rgba(74,124,111,0.6) }
+          0%, 100% { box-shadow: inset 0 0 0 0 rgba(22,163,74,0) }
+          50% { box-shadow: inset 0 0 12px 3px rgba(22,163,74,0.55) }
         }
         @keyframes pacFadeInOut {
           0% { opacity: 0; transform: translateY(6px) }
@@ -604,581 +722,708 @@ export default function PixelArtCoding({ sessionId, role, isLocked }: PixelArtCo
           75% { opacity: 1; transform: translateY(0) }
           100% { opacity: 0; transform: translateY(-4px) }
         }
+        @keyframes pacPoint {
+          0%, 100% { transform: translate(0, 0) }
+          50% { transform: translate(3px, -3px) }
+        }
+        .pac-scroll { scrollbar-width: thin; scrollbar-color: rgba(22,163,74,0.28) transparent; }
+        .pac-scroll::-webkit-scrollbar { width: 8px; }
+        .pac-scroll::-webkit-scrollbar-thumb { background: rgba(22,163,74,0.28); border-radius: 8px; }
+        .pac-strip { scrollbar-width: none; }
+        .pac-strip::-webkit-scrollbar { height: 0; display: none; }
+        .pac-chip:not(:disabled):hover { border-color: ${GREEN}; }
+        .pac-shape:not(:disabled):hover { transform: translateY(-2px); }
       `}</style>
 
       {/*
-        THREE-BLOCK LAYOUT:
-        ┌─────────────────────────────┐
-        │  TOP (flexShrink: 0)        │  ← Therapist controls
-        ├─────────────────────────────┤
-        │  MIDDLE (flex: 1,           │  ← Canvas area (scrollable)
-        │    overflow-y: auto)        │     Target preview + Grid + Match %
-        ├─────────────────────────────┤
-        │  BOTTOM (flexShrink: 0)     │  ← Block code commands + Score
-        └─────────────────────────────┘
+        Root fills the stage and never scrolls itself — ModuleStage's body sets
+        the 560px floor and expects height:100% with one internal flex:1 region.
+        The games ground is full-bleed; every control sits on a white card over
+        it, so no copy is ever light-on-light.
       */}
       <div
         style={{
           display: 'flex',
           flexDirection: 'column',
           height: '100%',
+          minHeight: 0,
+          maxWidth: '100%',
           userSelect: 'none',
+          fontFamily: FONT,
+          borderRadius: 18,
+          overflow: 'hidden',
+          overflowX: 'clip',
+          backgroundColor: MINT,
+          backgroundImage: `url("${PAC_SCENE}"), linear-gradient(170deg, #F5FCF6 0%, ${MINT} 60%, #E9F7EC 100%)`,
+          backgroundSize: 'cover, cover',
+          backgroundPosition: 'center center, center center',
+          backgroundRepeat: 'no-repeat, no-repeat',
         }}
       >
-        {/* ============================================== */}
-        {/* TOP SECTION — Therapist Controls              */}
-        {/* ============================================== */}
-        {isTherapist && (
-          <div style={{
-            flexShrink: 0,
-            paddingBottom: 8,
-            marginBottom: 8,
-            borderBottom: '1px solid rgba(0,0,0,0.05)',
-            width: '100%',
-            maxWidth: 1000,
-            alignSelf: 'center',
-            display: 'flex',
-            alignItems: 'center',
-            flexWrap: 'wrap',
-            gap: 12,
-          }}>
-            {/* Mode toggle */}
-            <div className="flex items-center" style={{ gap: 6, flex: '1 1 160px' }}>
-              {[{ key: 'paint' as PacMode, label: '🖌️ Paint' }, { key: 'code' as PacMode, label: '💻 Code' }].map((m) => (
+        {/* The only scrolling region: overflow stays inside the module. */}
+        <div
+          className="pac-scroll"
+          style={{ flex: 1, minHeight: 0, overflowY: 'auto', overflowX: 'hidden', padding: '20px 20px 24px' }}
+        >
+          <div style={{ width: '100%', maxWidth: 1180, margin: '0 auto', display: 'flex', flexDirection: 'column', gap: 18 }}>
+
+            {/* ================= Shape carousel (therapist setting) ================= */}
+            {isT && mode === 'paint' && (
+              <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
+                <div style={{
+                  display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8,
+                  fontSize: 14, fontWeight: 700, color: GREEN_DEEP, letterSpacing: 0.2,
+                }}>
+                  <span aria-hidden>🌱</span> Choose a Shape
+                </div>
+
+                <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
+                  <ChevronButton dir="left" onClick={() => scrollStrip(-1)} />
+                  <div
+                    ref={stripRef}
+                    className="pac-strip"
+                    style={{
+                      flex: 1, minWidth: 0, display: 'flex', gap: 12,
+                      overflowX: 'auto', padding: '6px 2px', scrollBehavior: 'smooth',
+                    }}
+                  >
+                    {SHAPE_CARDS.map((s) => {
+                      const on = targetPattern === s.key
+                      return (
+                        <button
+                          key={s.key}
+                          className="pac-shape"
+                          onClick={() => handlePatternChange(s.key)}
+                          style={{
+                            ...CARD,
+                            flex: '0 0 auto', width: 96,
+                            display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 8,
+                            padding: '14px 10px 12px',
+                            border: on ? `2px solid ${GREEN}` : `1px solid ${BORDER}`,
+                            background: on ? MINT : '#ffffff',
+                            cursor: 'pointer',
+                            transition: 'transform .15s, border-color .15s, background .15s',
+                            boxShadow: on ? '0 6px 18px rgba(22,163,74,0.18)' : CARD.boxShadow,
+                          }}
+                        >
+                          {/* eslint-disable-next-line @next/next/no-img-element */}
+                          <img
+                            src={A(`shape-${s.key}.svg`)}
+                            alt="" aria-hidden
+                            style={{ width: 46, height: 46, objectFit: 'contain', display: 'block' }}
+                          />
+                          <span style={{ fontSize: 13, fontWeight: on ? 700 : 600, color: on ? GREEN_DEEP : INK }}>
+                            {s.label}
+                          </span>
+                        </button>
+                      )
+                    })}
+                  </div>
+                  <ChevronButton dir="right" onClick={() => scrollStrip(1)} />
+                </div>
+              </div>
+            )}
+
+            {/* ================= Toolbar row (therapist settings) ================= */}
+            {isT && (
+              <div style={{
+                display: 'flex', alignItems: 'center', justifyContent: 'center',
+                flexWrap: 'wrap', gap: 16, rowGap: 14,
+              }}>
+                {/* Mode toggle — Block Code is the module's second activity. */}
+                <div style={{ display: 'flex', gap: 8 }}>
+                  {[{ key: 'paint' as PacMode, label: '🖌️ Paint' }, { key: 'code' as PacMode, label: '💻 Code' }].map((m) => {
+                    const on = mode === m.key
+                    return (
+                      <button
+                        key={m.key}
+                        className="pac-chip"
+                        onClick={() => handleModeChange(m.key)}
+                        style={{
+                          ...CARD,
+                          padding: '11px 16px', borderRadius: 14, cursor: 'pointer',
+                          fontSize: 13, fontWeight: 700, fontFamily: FONT,
+                          border: on ? `2px solid ${GREEN}` : `1px solid ${BORDER}`,
+                          background: on ? MINT_2 : '#ffffff',
+                          color: on ? GREEN_DEEP : MUTED,
+                          transition: 'all .15s',
+                        }}
+                      >
+                        {m.label}
+                      </button>
+                    )
+                  })}
+                </div>
+
+                {mode === 'paint' && (
+                  <>
+                    <Divider />
+
+                    {/* Colour swatches — the delivered palette, active one ringed. */}
+                    <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+                      {COLORS.map((c) => {
+                        const on = activeColor === c
+                        return (
+                          <button
+                            key={c}
+                            onClick={() => handleColorChange(c)}
+                            aria-label={`Paint colour ${c}`}
+                            style={{
+                              width: 46, height: 46, borderRadius: 13, padding: 0,
+                              display: 'flex', alignItems: 'center', justifyContent: 'center',
+                              background: '#ffffff',
+                              border: on ? `3px solid #66C98B` : `1px solid #E4E7EB`,
+                              boxShadow: on ? '0 5px 14px rgba(22,163,74,0.20)' : '0 2px 8px rgba(31,59,44,0.07)',
+                              cursor: 'pointer', flexShrink: 0, transition: 'all .15s',
+                            }}
+                          >
+                            <span style={{
+                              width: 30, height: 30, borderRadius: 8,
+                              background: SWATCH_FILL[c] ?? c, display: 'block',
+                            }} />
+                          </button>
+                        )
+                      })}
+                    </div>
+
+                    <Divider />
+
+                    {/* Letter targets */}
+                    <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                      {LETTER_CARDS.map((l) => {
+                        const on = targetPattern === l.key
+                        return (
+                          <button
+                            key={l.key}
+                            className="pac-chip"
+                            onClick={() => handlePatternChange(l.key)}
+                            style={{
+                              ...CARD,
+                              width: 46, height: 46, borderRadius: 13, cursor: 'pointer',
+                              fontSize: 15, fontWeight: 700, fontFamily: FONT,
+                              border: on ? `2px solid ${GREEN}` : `1px solid ${BORDER}`,
+                              background: on ? MINT_2 : '#ffffff',
+                              color: on ? GREEN_DEEP : INK,
+                              transition: 'all .15s',
+                            }}
+                          >
+                            {l.label}
+                          </button>
+                        )
+                      })}
+                    </div>
+                  </>
+                )}
+
+                <Divider />
+
+                {/* Grid size */}
+                <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                  {GRID_SIZES.map((s) => {
+                    const on = gridSize === s.key
+                    return (
+                      <button
+                        key={s.key}
+                        className="pac-chip"
+                        onClick={() => handleGridSizeChange(s.key)}
+                        style={{
+                          ...CARD,
+                          minWidth: 74, padding: '10px 12px', borderRadius: 14, cursor: 'pointer',
+                          display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 3,
+                          fontFamily: FONT,
+                          border: on ? `2px solid ${GREEN}` : `1px solid ${BORDER}`,
+                          background: on ? MINT_2 : '#ffffff',
+                          transition: 'all .15s',
+                        }}
+                      >
+                        <span style={{ fontSize: 14, fontWeight: 700, color: on ? GREEN_DEEP : INK_DEEP, lineHeight: 1.1 }}>
+                          {s.size}
+                        </span>
+                        <span style={{ fontSize: 12, fontWeight: 600, color: on ? GREEN : MUTED, lineHeight: 1.1 }}>
+                          {s.label}
+                        </span>
+                      </button>
+                    )
+                  })}
+                </div>
+
+                <Divider />
+
+                {/* Reset — the one coral action in the layout */}
                 <button
-                  key={m.key}
-                  onClick={() => handleModeChange(m.key)}
+                  onClick={handleReset}
                   style={{
-                    flex: 1,
-                    padding: '3px 0',
-                    borderRadius: 12,
-                    border: 'none',
-                    fontSize: 11,
-                    fontWeight: 500,
-                    cursor: 'pointer',
-                    background: mode === m.key ? 'rgba(74,124,111,0.18)' : 'rgba(0,0,0,0.05)',
-                    color: mode === m.key ? '#2f6d5e' : '#6b7280',
-                    transition: 'all 0.15s',
+                    display: 'inline-flex', alignItems: 'center', gap: 8,
+                    padding: '12px 20px', borderRadius: 999, cursor: 'pointer',
+                    background: '#FFF5F4', border: `1px solid rgba(239,68,68,0.32)`,
+                    color: '#D93A3A', fontSize: 13.5, fontWeight: 700, fontFamily: FONT,
+                    boxShadow: '0 2px 10px rgba(239,68,68,0.12)',
                   }}
                 >
-                  {m.label}
+                  <span aria-hidden style={{ fontSize: 15 }}>↻</span> Reset Grid
                 </button>
-              ))}
-            </div>
+              </div>
+            )}
 
-            {/* Pattern selector (Mode A only) */}
-            {mode === 'paint' && (
-              <div style={{ marginBottom: 5 }}>
-                <div style={{ display: 'flex', flexWrap: 'wrap', gap: 3 }}>
-                  {PATTERN_NAMES.map((p) => (
+            {/* Client notice */}
+            {!canInteract && (
+              <div style={{ display: 'flex', justifyContent: 'center' }}>
+                <span style={{
+                  padding: '9px 18px', borderRadius: 999, background: '#ffffff',
+                  border: `1px solid ${BORDER}`, fontSize: 13, fontWeight: 600, color: MUTED,
+                  boxShadow: '0 2px 8px rgba(31,59,44,0.06)',
+                }}>
+                  Therapist is controlling
+                </span>
+              </div>
+            )}
+
+            {/* ================= Play row: tools | target | grid | hint ================= */}
+            <div style={{
+              display: 'flex', alignItems: 'stretch', justifyContent: 'center',
+              flexWrap: 'wrap', gap: 18,
+            }}>
+              {/* Left rail — tool card over target card */}
+              <div style={{ flex: '0 1 210px', minWidth: 190, display: 'flex', flexDirection: 'column', gap: 16 }}>
+                <div style={{ ...CARD, padding: 14 }}>
+                  {tools.map((t, i) => (
                     <button
-                      key={p.key}
-                      onClick={() => handlePatternChange(p.key)}
+                      key={t.key}
+                      onClick={t.onClick}
+                      disabled={!t.enabled}
                       style={{
-                        padding: '2px 6px',
-                        borderRadius: 8,
-                        border: 'none',
-                        fontSize: 7,
-                        fontWeight: 500,
-                        cursor: 'pointer',
-                        background: targetPattern === p.key ? 'rgba(74,124,111,0.18)' : 'rgba(0,0,0,0.05)',
-                        color: targetPattern === p.key ? '#2f6d5e' : '#6b7280',
-                        transition: 'all 0.15s',
+                        width: '100%', display: 'flex', alignItems: 'center', gap: 12,
+                        padding: '13px 14px', borderRadius: 12, border: 'none',
+                        background: t.active ? MINT_2 : 'transparent',
+                        color: t.active ? GREEN_DEEP : INK,
+                        fontSize: 14.5, fontWeight: t.active ? 700 : 600, fontFamily: FONT,
+                        textAlign: 'left', cursor: t.enabled ? 'pointer' : 'default',
+                        opacity: t.enabled || t.active ? 1 : 0.42,
+                        marginTop: i === 0 ? 0 : 4,
+                        borderTop: i === 0 ? 'none' : `1px solid ${BORDER}`,
+                        paddingTop: i === 0 ? 13 : 15,
+                        transition: 'background .15s',
                       }}
                     >
-                      {p.label}
+                      {/* eslint-disable-next-line @next/next/no-img-element */}
+                      <img
+                        src={t.icon} alt="" aria-hidden width={20} height={20}
+                        style={{ display: 'block', flexShrink: 0, filter: t.active ? 'none' : 'grayscale(1)' }}
+                      />
+                      {t.label}
                     </button>
                   ))}
                 </div>
-              </div>
-            )}
 
-            {/* Color picker (Mode A only) */}
-            {mode === 'paint' && (
-              <div className="flex items-center" style={{ gap: 4, marginBottom: 5 }}>
-                {COLORS.map((c) => (
-                  <button
-                    key={c}
-                    onClick={() => handleColorChange(c)}
-                    style={{
-                      width: 20,
-                      height: 20,
-                      borderRadius: 4,
-                      border: activeColor === c ? '2px solid #fff' : '1px solid rgba(0,0,0,0.16)',
-                      background: c,
-                      cursor: 'pointer',
-                      flexShrink: 0,
-                      transition: 'all 0.15s',
-                    }}
-                  />
-                ))}
+                {/* Your Target — the scaled goal, so the preview and the score
+                    always describe the same board. */}
+                {mode === 'paint' && scaledTarget && (
+                  <div style={{ ...CARD, padding: 16, display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 12 }}>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: 8, alignSelf: 'flex-start' }}>
+                      <Target size={17} color={GREEN} strokeWidth={2.3} />
+                      <span style={{ fontSize: 14, fontWeight: 700, color: GREEN_DEEP }}>Your Target</span>
+                    </div>
+                    <div
+                      role="img"
+                      aria-label={`Target shape: ${shapeLabel}`}
+                      style={{
+                        display: 'grid',
+                        gridTemplateColumns: `repeat(${gridSize}, 1fr)`,
+                        gap: 2, width: 116, aspectRatio: '1',
+                      }}
+                    >
+                      {Array.from({ length: gridSize }, (_, r) =>
+                        Array.from({ length: gridSize }, (_, c) => (
+                          <div
+                            key={`preview-${r}-${c}`}
+                            style={{
+                              aspectRatio: '1',
+                              background: scaledTarget[r][c] === 1 ? targetTint : '#F2F5F3',
+                              borderRadius: 2,
+                            }}
+                          />
+                        ))
+                      )}
+                    </div>
+                    <div style={{ fontSize: 13, lineHeight: 1.5, color: MUTED, textAlign: 'center' }}>
+                      Recreate the pixel art by filling the grid!
+                    </div>
+                  </div>
+                )}
               </div>
-            )}
 
-            {/* Grid size selector */}
-            <div className="flex items-center" style={{ gap: 6, flex: '1 1 160px' }}>
-              {GRID_SIZES.map((s) => (
-                <button
-                  key={s.key}
-                  onClick={() => handleGridSizeChange(s.key)}
+              {/* Centre — the board */}
+              <div style={{
+                ...CARD, flex: '1 1 380px', minWidth: 300, borderRadius: 20, padding: 18,
+                display: 'flex', alignItems: 'center', justifyContent: 'center',
+              }}>
+                <div
+                  onTouchMove={handleGridTouchMove}
+                  onTouchEnd={handleGridTouchEnd}
                   style={{
-                    flex: 1,
-                    padding: '3px 0',
-                    borderRadius: 12,
-                    border: 'none',
-                    fontSize: 11,
-                    fontWeight: 500,
-                    cursor: 'pointer',
-                    background: gridSize === s.key ? 'rgba(74,124,111,0.18)' : 'rgba(0,0,0,0.05)',
-                    color: gridSize === s.key ? '#2f6d5e' : '#6b7280',
-                    transition: 'all 0.15s',
+                    display: 'grid',
+                    gridTemplateColumns: `repeat(${gridSize}, 1fr)`,
+                    gap: gridGap,
+                    // Sized from the width the card leaves and locked square, so
+                    // the board scales into its box and can never overflow it.
+                    width: 'min(100%, 460px)',
+                    aspectRatio: '1',
+                    touchAction: 'none',
                   }}
                 >
-                  {s.label}
-                </button>
+                  {Array.from({ length: gridSize }, (_, r) =>
+                    Array.from({ length: gridSize }, (_, c) => {
+                      const key = `${r}-${c}`
+                      const filledColor = cells[key]
+                      const isCursor = mode === 'code' && cursorPos.row === r && cursorPos.col === c
+                      const isPerfectCell = perfectCells.has(key)
+                      // Ghost preview of the program the child is building.
+                      const willPaint = projection.paint.has(key)
+                      const onPath = projection.path.has(key)
+                      const isEnd = !!projection.end && projection.end.row === r && projection.end.col === c
+
+                      return (
+                        <div
+                          key={key}
+                          data-cell={`${r},${c}`}
+                          onMouseDown={() => handleCellMouseDown(r, c)}
+                          onMouseEnter={() => handleCellMouseEnter(r, c)}
+                          onTouchStart={(e) => handleCellTouchStart(e, r, c)}
+                          style={{
+                            aspectRatio: '1',
+                            boxSizing: 'border-box',
+                            borderRadius: 6,
+                            background: isCursor
+                              ? 'rgba(22,163,74,0.20)'
+                              : filledColor
+                                ? filledColor
+                                : willPaint
+                                  ? 'rgba(255,198,39,0.40)'
+                                  : onPath
+                                    ? 'rgba(22,163,74,0.12)'
+                                    : '#ffffff',
+                            border: isCursor
+                              ? `2px solid ${GREEN}`
+                              : isEnd
+                                ? '2px dashed #E0A93B'
+                                : willPaint
+                                  ? '1px dashed #E0A93B'
+                                  : `1px solid ${CELL_BORDER}`,
+                            cursor: canInteract && mode === 'paint' && !isRunning ? 'pointer' : 'default',
+                            transition: isCursor ? 'all 0.25s ease' : 'background 0.1s',
+                            animation: isPerfectCell ? 'pacPulseGreen 0.6s ease infinite' : 'none',
+                            position: 'relative',
+                          }}
+                        />
+                      )
+                    })
+                  )}
+                </div>
+              </div>
+
+              {/* Right — how-to hint */}
+              <div style={{ flex: '0 1 200px', minWidth: 180, display: 'flex', alignItems: 'center' }}>
+                <div style={{ ...CARD, width: '100%', padding: 16, display: 'flex', flexDirection: 'column', gap: 14 }}>
+                  <div style={{ display: 'flex', alignItems: 'flex-start', gap: 11 }}>
+                    <span style={{
+                      width: 32, height: 32, flexShrink: 0, borderRadius: '50%', background: GREEN,
+                      display: 'flex', alignItems: 'center', justifyContent: 'center',
+                      boxShadow: '0 3px 8px rgba(22,163,74,0.28)',
+                    }}>
+                      <Wand2 size={16} color="#ffffff" strokeWidth={2.3} />
+                    </span>
+                    <span style={{ fontSize: 13.5, lineHeight: 1.5, fontWeight: 600, color: INK }}>
+                      {mode === 'paint'
+                        ? 'Select a color and click or drag to fill cells'
+                        : 'Stack blocks below, then press Run to watch the robot paint'}
+                    </span>
+                  </div>
+
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 7 }}>
+                    {COLORS.slice(0, 4).map((c) => (
+                      <span
+                        key={c}
+                        style={{
+                          width: 26, height: 26, borderRadius: 7,
+                          background: SWATCH_FILL[c] ?? c,
+                          border: activeColor === c ? `2px solid ${GREEN}` : `1px solid ${BORDER}`,
+                          boxSizing: 'border-box',
+                        }}
+                      />
+                    ))}
+                    <span aria-hidden style={{ fontSize: 20, marginLeft: 2, animation: 'pacPoint 1.6s ease-in-out infinite' }}>
+                      👆
+                    </span>
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            {/* ================= Block coding panel ================= */}
+            {mode === 'code' && (
+              <div style={{ ...CARD, padding: 18, display: 'flex', flexDirection: 'column', gap: 14 }}>
+                {/* How Mode B works — a worked example, since a bare row of arrows
+                    gives no clue what "running a program" does. Dismissible, and
+                    it stays hidden once the child has started building. */}
+                {showCodeHelp && program.length === 0 && (
+                  <div style={{
+                    padding: 14, borderRadius: 14,
+                    background: MINT, border: `1px solid rgba(22,163,74,0.22)`,
+                    display: 'flex', flexDirection: 'column', gap: 9,
+                  }}>
+                    <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 12 }}>
+                      <span style={{ fontSize: 14, fontWeight: 700, color: GREEN_DEEP }}>How it works</span>
+                      <button
+                        onClick={() => setShowCodeHelp(false)}
+                        style={{ background: 'none', border: 'none', color: MUTED, cursor: 'pointer', fontSize: 13, fontWeight: 600, padding: 0, fontFamily: FONT }}
+                      >
+                        Got it ✕
+                      </button>
+                    </div>
+                    <div style={{ fontSize: 13.5, color: INK, lineHeight: 1.55 }}>
+                      The green square is your robot. Tap blocks to tell it where to go, then press Run.
+                    </div>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
+                      {['➡', '➡', '🎨'].map((g, i) => (
+                        <span key={i} style={{ padding: '5px 11px', borderRadius: 10, background: MINT_2, fontSize: 14 }}>
+                          {g}
+                        </span>
+                      ))}
+                      <span style={{ fontSize: 13, color: MUTED }}>
+                        = move right, right, then colour that square
+                      </span>
+                    </div>
+                  </div>
+                )}
+
+                {/* Plain-English readout of the program being built, plus what the
+                    ghost markers on the grid mean. */}
+                {program.length > 0 && !isRunning && (
+                  <div style={{ fontSize: 13, color: MUTED, lineHeight: 1.5 }}>
+                    {projection.blocked ? (
+                      <span style={{ color: '#C2410C', fontWeight: 600 }}>
+                        ⚠ This program walks off the grid — remove a move block.
+                      </span>
+                    ) : (
+                      <>
+                        Robot will make {program.filter((c) => c !== 'paint').length} move
+                        {program.filter((c) => c !== 'paint').length === 1 ? '' : 's'} and colour{' '}
+                        {projection.paint.size} square{projection.paint.size === 1 ? '' : 's'}
+                        {projection.paint.size > 0 ? ' (shown in yellow)' : ''}.
+                      </>
+                    )}
+                  </div>
+                )}
+
+                {/* Program sequence */}
+                <div style={{
+                  display: 'flex', gap: 8, padding: '12px 14px',
+                  background: '#F7F9F8', borderRadius: 14, border: `1px solid ${BORDER}`,
+                  overflowX: 'auto', minHeight: 52, alignItems: 'center', flexWrap: 'nowrap',
+                }}>
+                  {program.map((cmd, i) => {
+                    const c = COMMANDS.find((x) => x.key === cmd)
+                    return (
+                      <div
+                        key={i}
+                        style={{
+                          display: 'flex', alignItems: 'center', gap: 7,
+                          padding: '8px 12px', borderRadius: 999,
+                          background: MINT_2, color: GREEN_DEEP,
+                          fontSize: 14, fontWeight: 600, whiteSpace: 'nowrap', flexShrink: 0,
+                        }}
+                      >
+                        <span>{c?.label || cmd}</span>
+                        <span style={{ fontSize: 12.5, color: GREEN }}>{c?.name}</span>
+                        {canInteract && !isRunning && (
+                          <button
+                            onClick={() => handleRemoveCommand(i)}
+                            aria-label={`Remove ${c?.name || cmd}`}
+                            style={{ background: 'none', border: 'none', color: MUTED, cursor: 'pointer', padding: 0, fontSize: 13, lineHeight: 1, fontFamily: FONT }}
+                          >
+                            ✕
+                          </button>
+                        )}
+                      </div>
+                    )
+                  })}
+                  {program.length === 0 && programStatus === 'idle' && (
+                    <span style={{ fontSize: 13, color: MUTED }}>
+                      Click blocks below to build your program
+                    </span>
+                  )}
+                </div>
+
+                {/* Command blocks tray */}
+                <div style={{ display: 'flex', gap: 10 }}>
+                  {COMMANDS.map((cmd) => (
+                    <button
+                      key={cmd.key}
+                      onClick={() => handleAddCommand(cmd.key)}
+                      disabled={!canInteract || isRunning}
+                      style={{
+                        flex: 1, padding: '12px 0', borderRadius: 14,
+                        border: `1px solid ${BORDER}`, background: '#ffffff',
+                        cursor: canInteract && !isRunning ? 'pointer' : 'default',
+                        opacity: canInteract && !isRunning ? 1 : 0.45,
+                        color: GREEN_DEEP, fontFamily: FONT,
+                        boxShadow: '0 2px 8px rgba(31,59,44,0.06)',
+                        transition: 'all .15s',
+                      }}
+                    >
+                      <span style={{ display: 'block', fontSize: 18, lineHeight: 1.2 }}>{cmd.label}</span>
+                      <span style={{ display: 'block', fontSize: 12, fontWeight: 600, color: MUTED, lineHeight: 1.4, marginTop: 2 }}>{cmd.name}</span>
+                    </button>
+                  ))}
+                </div>
+
+                {/* Program controls */}
+                <div style={{ display: 'flex', gap: 12 }}>
+                  {!isRunning ? (
+                    <button
+                      onClick={handleRun}
+                      disabled={program.length === 0}
+                      style={{
+                        flex: 1, padding: '13px 0', borderRadius: 999, border: 'none',
+                        fontSize: 14, fontWeight: 700, fontFamily: FONT,
+                        cursor: program.length > 0 ? 'pointer' : 'default',
+                        opacity: program.length > 0 ? 1 : 0.45,
+                        background: GREEN, color: '#ffffff',
+                        boxShadow: '0 5px 14px rgba(22,163,74,0.26)',
+                      }}
+                    >
+                      ▶ Run
+                    </button>
+                  ) : (
+                    <button
+                      onClick={handleStop}
+                      style={{
+                        flex: 1, padding: '13px 0', borderRadius: 999, border: 'none',
+                        fontSize: 14, fontWeight: 700, fontFamily: FONT, cursor: 'pointer',
+                        background: CORAL, color: '#ffffff',
+                        boxShadow: '0 5px 14px rgba(239,68,68,0.26)',
+                      }}
+                    >
+                      ⏹ Stop
+                    </button>
+                  )}
+                  <button
+                    onClick={handleResetProgram}
+                    style={{
+                      flex: 1, padding: '13px 0', borderRadius: 999,
+                      border: `1px solid ${BORDER}`, background: '#ffffff',
+                      fontSize: 14, fontWeight: 700, fontFamily: FONT, cursor: 'pointer',
+                      color: INK,
+                    }}
+                  >
+                    🔄 Reset
+                  </button>
+                </div>
+
+                {/* Program status */}
+                {programStatus === 'out-of-bounds' && (
+                  <div style={{ textAlign: 'center', fontSize: 14, fontWeight: 700, color: '#D93A3A', animation: 'pacFadeInOut 2s ease forwards' }}>
+                    Out of bounds!
+                  </div>
+                )}
+                {programStatus === 'complete' && (
+                  <div style={{ textAlign: 'center', fontSize: 14, fontWeight: 700, color: GREEN_DEEP, animation: 'pacFadeInOut 2s ease forwards' }}>
+                    Program complete!
+                  </div>
+                )}
+              </div>
+            )}
+
+            {/* ================= Progress ================= */}
+            <div style={{
+              ...CARD, position: 'relative', padding: '16px 20px',
+              display: 'flex', alignItems: 'center', flexWrap: 'wrap', gap: 16,
+            }}>
+              <span style={{ fontSize: 14.5, fontWeight: 700, color: INK_DEEP, flexShrink: 0 }}>
+                Progress
+              </span>
+
+              <div style={{
+                flex: '1 1 200px', minWidth: 140, height: 14, borderRadius: 999,
+                background: '#EEF2F0', overflow: 'hidden',
+              }}>
+                <div style={{
+                  width: `${celebrating ? 100 : matchPct ?? 0}%`, height: '100%', borderRadius: 999,
+                  background: `linear-gradient(90deg, ${GREEN} 0%, #22C55E 100%)`,
+                  transition: 'width .3s ease',
+                }} />
+              </div>
+
+              <span style={{
+                flexShrink: 0, padding: '7px 14px', borderRadius: 999,
+                background: MINT_2, color: GREEN_DEEP, fontSize: 14, fontWeight: 700,
+              }}>
+                {celebrating ? 100 : matchPct ?? 0}%
+              </span>
+
+              <span style={{ flexShrink: 0, fontSize: 14, fontWeight: 600, color: MUTED }}>
+                {celebrating
+                  ? 'Perfect match!'
+                  : matchedCells !== null
+                    ? `${matchedCells} / ${totalCells} cells completed`
+                    : `${program.length} block${program.length === 1 ? '' : 's'} in the program`}
+              </span>
+
+              <span style={{
+                flexShrink: 0, marginLeft: 'auto', padding: '7px 14px', borderRadius: 999,
+                background: MINT, border: `1px solid rgba(22,163,74,0.22)`,
+                fontSize: 13.5, fontWeight: 700, color: GREEN_DEEP,
+              }}>
+                ✓ {score} completed
+              </span>
+
+              {/* Celebration emojis */}
+              {celebEmojis.map((e) => (
+                <div
+                  key={e.id}
+                  style={{
+                    position: 'absolute',
+                    left: `${e.x}%`,
+                    bottom: 0,
+                    fontSize: 24,
+                    zIndex: 10,
+                    pointerEvents: 'none',
+                    animation: 'pacFloatUp 1.6s ease forwards',
+                  }}
+                >
+                  {e.emoji}
+                </div>
               ))}
             </div>
 
-            {/* Reset */}
-            <button
-              onClick={handleReset}
-              style={{
-                flex: '0 0 auto',
-                padding: '6px 14px',
-                borderRadius: 8,
-                border: '1px solid rgba(200,96,42,0.18)',
-                background: 'rgba(200,96,42,0.1)',
-                color: '#c8602a',
-                fontSize: 11,
-                fontWeight: 600,
-                cursor: 'pointer',
-              }}
-            >
-              ↺ Reset Grid
-            </button>
-          </div>
-        )}
-
-        {/* Locked overlay notice */}
-        {!canInteract && (
-          <div style={{ flexShrink: 0, fontSize: 9, color: '#8b9096', textAlign: 'center', paddingBottom: 4 }}>
-            Therapist is controlling
-          </div>
-        )}
-
-        {/* ============================================== */}
-        {/* MIDDLE SECTION — Canvas (scrollable)          */}
-        {/* ============================================== */}
-        <div style={{ flex: 1, minHeight: 0, overflowY: 'auto', display: 'flex', flexDirection: 'column' }}>
-          {/* Target preview - Mode A */}
-          {mode === 'paint' && pattern && scaledTarget && (
-            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 10, flexShrink: 0, paddingBottom: 6 }}>
-              <div
-                style={{
-                  display: 'grid',
-                  gridTemplateColumns: `repeat(${gridSize}, ${previewCellSize})`,
-                  gap: 0.5,
-                  width: 56,
-                  height: 56,
-                  flexShrink: 0,
-                }}
-              >
-                {Array.from({ length: gridSize }, (_, r) =>
-                  Array.from({ length: gridSize }, (_, c) => {
-                    const shouldFill = scaledTarget[r][c] === 1
-                    return (
-                      <div
-                        key={`preview-${r}-${c}`}
-                        style={{
-                          background: shouldFill ? '#4a7c6f' : 'rgba(0,0,0,0.04)',
-                          borderRadius: 1,
-                        }}
-                      />
-                    )
-                  })
-                )}
-              </div>
-              <span style={{ fontSize: 9, color: '#8b9096' }}>Match this</span>
-            </div>
-          )}
-
-          {/* Grid */}
-          <div
-            style={{
-              display: 'flex',
-              alignItems: 'center',
-              justifyContent: 'center',
-              paddingBottom: 4,
-              flex: 1,
-              minHeight: 0,
-            }}
-          >
-            <div
-              onTouchMove={handleGridTouchMove}
-              onTouchEnd={handleGridTouchEnd}
-              style={{
-                display: 'grid',
-                gridTemplateColumns: `repeat(${gridSize}, 1fr)`,
-                gap: gridGap,
-                // Square, sized from the height the canvas actually leaves,
-                // rather than a fixed 288px sidebar cap.
-                height: '100%',
-                minHeight: 120,
-                aspectRatio: '1',
-                maxWidth: '100%',
-                touchAction: 'none',
-              }}
-            >
-              {Array.from({ length: gridSize }, (_, r) =>
-                Array.from({ length: gridSize }, (_, c) => {
-                  const key = `${r}-${c}`
-                  const filledColor = cells[key]
-                  const isCursor = mode === 'code' && cursorPos.row === r && cursorPos.col === c
-                  const isPerfectCell = perfectCells.has(key)
-                  // Ghost preview of the program the child is building.
-                  const willPaint = projection.paint.has(key)
-                  const onPath = projection.path.has(key)
-                  const isEnd = !!projection.end && projection.end.row === r && projection.end.col === c
-
-                  return (
-                    <div
-                      key={key}
-                      data-cell={`${r},${c}`}
-                      onMouseDown={() => handleCellMouseDown(r, c)}
-                      onMouseEnter={() => handleCellMouseEnter(r, c)}
-                      onTouchStart={(e) => handleCellTouchStart(e, r, c)}
-                      style={{
-                        aspectRatio: '1',
-                        borderRadius: 2,
-                        background: isCursor
-                          ? 'rgba(74,124,111,0.25)'
-                          : filledColor
-                            ? filledColor
-                            : willPaint
-                              ? 'rgba(247,201,72,0.35)'
-                              : onPath
-                                ? 'rgba(74,124,111,0.14)'
-                                : 'rgba(0,0,0,0.04)',
-                        border: isCursor
-                          ? '2px solid #4a7c6f'
-                          : isEnd
-                            ? '1.5px dashed rgba(247,201,72,0.8)'
-                            : willPaint
-                              ? '1px dashed rgba(247,201,72,0.7)'
-                              : '0.5px solid rgba(0,0,0,0.06)',
-                        cursor: canInteract && mode === 'paint' && !isRunning ? 'pointer' : 'default',
-                        transition: isCursor
-                          ? 'all 0.25s ease'
-                          : 'background 0.1s',
-                        animation: isPerfectCell ? 'pacPulseGreen 0.6s ease infinite' : 'none',
-                        position: 'relative',
-                      }}
-                    >
-                      {isCursor && mode === 'code' && (
-                        <div
-                          style={{
-                            position: 'absolute',
-                            borderRadius: 3,
-                            border: '2px solid #4a7c6f',
-                            pointerEvents: 'none',
-                          }}
-                        />
-                      )}
-                    </div>
-                  )
-                })
-              )}
-            </div>
-          </div>
-
-          {/* Match percentage - Mode A */}
-          {mode === 'paint' && matchPct !== null && (
-            <div style={{ textAlign: 'center', paddingBottom: 4, flexShrink: 0 }}>
-              <span style={{ fontSize: 9, color: matchPct === 100 ? '#6ba395' : '#6b7280' }}>
-                {matchPct}% matched
-              </span>
-            </div>
-          )}
-        </div>
-
-        {/* ============================================== */}
-        {/* BOTTOM SECTION — Command Tray + Score         */}
-        {/* ============================================== */}
-        <div style={{ flexShrink: 0, borderTop: '1px solid rgba(0,0,0,0.05)', paddingTop: 6, marginTop: 6 }}>
-          {/* Block Coding Mode */}
-          {mode === 'code' && (
-            <>
-              {/* How Mode B works — a worked example, since a bare row of arrows
-                  gives no clue what "running a program" does. Dismissible, and
-                  it stays hidden once the child has started building. */}
-              {showCodeHelp && program.length === 0 && (
-                <div
-                  style={{
-                    marginBottom: 5,
-                    padding: '6px 8px',
-                    borderRadius: 8,
-                    background: 'rgba(74,124,111,0.12)',
-                    border: '1px solid rgba(74,124,111,0.18)',
-                  }}
-                >
-                  <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 4 }}>
-                    <span style={{ fontSize: 9, fontWeight: 600, color: '#2f6d5e' }}>
-                      How it works
-                    </span>
-                    <button
-                      onClick={() => setShowCodeHelp(false)}
-                      style={{ background: 'none', border: 'none', color: '#8b9096', cursor: 'pointer', fontSize: 9, padding: 0 }}
-                    >
-                      Got it ✕
-                    </button>
-                  </div>
-                  <div style={{ fontSize: 8, color: '#5b6169', lineHeight: 1.5 }}>
-                    The green square is your robot. Tap blocks to tell it where to
-                    go, then press Run.
-                  </div>
-                  <div style={{ display: 'flex', alignItems: 'center', gap: 3, marginTop: 5 }}>
-                    {['➡', '➡', '🎨'].map((g, i) => (
-                      <span
-                        key={i}
-                        style={{ padding: '1px 5px', borderRadius: 8, background: 'rgba(74,124,111,0.25)', fontSize: 10 }}
-                      >
-                        {g}
-                      </span>
-                    ))}
-                    <span style={{ fontSize: 8, color: '#6b7280', marginLeft: 2 }}>
-                      = move right, right, then colour that square
-                    </span>
-                  </div>
-                </div>
-              )}
-
-              {/* Plain-English readout of the program being built, plus what the
-                  ghost markers on the grid mean. */}
-              {program.length > 0 && !isRunning && (
-                <div style={{ marginBottom: 4, fontSize: 8, color: '#6b7280', lineHeight: 1.4 }}>
-                  {projection.blocked ? (
-                    <span style={{ color: '#e8a87c' }}>
-                      ⚠ This program walks off the grid — remove a move block.
-                    </span>
-                  ) : (
-                    <>
-                      Robot will make {program.filter((c) => c !== 'paint').length} move
-                      {program.filter((c) => c !== 'paint').length === 1 ? '' : 's'} and colour{' '}
-                      {projection.paint.size} square{projection.paint.size === 1 ? '' : 's'}
-                      {projection.paint.size > 0 ? ' (shown in yellow)' : ''}.
-                    </>
-                  )}
-                </div>
-              )}
-
-              {/* Program sequence */}
-              <div
-                style={{
-                  display: 'flex',
-                  gap: 3,
-                  padding: '4px 6px',
-                  background: 'rgba(0,0,0,0.04)',
-                  borderRadius: 8,
-                  marginBottom: 4,
-                  overflowX: 'auto',
-                  minHeight: 28,
-                  alignItems: 'center',
-                  flexWrap: 'nowrap',
-                }}
-              >
-                {program.map((cmd, i) => {
-                  const c = COMMANDS.find((x) => x.key === cmd)
-                  return (
-                    <div
-                      key={i}
-                      style={{
-                        display: 'flex',
-                        alignItems: 'center',
-                        gap: 2,
-                        padding: '2px 6px',
-                        borderRadius: 10,
-                        background: 'rgba(74,124,111,0.2)',
-                        color: '#2f6d5e',
-                        fontSize: 10,
-                        whiteSpace: 'nowrap',
-                        flexShrink: 0,
-                      }}
-                    >
-                      <span>{c?.label || cmd}</span>
-                      <span style={{ fontSize: 8, opacity: 0.75 }}>{c?.name}</span>
-                      {canInteract && !isRunning && (
-                        <button
-                          onClick={() => handleRemoveCommand(i)}
-                          style={{
-                            background: 'none',
-                            border: 'none',
-                            color: '#8b9096',
-                            cursor: 'pointer',
-                            padding: 0,
-                            fontSize: 9,
-                            lineHeight: 1,
-                          }}
-                        >
-                          ✕
-                        </button>
-                      )}
-                    </div>
-                  )
-                })}
-                {program.length === 0 && programStatus === 'idle' && (
-                  <span style={{ fontSize: 8, color: 'rgba(0,0,0,0.22)' }}>
-                    Click blocks below to build your program
-                  </span>
-                )}
-              </div>
-
-              {/* Command blocks tray */}
-              <div className="flex items-center" style={{ gap: 3, marginBottom: 4 }}>
-                {COMMANDS.map((cmd) => (
-                  <button
-                    key={cmd.key}
-                    onClick={() => handleAddCommand(cmd.key)}
-                    disabled={!canInteract || isRunning}
-                    style={{
-                      flex: 1,
-                      padding: '4px 0',
-                      borderRadius: 10,
-                      border: 'none',
-                      fontSize: 12,
-                      cursor: canInteract && !isRunning ? 'pointer' : 'default',
-                      opacity: canInteract && !isRunning ? 1 : 0.4,
-                      background: 'rgba(0,0,0,0.05)',
-                      color: '#2f6d5e',
-                      transition: 'all 0.15s',
-                    }}
-                  >
-                    <span style={{ display: 'block', fontSize: 13, lineHeight: 1.1 }}>{cmd.label}</span>
-                    <span style={{ display: 'block', fontSize: 7, opacity: 0.7, lineHeight: 1.3 }}>{cmd.name}</span>
-                  </button>
-                ))}
-              </div>
-
-              {/* Program controls */}
-              <div className="flex items-center" style={{ gap: 3, marginBottom: 4 }}>
-                {!isRunning ? (
-                  <button
-                    onClick={handleRun}
-                    disabled={program.length === 0}
-                    style={{
-                      flex: 1,
-                      padding: '5px 0',
-                      borderRadius: 8,
-                      border: 'none',
-                      fontSize: 9,
-                      fontWeight: 600,
-                      cursor: program.length > 0 ? 'pointer' : 'default',
-                      opacity: program.length > 0 ? 1 : 0.4,
-                      background: 'rgba(74,124,111,0.18)',
-                      color: '#2f6d5e',
-                    }}
-                  >
-                    ▶ Run
-                  </button>
-                ) : (
-                  <button
-                    onClick={handleStop}
-                    style={{
-                      flex: 1,
-                      padding: '5px 0',
-                      borderRadius: 8,
-                      border: 'none',
-                      fontSize: 9,
-                      fontWeight: 600,
-                      cursor: 'pointer',
-                      background: 'rgba(200,96,42,0.16)',
-                      color: '#c8602a',
-                    }}
-                  >
-                    ⏹ Stop
-                  </button>
-                )}
-                <button
-                  onClick={handleResetProgram}
-                  style={{
-                    flex: 1,
-                    padding: '5px 0',
-                    borderRadius: 8,
-                    border: 'none',
-                    fontSize: 9,
-                    fontWeight: 600,
-                    cursor: 'pointer',
-                    background: 'rgba(0,0,0,0.05)',
-                    color: '#6b7280',
-                  }}
-                >
-                  🔄 Reset
-                </button>
-              </div>
-
-              {/* Program status */}
-              {programStatus === 'out-of-bounds' && (
-                <div
-                  style={{
-                    textAlign: 'center',
-                    fontSize: 9,
-                    color: '#c8602a',
-                    animation: 'pacFadeInOut 2s ease forwards',
-                  }}
-                >
-                  Out of bounds!
-                </div>
-              )}
-              {programStatus === 'complete' && (
-                <div
-                  style={{
-                    textAlign: 'center',
-                    fontSize: 9,
-                    color: '#6ba395',
-                    animation: 'pacFadeInOut 2s ease forwards',
-                  }}
-                >
-                  Program complete!
-                </div>
-              )}
-            </>
-          )}
-
-          {/* Score bar */}
-          <div
-            style={{
-              display: 'flex',
-              alignItems: 'center',
-              justifyContent: 'space-between',
-              position: 'relative',
-            }}
-          >
-            <span style={{ fontSize: 10, color: '#6b7280' }}>
-              {mode === 'paint' ? '🎨 Free Paint' : '💻 Block Code'}
-            </span>
-            <span style={{ fontSize: 10, color: '#6b7280' }}>
-              ✓ {score} completed
-            </span>
-
-            {/* Celebration emojis */}
-            {celebEmojis.map((e) => (
-              <div
-                key={e.id}
-                style={{
-                  position: 'absolute',
-                  left: `${e.x}%`,
-                  bottom: 0,
-                  fontSize: 18,
-                  zIndex: 10,
-                  pointerEvents: 'none',
-                  animation: 'pacFloatUp 1.6s ease forwards',
-                }}
-              >
-                {e.emoji}
-              </div>
-            ))}
           </div>
         </div>
       </div>
     </>
   )
+}
+
+/* Round carousel arrows at each end of the shape strip. */
+function ChevronButton({ dir, onClick }: { dir: 'left' | 'right'; onClick: () => void }) {
+  return (
+    <button
+      onClick={onClick}
+      aria-label={dir === 'left' ? 'Previous shapes' : 'More shapes'}
+      style={{
+        flexShrink: 0, width: 40, height: 40, borderRadius: '50%',
+        display: 'flex', alignItems: 'center', justifyContent: 'center',
+        background: '#ffffff', border: `1px solid ${BORDER}`, cursor: 'pointer',
+        boxShadow: '0 3px 10px rgba(31,59,44,0.10)',
+      }}
+    >
+      {dir === 'left'
+        ? <ChevronLeft size={20} color={INK} strokeWidth={2.2} />
+        : <ChevronRight size={20} color={INK} strokeWidth={2.2} />}
+    </button>
+  )
+}
+
+/* Hairline between toolbar groups. */
+function Divider() {
+  return <span aria-hidden style={{ width: 1, height: 30, background: 'rgba(31,59,44,0.12)', flexShrink: 0 }} />
 }

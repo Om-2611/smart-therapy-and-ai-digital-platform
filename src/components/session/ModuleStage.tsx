@@ -91,6 +91,9 @@ function VideoTile({
   )
 }
 
+/** Floor for the activity canvas; below this the stage scrolls instead of squeezing. */
+const MODULE_MIN_HEIGHT = 560
+
 /** Registry lookup: the module's display identity and its category tint. */
 function moduleIdentity(moduleId: string | null) {
   for (const cat of MODULE_CATEGORIES) {
@@ -301,17 +304,22 @@ export default function ModuleStage({
         style={{
           flex: 1,
           minHeight: 0,
-          // A flex column that does NOT scroll: modules are built to fill their
-          // container (root `height: 100%` with internal `flex: 1` regions), the
-          // same contract the 420px panel gave them. Letting this scroll instead
-          // makes tall modules overflow and cuts off their game area.
-          overflow: 'hidden',
-          padding: '10px 16px 12px',
+          // Scrolls rather than compresses. Modules fill their container, so a
+          // short window used to squeeze every panel until the layout looked
+          // packed. The inner sizer below keeps a comfortable canvas and this
+          // scrolls past it instead.
+          overflowY: 'auto',
+          overflowX: 'hidden',
+          padding: '18px 22px 22px',
           display: 'flex',
           flexDirection: 'column',
         }}
       >
-        {children}
+        {/* Grows to fill a tall window, but never shrinks below a workable
+            height — that floor is what stops the packed-in look. */}
+        <div style={{ flex: '1 0 auto', minHeight: MODULE_MIN_HEIGHT, display: 'flex', flexDirection: 'column' }}>
+          {children}
+        </div>
       </div>
     </div>
   )

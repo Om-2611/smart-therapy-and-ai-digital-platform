@@ -8,6 +8,10 @@ import { staadSpeak, randomPraise } from '@/lib/voice/staadVoice'
 import { useVoiceLanguage } from '@/lib/voice/useVoiceLanguage'
 import VoiceLanguageToggle from '@/components/modules/VoiceLanguageToggle'
 
+// Scene backdrop for the sorting canvas. Pale sky art with the decoration kept
+// to the edges, so bins and item tiles stay readable over the middle.
+const DD_SCENE = `/assets/modules/Background/${encodeURIComponent('Drag and drop sorting_.png')}`
+
 interface DragDropSortingProps {
   sessionId: string
   role: 'therapist' | 'client'
@@ -427,13 +431,31 @@ export default function DragDropSorting({ sessionId, role, isLocked }: DragDropS
       )}
 
       {/* Canvas */}
-      <div ref={cRef} style={{ flex: 1, position: 'relative', overflow: 'hidden', minHeight: 0, display: 'flex', flexDirection: 'column', padding: 10, gap: 8, touchAction: 'none' }}>
+      <div
+        ref={cRef}
+        style={{
+          flex: 1,
+          position: 'relative',
+          overflow: 'hidden',
+          minHeight: 0,
+          display: 'flex',
+          flexDirection: 'column',
+          padding: 18,
+          gap: 14,
+          touchAction: 'none',
+          borderRadius: 16,
+          backgroundImage: `url('${DD_SCENE}')`,
+          backgroundSize: 'cover',
+          backgroundPosition: 'center',
+        }}
+      >
 
         {/* Item pool */}
         <div style={{
-          background: 'rgba(0,0,0,0.03)', borderRadius: 10, padding: 10,
-          minHeight: 80, border: '1px dashed rgba(0,0,0,0.08)',
-          display: 'flex', flexWrap: 'wrap', gap: 6, alignContent: 'flex-start',
+          background: 'rgba(255,255,255,0.78)', borderRadius: 14, padding: 16,
+          minHeight: 104, border: '1px dashed rgba(0,0,0,0.14)',
+          display: 'flex', flexWrap: 'wrap', gap: 12, alignContent: 'flex-start',
+          boxShadow: '0 4px 14px rgba(20,30,40,0.06)',
         }}>
           {unsortedItems.map(id => {
             const item = itemMap.get(id)
@@ -476,7 +498,7 @@ export default function DragDropSorting({ sessionId, role, isLocked }: DragDropS
         </div>
 
         {/* Bins */}
-        <div style={{ display: 'flex', gap: 6, flex: 1, minHeight: 0 }}>
+        <div style={{ display: 'flex', gap: 12, flex: 1, minHeight: 0 }}>
           {usedBins.map(bin => {
             const isHover = hoverBin === bin.id
             const isFlash = flashWrong.has(bin.id)
@@ -488,11 +510,12 @@ export default function DragDropSorting({ sessionId, role, isLocked }: DragDropS
                 onDragLeave={onDragLeave}
                 onDrop={e => onDrop(e, bin.id)}
                 style={{
-                  flex: 1, borderRadius: 12, minHeight: 80, padding: 6,
-                  display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 4,
+                  flex: 1, borderRadius: 16, minHeight: 120, padding: 14,
+                  display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 10,
                   transition: 'all 0.2s', overflowY: 'auto',
-                  background: isFlash ? 'rgba(200,96,42,0.2)' : isHover ? 'rgba(74,124,111,0.12)' : 'rgba(0,0,0,0.04)',
-                  border: isFlash ? '1.5px solid rgba(200,96,42,0.5)' : isHover ? '1.5px solid rgba(74,124,111,0.5)' : '1.5px dashed rgba(0,0,0,0.12)',
+                  boxShadow: '0 4px 14px rgba(20,30,40,0.06)',
+                  background: isFlash ? 'rgba(200,96,42,0.2)' : isHover ? 'rgba(74,124,111,0.16)' : 'rgba(255,255,255,0.78)',
+                  border: isFlash ? '1.5px solid rgba(200,96,42,0.5)' : isHover ? '1.5px solid rgba(74,124,111,0.5)' : '1.5px dashed rgba(0,0,0,0.18)',
                   borderStyle: isHover ? 'solid' : 'dashed',
                   transform: isHover ? 'scale(1.02)' : 'scale(1)',
                 }}
@@ -524,12 +547,12 @@ export default function DragDropSorting({ sessionId, role, isLocked }: DragDropS
         </div>
 
         {/* Score bar */}
-        <div style={{ flexShrink: 0 }}>
-          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', fontSize: 11, color: 'rgba(0,0,0,0.5)', marginBottom: 3 }}>
+        <div style={{ flexShrink: 0, background: 'rgba(255,255,255,0.82)', borderRadius: 12, padding: '12px 14px', boxShadow: '0 4px 14px rgba(20,30,40,0.06)' }}>
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', fontSize: 11, color: 'rgba(0,0,0,0.62)', marginBottom: 8 }}>
             <span>✓ {correct} sorted correctly</span>
             <span>{remaining} left</span>
           </div>
-          <div style={{ width: '100%', height: 3, borderRadius: 2, background: 'rgba(0,0,0,0.08)', overflow: 'hidden' }}>
+          <div style={{ width: '100%', height: 6, borderRadius: 3, background: 'rgba(0,0,0,0.10)', overflow: 'hidden' }}>
             <div style={{ width: `${pct}%`, height: '100%', background: '#4a7c6f', borderRadius: 2, transition: 'width 0.3s ease' }} />
           </div>
         </div>
@@ -569,7 +592,7 @@ export default function DragDropSorting({ sessionId, role, isLocked }: DragDropS
               style={{ padding: '8px 20px', borderRadius: 8, border: '1px solid rgba(0,0,0,0.12)', background: 'rgba(0,0,0,0.07)', color: 'rgba(0,0,0,0.8)', cursor: 'pointer', fontSize: 12 }}
             >Same set again</button>
             <button onClick={handleNewSet}
-              style={{ padding: '8px 20px', borderRadius: 8, border: '1px solid rgba(74,124,111,0.4)', background: 'rgba(74,124,111,0.2)', color: '#b8d4ce', cursor: 'pointer', fontSize: 12 }}
+              style={{ padding: '8px 20px', borderRadius: 8, border: '1px solid rgba(74,124,111,0.4)', background: 'rgba(74,124,111,0.2)', color: '#1F7A44', cursor: 'pointer', fontSize: 12 }}
             >New set</button>
           </div>
         </div>

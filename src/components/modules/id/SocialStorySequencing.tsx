@@ -550,7 +550,7 @@ export default function SocialStorySequencing({ sessionId, role, isLocked }: Soc
           )}
           <div style={{ display: 'flex', gap: 4 }}>
             <button onClick={saveCustomStory}
-              style={{ flex: 1, padding: '5px 0', borderRadius: 6, border: '1px solid rgba(74,124,111,0.5)', background: 'rgba(74,124,111,0.2)', color: '#b8d4ce', cursor: 'pointer', fontSize: 11 }}
+              style={{ flex: 1, padding: '5px 0', borderRadius: 6, border: '1px solid rgba(74,124,111,0.5)', background: 'rgba(74,124,111,0.2)', color: '#1F7A44', cursor: 'pointer', fontSize: 11 }}
             >Save & use</button>
             <button onClick={() => setShowCustomForm(false)}
               style={{ padding: '5px 12px', borderRadius: 6, border: '1px solid rgba(0,0,0,0.1)', background: 'transparent', color: 'rgba(0,0,0,0.4)', cursor: 'pointer', fontSize: 11 }}
@@ -567,14 +567,14 @@ export default function SocialStorySequencing({ sessionId, role, isLocked }: Soc
       )}
 
       {currentStory && (
-        <div ref={cRef} style={{ flex: 1, position: 'relative', overflow: 'hidden', minHeight: 0, display: 'flex', flexDirection: 'column', padding: 10, gap: 8, touchAction: 'none' }}>
+        <div ref={cRef} style={{ flex: 1, position: 'relative', overflow: 'hidden', minHeight: 0, display: 'flex', flexDirection: 'column', padding: 18, gap: 14, touchAction: 'none' }}>
           {/* Story title */}
           <div style={{ fontSize: 14, fontFamily: '"DM Serif Display", serif', color: 'rgba(0,0,0,0.8)', textAlign: 'center', flexShrink: 0 }}>
             {currentStory.title}
           </div>
 
           {/* Sequence slots */}
-          <div style={{ display: 'flex', gap: 4, flexShrink: 0 }}>
+          <div style={{ display: 'flex', gap: 10, flexShrink: 0 }}>
             {Array.from({ length: slotCount }, (_, idx) => {
               const pid = placed[String(idx)]
               const panel = pid ? panelMap.get(pid) : null
@@ -624,7 +624,7 @@ export default function SocialStorySequencing({ sessionId, role, isLocked }: Soc
           </div>
 
           {/* Shuffled panel cards */}
-          <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6, padding: 6, minHeight: 86, alignContent: 'flex-start', background: 'rgba(0,0,0,0.03)', borderRadius: 10, border: '1px dashed rgba(0,0,0,0.08)', flex: 1, overflowY: 'auto' }}>
+          <div style={{ display: 'flex', flexWrap: 'wrap', gap: 12, padding: 16, minHeight: 110, alignContent: 'flex-start', background: 'rgba(0,0,0,0.035)', borderRadius: 14, border: '1px dashed rgba(0,0,0,0.14)', flex: 1, overflowY: 'auto' }}>
             {unplacedIds.map(id => {
               const panel = panelMap.get(id)
               if (!panel) return null
@@ -660,14 +660,14 @@ export default function SocialStorySequencing({ sessionId, role, isLocked }: Soc
           </div>
 
           {/* Check button */}
-          <div style={{ display: 'flex', gap: 6, flexShrink: 0 }}>
+          <div style={{ display: 'flex', gap: 10, flexShrink: 0 }}>
             <button onClick={handleCheck}
               disabled={!canCheck}
               style={{
                 flex: 1, padding: '8px 0', borderRadius: 8, fontSize: 12, cursor: canCheck ? 'pointer' : 'default',
                 background: canCheck ? 'rgba(74,124,111,0.3)' : 'rgba(0,0,0,0.04)',
                 border: canCheck ? '1px solid rgba(74,124,111,0.4)' : '1px solid rgba(0,0,0,0.08)',
-                color: canCheck ? '#b8d4ce' : 'rgba(0,0,0,0.25)',
+                color: canCheck ? '#1F7A44' : 'rgba(0,0,0,0.25)',
                 opacity: canCheck ? 1 : 0.4,
               }}
             >Check my story ✓</button>
@@ -717,7 +717,7 @@ export default function SocialStorySequencing({ sessionId, role, isLocked }: Soc
             >Same story</button>
             {isT && (
               <button onClick={nextStory}
-                style={{ padding: '8px 20px', borderRadius: 8, border: '1px solid rgba(74,124,111,0.4)', background: 'rgba(74,124,111,0.2)', color: '#b8d4ce', cursor: 'pointer', fontSize: 12 }}
+                style={{ padding: '8px 20px', borderRadius: 8, border: '1px solid rgba(74,124,111,0.4)', background: 'rgba(74,124,111,0.2)', color: '#1F7A44', cursor: 'pointer', fontSize: 12 }}
               >New story</button>
             )}
           </div>
