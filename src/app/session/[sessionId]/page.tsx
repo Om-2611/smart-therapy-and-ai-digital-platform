@@ -32,6 +32,7 @@ import TherapyModulesPanel from '@/components/session/TherapyModulesPanel';
 import { ShareWhiteboardModal } from '@/components/session/WhiteboardStage';
 import StaadWhiteboard from '@/components/session/StaadWhiteboard';
 import ModuleStage from '@/components/session/ModuleStage';
+import ClientSessionRoom from '@/components/session/ClientSessionRoom';
 import { ModuleContent } from '@/components/GlassModulePanel';
 
 interface SessionState {
@@ -593,10 +594,41 @@ export default function SessionRoomPage({ params }: { params: { sessionId: strin
         userRole={userRole}
         onState={setAttention}
       />
-      {/* Skill Development modules take over the whole room with their own
-          full-canvas layout. Every other module falls through to the normal
-          session room layout below, unchanged. */}
-      {isSkillModule(activeModule) ? (
+      {/* The patient gets their own calm call surface: STAAD header, one big
+          video stage and a labelled control dock. Skill Development modules
+          still take the room over for both roles (below), so this only covers
+          the ordinary session. */}
+      {!isTherapist && !isSkillModule(activeModule) ? (
+        <>
+          <ClientSessionRoom
+            sessionId={sessionId}
+            uid={uid}
+            therapistName={participantName}
+            therapistOnline={Object.values(participants).some((p) => p.role === 'therapist' && p.isOnline)}
+            clientName={selfName}
+            elapsed={elapsed}
+            onEndSession={() => setShowConfirm(true)}
+            activeModule={activeModule}
+            isLocked={isLocked}
+            whiteboardActive={whiteboardOpenRemote && whiteboardShared}
+          />
+          <AIErrorBoundary>
+            {showConsentBanner && (
+              <AIConsentBanner
+                userRole={userRole}
+                onConsent={handleConsent}
+                otherPartyConsented={therapistConsented}
+              />
+            )}
+          </AIErrorBoundary>
+          {showConfirm && (
+            <ConfirmEndDialog
+              onCancel={() => setShowConfirm(false)}
+              onConfirmed={handleLeaveSession}
+            />
+          )}
+        </>
+      ) : isSkillModule(activeModule) ? (
         <>
           <SkillDevLayout
             sessionId={sessionId}
