@@ -33,7 +33,7 @@ export default function SessionTopBar({
   const timeLabel = started.toLocaleTimeString(undefined, { hour: 'numeric', minute: '2-digit' })
 
   const microLabel: React.CSSProperties = {
-    fontSize: 11.5,
+    fontSize: 13,
     fontWeight: 600,
     letterSpacing: 0.4,
     textTransform: 'uppercase',
@@ -75,14 +75,14 @@ export default function SessionTopBar({
               background: RC.greenSoft,
               border: `1px solid ${RC.green}`,
               color: RC.greenDark,
-              fontSize: 13,
+              fontSize: 14,
               fontWeight: 600,
             }}
           >
             <ShieldCheck size={13} />
             End-to-End Encrypted
           </div>
-          <div style={{ fontSize: 11.5, color: RC.inkMuted, marginTop: 2, paddingLeft: 2 }}>
+          <div style={{ fontSize: 13, color: RC.inkMuted, marginTop: 2, paddingLeft: 2 }}>
             Your session is secure
           </div>
         </div>
@@ -100,7 +100,7 @@ export default function SessionTopBar({
           </div>
           <div
             style={{
-              fontSize: 16,
+              fontSize: 17.5,
               fontWeight: 600,
               color: RC.ink,
               fontFamily: 'monospace',
@@ -118,10 +118,10 @@ export default function SessionTopBar({
         <div style={{ flexShrink: 0, display: 'flex', alignItems: 'center', gap: 8 }}>
           <div style={{ textAlign: 'right' }}>
             <div style={{ ...microLabel, justifyContent: 'flex-end' }}>Session Info</div>
-            <div style={{ fontSize: 13, fontWeight: 600, color: RC.ink, marginTop: 1 }}>
+            <div style={{ fontSize: 14, fontWeight: 600, color: RC.ink, marginTop: 1 }}>
               {dateLabel} · {timeLabel}
             </div>
-            <div style={{ fontSize: 12, color: RC.inkMuted }}>{sessionType}</div>
+            <div style={{ fontSize: 13, color: RC.inkMuted }}>{sessionType}</div>
           </div>
           <button
             onClick={() => setInfoOpen((o) => !o)}
@@ -168,10 +168,10 @@ export default function SessionTopBar({
             ['Session ID', sessionId],
           ].map(([k, v]) => (
             <div key={k} style={{ display: 'flex', justifyContent: 'space-between', gap: 12, padding: '4px 0' }}>
-              <span style={{ fontSize: 12, color: RC.inkMuted }}>{k}</span>
+              <span style={{ fontSize: 13, color: RC.inkMuted }}>{k}</span>
               <span
                 style={{
-                  fontSize: 12,
+                  fontSize: 13,
                   fontWeight: 600,
                   color: RC.ink,
                   maxWidth: 160,

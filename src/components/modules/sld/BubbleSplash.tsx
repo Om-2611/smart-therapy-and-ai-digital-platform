@@ -798,7 +798,7 @@ export default function BubbleSplash({ sessionId, role, isLocked }: BubbleSplash
     border: `2px solid ${on ? accent : `${accent}33`}`,
     background: on ? accent : '#ffffff',
     color: on ? '#ffffff' : accent,
-    fontSize: 16,
+    fontSize: 17.5,
     fontWeight: 700,
     lineHeight: 1.15,
     whiteSpace: 'nowrap',
@@ -814,7 +814,7 @@ export default function BubbleSplash({ sessionId, role, isLocked }: BubbleSplash
     border: `2px solid ${on ? '#BBE7CC' : 'transparent'}`,
     background: on ? '#E7F7EE' : '#F3F5F8',
     color: on ? GREEN_DEEP : MUTED,
-    fontSize: 16,
+    fontSize: 17.5,
     fontWeight: 700,
     lineHeight: 1.15,
     whiteSpace: 'nowrap',
@@ -833,7 +833,7 @@ export default function BubbleSplash({ sessionId, role, isLocked }: BubbleSplash
     border: `2px solid ${on ? accent : BORDER}`,
     background: on ? `${accent}12` : '#ffffff',
     color: on ? accent : INK_BODY,
-    fontSize: 16,
+    fontSize: 17.5,
     fontWeight: 700,
     lineHeight: 1.15,
     whiteSpace: 'nowrap',
@@ -862,7 +862,7 @@ export default function BubbleSplash({ sessionId, role, isLocked }: BubbleSplash
     border: `1px solid ${BORDER}`,
     background: '#ffffff',
     color: INK,
-    fontSize: 15,
+    fontSize: 16.5,
     fontWeight: 600,
     outline: 'none',
   }
@@ -1022,7 +1022,7 @@ export default function BubbleSplash({ sessionId, role, isLocked }: BubbleSplash
               border: `2px solid ${isPlaying ? '#F6D6AE' : '#BBE7CC'}`,
               background: isPlaying ? '#FFF6EC' : '#E7F7EE',
               color: isPlaying ? AMBER : GREEN_DEEP,
-              fontSize: 16,
+              fontSize: 17.5,
               fontWeight: 700,
               lineHeight: 1.15,
               whiteSpace: 'nowrap',
@@ -1067,7 +1067,7 @@ export default function BubbleSplash({ sessionId, role, isLocked }: BubbleSplash
                 }}
               >
                 <BookOpen size={18} strokeWidth={2.4} color={VIOLET} />
-                <span style={{ fontSize: 17, fontWeight: 800, color: VIOLET, letterSpacing: -0.2 }}>
+                <span style={{ fontSize: 18.5, fontWeight: 800, color: VIOLET, letterSpacing: -0.2 }}>
                   How it works
                 </span>
               </div>
@@ -1077,7 +1077,7 @@ export default function BubbleSplash({ sessionId, role, isLocked }: BubbleSplash
                     <span aria-hidden style={{ flexShrink: 0, marginTop: 2, lineHeight: 0 }}>
                       <h.Icon size={17} strokeWidth={2.3} color={h.accent} />
                     </span>
-                    <p style={{ margin: 0, fontSize: 15, fontWeight: 600, lineHeight: 1.6, color: INK_BODY }}>
+                    <p style={{ margin: 0, fontSize: 16.5, fontWeight: 600, lineHeight: 1.6, color: INK_BODY }}>
                       <span style={{ fontWeight: 800, color: h.accent }}>{h.term}:</span> {h.body}
                     </p>
                   </div>
@@ -1091,7 +1091,7 @@ export default function BubbleSplash({ sessionId, role, isLocked }: BubbleSplash
               <div style={{ ...card, padding: 18, flexShrink: 0, display: 'flex', flexDirection: 'column', gap: 12 }}>
                 <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
                   <Sparkles size={17} strokeWidth={2.4} color="#0891B2" />
-                  <span style={{ fontSize: 16, fontWeight: 800, color: '#0E7490' }}>Custom words</span>
+                  <span style={{ fontSize: 17.5, fontWeight: 800, color: '#0E7490' }}>Custom words</span>
                 </div>
                 <input
                   className="bs-input"
@@ -1112,17 +1112,17 @@ export default function BubbleSplash({ sessionId, role, isLocked }: BubbleSplash
 
             <div style={{ ...card, padding: 18, flexShrink: 0, display: 'flex', flexDirection: 'column', gap: 12 }}>
               <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 12 }}>
-                <span style={{ fontSize: 15, fontWeight: 600, color: MUTED }}>💧 Bubbles popped</span>
-                <span style={{ fontSize: 19.5, fontWeight: 800, color: INK, fontVariantNumeric: 'tabular-nums' }}>{score}</span>
+                <span style={{ fontSize: 16.5, fontWeight: 600, color: MUTED }}>💧 Bubbles popped</span>
+                <span style={{ fontSize: 20.5, fontWeight: 800, color: INK, fontVariantNumeric: 'tabular-nums' }}>{score}</span>
               </div>
               <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 12 }}>
-                <span style={{ fontSize: 15, fontWeight: 600, color: MUTED }}>⚡ In a row</span>
-                <span style={{ fontSize: 19.5, fontWeight: 800, color: GREEN_DEEP, fontVariantNumeric: 'tabular-nums' }}>{streak}</span>
+                <span style={{ fontSize: 16.5, fontWeight: 600, color: MUTED }}>⚡ In a row</span>
+                <span style={{ fontSize: 20.5, fontWeight: 800, color: GREEN_DEEP, fontVariantNumeric: 'tabular-nums' }}>{streak}</span>
               </div>
             </div>
 
             {!canInteract && (
-              <div style={{ flexShrink: 0, fontSize: 14.5, fontWeight: 600, color: MUTED, textAlign: 'center', padding: '2px 6px 6px' }}>
+              <div style={{ flexShrink: 0, fontSize: 16, fontWeight: 600, color: MUTED, textAlign: 'center', padding: '2px 6px 6px' }}>
                 Your therapist is controlling this activity
               </div>
             )}
@@ -1188,7 +1188,7 @@ export default function BubbleSplash({ sessionId, role, isLocked }: BubbleSplash
                   background: 'rgba(255,255,255,0.94)',
                   border: `1px solid ${BORDER}`,
                   boxShadow: '0 6px 18px rgba(20,30,45,0.12)',
-                  fontSize: 16,
+                  fontSize: 17.5,
                   fontWeight: 700,
                   color: INK,
                   textAlign: 'center',
@@ -1400,7 +1400,7 @@ export default function BubbleSplash({ sessionId, role, isLocked }: BubbleSplash
                   position: 'absolute',
                   left: `${star.x}%`,
                   top: `${star.y}%`,
-                  fontSize: 28.5,
+                  fontSize: 30,
                   zIndex: 10,
                   pointerEvents: 'none',
                   animation: 'bsFloatStar 1.4s ease forwards',
@@ -1418,7 +1418,7 @@ export default function BubbleSplash({ sessionId, role, isLocked }: BubbleSplash
                   top: 74,
                   left: '50%',
                   transform: 'translateX(-50%)',
-                  fontSize: 15,
+                  fontSize: 16.5,
                   fontWeight: 800,
                   color: '#ffffff',
                   background: GREEN,
@@ -1482,10 +1482,10 @@ export default function BubbleSplash({ sessionId, role, isLocked }: BubbleSplash
                       />
                     ))}
                   </div>
-                  <div style={{ fontSize: 18.5, fontWeight: 800, color: INK, letterSpacing: -0.2 }}>
+                  <div style={{ fontSize: 19.5, fontWeight: 800, color: INK, letterSpacing: -0.2 }}>
                     {isTherapist ? 'Press Start to begin' : 'Waiting for your therapist to start…'}
                   </div>
-                  <div style={{ fontSize: 15, fontWeight: 600, color: MUTED, lineHeight: 1.6 }}>
+                  <div style={{ fontSize: 16.5, fontWeight: 600, color: MUTED, lineHeight: 1.6 }}>
                     Bubbles float up carrying words. Tap the one that matches the prompt before it drifts away.
                   </div>
                 </div>

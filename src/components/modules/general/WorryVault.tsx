@@ -194,6 +194,15 @@ export default function WorryVault({ sessionId, role, isLocked }: WorryVaultProp
         .wv-input:focus { border-color: ${GREEN}; box-shadow: 0 0 0 3px rgba(31,122,68,0.14); }
         .wv-cta:not(:disabled):hover { background: #1a6b3b; }
         .wv-ghost:hover { border-color: ${GREEN}; color: ${GREEN}; }
+        /* The worry text is the variable part of the row, so the action word is
+           what has to carry. "Reopen:" used to sit in the same body weight and
+           colour as the worry after it and read as part of the sentence. */
+        .wv-reopen-word {
+          background: ${MINT}; color: ${GREEN}; font-weight: 800;
+          padding: 2px 8px; border-radius: 8px;
+          border: 1px solid rgba(31,122,68,0.30);
+        }
+        .wv-ghost:hover .wv-reopen-word { background: ${GREEN}; color: #ffffff; border-color: ${GREEN}; }
         .wv-scroll { scrollbar-width: thin; scrollbar-color: rgba(31,122,68,0.30) transparent; }
         .wv-scroll::-webkit-scrollbar { width: 8px; }
         .wv-scroll::-webkit-scrollbar-thumb { background: rgba(31,122,68,0.30); border-radius: 8px; }
@@ -226,7 +235,7 @@ export default function WorryVault({ sessionId, role, isLocked }: WorryVaultProp
             />
           </div>
 
-          <div style={{ textAlign: 'center', fontSize: 17, lineHeight: 1.5, color: INK_BODY, maxWidth: 560, fontWeight: 500 }}>
+          <div style={{ textAlign: 'center', fontSize: 18.5, lineHeight: 1.5, color: INK_BODY, maxWidth: 560, fontWeight: 500 }}>
             Not ignoring — just not now. Lock worries away and return later.
           </div>
 
@@ -245,7 +254,7 @@ export default function WorryVault({ sessionId, role, isLocked }: WorryVaultProp
                   style={{
                     width: '100%', boxSizing: 'border-box', minHeight: 64,
                     background: '#ffffff', border: `1px solid ${BORDER}`, borderRadius: 20,
-                    padding: '20px 22px 20px 56px', fontSize: 17, lineHeight: 1.35, color: INK,
+                    padding: '20px 22px 20px 56px', fontSize: 18.5, lineHeight: 1.35, color: INK,
                     resize: 'none', outline: 'none', fontFamily: '"DM Sans", sans-serif',
                     boxShadow: '0 2px 12px rgba(31,59,44,0.06)',
                     transition: 'border-color .15s, box-shadow .15s',
@@ -260,7 +269,7 @@ export default function WorryVault({ sessionId, role, isLocked }: WorryVaultProp
                 style={{
                   display: 'inline-flex', alignItems: 'center', justifyContent: 'center', gap: 9,
                   padding: '13px 30px', borderRadius: 999, border: 'none',
-                  background: GREEN, color: '#ffffff', fontSize: 17, fontWeight: 600,
+                  background: GREEN, color: '#ffffff', fontSize: 18.5, fontWeight: 600,
                   fontFamily: '"DM Sans", sans-serif',
                   cursor: canSubmit ? 'pointer' : 'default',
                   opacity: canSubmit ? 1 : 0.5,
@@ -303,14 +312,14 @@ export default function WorryVault({ sessionId, role, isLocked }: WorryVaultProp
                     ? <Unlock size={17} color="#ffffff" strokeWidth={2.3} />
                     : <Lock size={17} color="#ffffff" strokeWidth={2.3} />}
                 </span>
-                <span style={{ fontSize: 25.5, fontWeight: 800, letterSpacing: -0.3, lineHeight: 1.15, color: INK_DEEP }}>
+                <span style={{ fontSize: 27, fontWeight: 800, letterSpacing: -0.3, lineHeight: 1.15, color: INK_DEEP }}>
                   {lockedWorries.length} worr{lockedWorries.length === 1 ? 'y' : 'ies'} locked away
                 </span>
               </div>
-              <div style={{ fontSize: 17, fontWeight: 500, lineHeight: 1.4, color: ACCENT, paddingLeft: 45 }}>
+              <div style={{ fontSize: 18.5, fontWeight: 500, lineHeight: 1.4, color: ACCENT, paddingLeft: 45 }}>
                 {lockedWorries.length === 0 ? 'The vault is empty.' : 'Sealed and safe until you’re ready.'}
               </div>
-              <div style={{ fontSize: 16, lineHeight: 1.45, color: MUTED, paddingLeft: 45 }}>
+              <div style={{ fontSize: 17.5, lineHeight: 1.45, color: MUTED, paddingLeft: 45 }}>
                 {lockedWorries.length === 0
                   ? <>When you lock worries, they&apos;ll appear here.</>
                   : <>Reopen one when you&apos;re ready to work on it.</>}
@@ -336,7 +345,7 @@ export default function WorryVault({ sessionId, role, isLocked }: WorryVaultProp
                   <div style={{
                     position: 'absolute', left: '12.1%', top: '31.4%', width: '75.8%', height: '43%',
                     borderRadius: 4, background: '#FFFFFF', padding: '3px 5px', overflow: 'hidden',
-                    fontSize: 10.5, lineHeight: 1.25, color: '#5D7168', filter: 'blur(2.5px)',
+                    fontSize: 12, lineHeight: 1.25, color: '#5D7168', filter: 'blur(2.5px)',
                   }}>{w.text}</div>
                 </div>
               ))}
@@ -344,7 +353,7 @@ export default function WorryVault({ sessionId, role, isLocked }: WorryVaultProp
                 <div style={{
                   alignSelf: 'center', padding: '7px 14px', borderRadius: 999,
                   background: MINT, border: `1px solid rgba(31,122,68,0.28)`,
-                  fontSize: 15, fontWeight: 600, color: GREEN, animation: 'wv-settle 1.6s ease forwards',
+                  fontSize: 16.5, fontWeight: 600, color: GREEN, animation: 'wv-settle 1.6s ease forwards',
                 }}>
                   settling in…
                 </div>
@@ -358,8 +367,12 @@ export default function WorryVault({ sessionId, role, isLocked }: WorryVaultProp
               <div style={{ ...labelStyle, textAlign: 'center' }}>Reopen one worry</div>
               {lockedWorries.map(w => (
                 <button key={w.id} className="wv-ghost" onClick={() => reopenWorry(w.id)}
-                  style={{ ...btnStyle, width: '100%', textAlign: 'left', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
-                  Reopen: {w.text}
+                  style={{ ...btnStyle, width: '100%', display: 'flex', alignItems: 'center', gap: 9, textAlign: 'left' }}>
+                  <span className="wv-reopen-word" style={{ flexShrink: 0 }}>Reopen</span>
+                  {/* minWidth:0 is what lets the flex child actually ellipsize. */}
+                  <span style={{ minWidth: 0, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                    {w.text}
+                  </span>
                 </button>
               ))}
             </div>
@@ -372,10 +385,10 @@ export default function WorryVault({ sessionId, role, isLocked }: WorryVaultProp
               padding: '18px 20px', animation: 'wv-float 0.6s ease', textAlign: 'center',
               boxShadow: '0 4px 18px rgba(31,59,44,0.07)',
             }}>
-              <div style={{ fontSize: 12.5, letterSpacing: 1.2, textTransform: 'uppercase', fontWeight: 700, color: MUTED, marginBottom: 8 }}>
+              <div style={{ fontSize: 13.5, letterSpacing: 1.2, textTransform: 'uppercase', fontWeight: 700, color: MUTED, marginBottom: 8 }}>
                 Working on this one now
               </div>
-              <div style={{ fontFamily: '"DM Serif Display", serif', fontStyle: 'italic', fontSize: 21, lineHeight: 1.4, color: INK }}>
+              <div style={{ fontFamily: '"DM Serif Display", serif', fontStyle: 'italic', fontSize: 22.5, lineHeight: 1.4, color: INK }}>
                 {selectedWorry.text}
               </div>
               {isT && (
@@ -398,11 +411,11 @@ export default function WorryVault({ sessionId, role, isLocked }: WorryVaultProp
 
 const btnStyle: React.CSSProperties = {
   padding: '11px 16px', borderRadius: 14, border: `1px solid ${BORDER}`,
-  background: '#ffffff', color: '#244a35', fontSize: 15.5, fontWeight: 500,
+  background: '#ffffff', color: '#244a35', fontSize: 17, fontWeight: 500,
   cursor: 'pointer', fontFamily: '"DM Sans", sans-serif',
   boxShadow: '0 1px 4px rgba(31,59,44,0.05)', transition: 'border-color .15s, color .15s',
 }
 const labelStyle: React.CSSProperties = {
-  fontSize: 12.5, letterSpacing: 1.2, textTransform: 'uppercase', fontWeight: 700,
+  fontSize: 13.5, letterSpacing: 1.2, textTransform: 'uppercase', fontWeight: 700,
   color: MUTED, marginBottom: 2,
 }

@@ -44,7 +44,13 @@ interface DefusionRiverProps {
   isLocked: boolean
 }
 
-interface Leaf { id: string; text: string; posX: number; posY: number }
+/* `floating` is what separates "placed on the leaf" from "released down the
+   river". Placing used to start the animation immediately, so the thought was
+   already sailing away before it had been read aloud — the whole point of the
+   first two steps. A placed leaf now waits, full size and still, until Next
+   Step releases it. `lane` is its horizontal position, kept so the leaf tracks
+   straight down the river instead of jumping sideways when it starts moving. */
+interface Leaf { id: string; text: string; posX: number; posY: number; floating?: boolean; lane?: number }
 
 const STEPS = [
   'Read the thought on the leaf',
@@ -67,15 +73,6 @@ const STEP_ICONS = [
   { Icon: MessageCircle, tint: '#7C5CD6' },
   { Icon: Eye, tint: '#E8871E' },
 ]
-
-/* `posY` is stored as a raw pixel offset from the old 200px-tall river box.
-   The scene artwork puts the water in its lower half, so the same 20..70
-   range is mapped into the 50%..76% band where the water actually is. The
-   stored value is untouched — this is purely how it is painted. */
-function leafTop(posY: number) {
-  const clamped = Math.min(Math.max(posY, 20), 70)
-  return `${50 + ((clamped - 20) / 50) * 26}%`
-}
 
 export default function DefusionRiver({ sessionId, role, isLocked }: DefusionRiverProps) {
   const isT = role === 'therapist'
@@ -109,7 +106,14 @@ export default function DefusionRiver({ sessionId, role, isLocked }: DefusionRiv
     if (!isT) return
     const t = (txt ?? input).trim()
     if (!t) return
-    const leaf: Leaf = { id: `dr${Date.now()}-${Math.random().toString(36).slice(2, 6)}`, text: t, posX: 0, posY: 20 + Math.random() * 50 }
+    const leaf: Leaf = {
+      id: `dr${Date.now()}-${Math.random().toString(36).slice(2, 6)}`,
+      text: t, posX: 0, posY: 20 + Math.random() * 50,
+      floating: false,
+      // Lanes stay near the middle third: the river narrows toward the horizon,
+      // so a leaf starting at the edge would drift outside the water.
+      lane: 38 + Math.random() * 24,
+    }
     write({ 'moduleState.drThought': t, 'moduleState.drLeaves': [...leaves, leaf] })
     logModuleEvent(sessionId, {
       module: 'defusion-river',
@@ -121,7 +125,17 @@ export default function DefusionRiver({ sessionId, role, isLocked }: DefusionRiv
 
   const releaseAll = useCallback(() => { if (isT) write({ 'moduleState.drLeaves': [] }) }, [isT, write])
   const togglePause = useCallback(() => { if (isT) write({ 'moduleState.drPaused': !paused }) }, [isT, paused, write])
-  const advance = useCallback(() => { if (isT) write({ 'moduleState.drStep': (step + 1) % STEPS.length }) }, [isT, step, write])
+  /* Next Step both advances the instruction AND releases any leaf still
+     waiting at the near bank — that is the moment the thought is let go. */
+  const advance = useCallback(() => {
+    if (!isT) return
+    const released = leaves.map(l => (l.floating ? l : { ...l, floating: true }))
+    const anyReleased = released.some((l, i) => l.floating !== leaves[i].floating)
+    write({
+      'moduleState.drStep': (step + 1) % STEPS.length,
+      ...(anyReleased ? { 'moduleState.drLeaves': released } : {}),
+    })
+  }, [isT, step, leaves, write])
 
   const canSubmit = isT && !!input.trim()
   const nextStep = (step + 1) % STEPS.length
@@ -135,7 +149,17 @@ export default function DefusionRiver({ sessionId, role, isLocked }: DefusionRiv
       fontFamily: '"DM Sans", sans-serif',
     }}>
       <style>{`
-        @keyframes dr-drift { from{left:-20%} to{left:110%} }
+        /* The river runs AWAY from the viewer, so a released leaf travels up
+           the frame toward the horizon, shrinking with distance and fading out
+           as it goes — it used to slide flat across the screen from left to
+           right, which read as a conveyor belt rather than a current.
+           --lane / --dur are set per leaf. */
+        @keyframes dr-flow {
+          0%   { top: 92%; transform: translate(-50%,-50%) scale(1);    opacity: 0 }
+          9%   { top: 87%; transform: translate(-50%,-50%) scale(0.95); opacity: 1 }
+          78%  { opacity: 1 }
+          100% { top: 46%; transform: translate(-50%,-50%) scale(0.24); opacity: 0 }
+        }
         @keyframes dr-bob { 0%,100%{transform:translateY(0) rotate(-2deg)} 50%{transform:translateY(-6px) rotate(2deg)} }
         @keyframes dr-ripple { 0%,100%{opacity:0.3} 50%{opacity:0.6} }
         @keyframes dr-breathe { 0%,100%{transform:scale(1);opacity:0.5} 50%{transform:scale(1.25);opacity:0.9} }
@@ -164,7 +188,7 @@ export default function DefusionRiver({ sessionId, role, isLocked }: DefusionRiv
             }}>
               <Icon size={17} color={tint} strokeWidth={2.1} style={{ flexShrink: 0 }} />
               <span style={{
-                fontSize: 16.5, lineHeight: 1.35,
+                fontSize: 18, lineHeight: 1.35,
                 fontWeight: active ? 700 : 500,
                 color: active ? HEAD : INK_SOFT,
                 overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap',
@@ -202,69 +226,103 @@ export default function DefusionRiver({ sessionId, role, isLocked }: DefusionRiv
 
           {leaves.map((leaf, idx) => {
             const focus = idx === leaves.length - 1
-            const w = focus ? 170 : 92
-            const h = focus ? 104 : 56
+            /* Full size, matching the delivered leaf art's 185x120 proportion.
+               The old leaf was 170x104 for the focused one and 92x56 otherwise —
+               far too small to read a thought on, which is the whole exercise.
+               Distance is now conveyed by the animation's scale, not by drawing
+               some leaves permanently tiny. */
+            const w = focus ? 300 : 224
+            const h = Math.round(w / 1.54)
+            const lane = leaf.lane ?? 50
+            const dur = 16 + (idx % 3) * 3
+
             return (
-              <div key={leaf.id} style={{
-                position: 'absolute', top: leafTop(leaf.posY), left: '-20%',
-                animation: paused ? 'none' : `dr-drift ${10 + (idx % 3) * 2}s linear infinite`,
-                animationDelay: `${idx * 1.5}s`,
-              }}>
-                <div style={{ animation: 'dr-bob 3s ease-in-out infinite', position: 'relative', width: w, height: h }}>
+              <div
+                key={leaf.id}
+                style={leaf.floating
+                  ? {
+                      position: 'absolute', left: `${lane}%`, top: '92%',
+                      transform: 'translate(-50%,-50%)',
+                      animation: `dr-flow ${dur}s linear forwards`,
+                      animationDelay: `${idx * 0.4}s`,
+                      // Pausing must FREEZE the leaf where it is. This used to be
+                      // `animation: none`, which tore the animation off the
+                      // element: the leaf snapped back to its start position and
+                      // replayed from the top on resume. play-state holds the
+                      // current frame and carries on from it.
+                      animationPlayState: paused ? 'paused' : 'running',
+                    }
+                  : {
+                      // Placed but not yet released: waiting at the near bank.
+                      position: 'absolute', left: `${lane}%`, top: '86%',
+                      transform: 'translate(-50%,-50%)',
+                    }}
+              >
+                <div style={{
+                  animation: 'dr-bob 3s ease-in-out infinite',
+                  animationPlayState: paused ? 'paused' : 'running',
+                  position: 'relative', width: w, height: h,
+                }}>
                   {/* ripple rings the leaf sits inside */}
-                  <svg width={w * 1.9} height={h * 1.1} viewBox="0 0 190 62" style={{ position: 'absolute', left: w * -0.45, top: h * 0.52, opacity: 0.75 }}>
+                  <svg width={w * 1.3} height={h * 0.9} viewBox="0 0 190 62" style={{ position: 'absolute', left: w * -0.15, top: h * 0.56, opacity: 0.7 }}>
                     <ellipse cx="95" cy="31" rx="88" ry="24" fill="none" stroke="rgba(255,255,255,0.55)" strokeWidth="1.6" />
                     <ellipse cx="95" cy="31" rx="66" ry="17" fill="none" stroke="rgba(255,255,255,0.45)" strokeWidth="1.4" />
                     <ellipse cx="95" cy="31" rx="44" ry="11" fill="none" stroke="rgba(255,255,255,0.35)" strokeWidth="1.2" />
                   </svg>
 
-                  <svg width={w} height={h} viewBox="0 0 92 56" style={{ position: 'absolute', inset: 0, filter: 'drop-shadow(0 4px 8px rgba(20,60,40,0.28))' }}>
+                  {/* Leaf drawn to the delivered art's silhouette and palette:
+                      a broad blade with a pale rib and veins. */}
+                  <svg width={w} height={h} viewBox="0 0 185 120" style={{ position: 'absolute', inset: 0, filter: 'drop-shadow(0 6px 12px rgba(20,60,40,0.30))' }}>
                     <defs>
-                      <linearGradient id={`dr-lg-${leaf.id}`} x1="0" y1="0" x2="0.6" y2="1">
-                        <stop offset="0%" stopColor="#7BC24E" />
-                        <stop offset="100%" stopColor="#3E8B3C" />
+                      <linearGradient id={`dr-lg-${leaf.id}`} x1="0.1" y1="0" x2="0.75" y2="1">
+                        <stop offset="0%" stopColor="#A8D95F" />
+                        <stop offset="55%" stopColor="#7BC24E" />
+                        <stop offset="100%" stopColor="#4E9B3F" />
                       </linearGradient>
                     </defs>
-                    <path d="M46,4 C70,8 86,24 88,46 C66,52 28,52 6,46 C8,24 24,8 46,4 Z" fill={`url(#dr-lg-${leaf.id})`} stroke="#2F6E31" strokeWidth="1.5" />
-                    <path d="M46,8 L46,48" stroke="rgba(255,255,255,0.55)" strokeWidth="1.2" />
-                    <path d="M46,20 L30,30 M46,20 L62,30 M46,32 L33,40 M46,32 L59,40" stroke="rgba(255,255,255,0.32)" strokeWidth="1" fill="none" />
+                    <path
+                      d="M12,74 C18,34 60,8 108,8 C146,8 172,26 178,50 C170,88 128,112 82,112 C46,112 18,98 12,74 Z"
+                      fill={`url(#dr-lg-${leaf.id})`} stroke="#37793A" strokeWidth="2.2"
+                    />
+                    <path d="M16,76 C60,66 128,40 176,50" stroke="rgba(255,255,255,0.62)" strokeWidth="2.6" fill="none" strokeLinecap="round" />
+                    <g stroke="rgba(255,255,255,0.34)" strokeWidth="1.7" fill="none" strokeLinecap="round">
+                      <path d="M52,71 C62,54 74,40 86,30" /><path d="M84,63 C94,48 108,34 120,26" />
+                      <path d="M116,55 C126,44 140,34 152,30" /><path d="M60,84 C74,78 92,68 104,58" />
+                      <path d="M96,92 C112,84 130,72 144,62" />
+                    </g>
                   </svg>
 
-                  {/* White text is safe here: the leaf is a solid saturated
-                      green fill, not translucent artwork. */}
+                  {/* The thought itself. Dark ink with a light halo: the blade is
+                      a bright yellow-green, so white type would disappear on it. */}
                   <div style={{
                     position: 'absolute', inset: 0, display: 'flex', alignItems: 'center', justifyContent: 'center',
-                    fontSize: focus ? 15 : 9, fontWeight: 700, color: '#ffffff', textAlign: 'center',
-                    padding: focus ? '0 24px' : '0 12px', lineHeight: 1.15,
-                    textShadow: '0 1px 3px rgba(20,60,35,0.55)',
+                    fontSize: focus ? 22 : 17, fontWeight: 800, color: '#173D1C', textAlign: 'center',
+                    padding: `0 ${Math.round(w * 0.17)}px`, lineHeight: 1.2,
+                    textShadow: '0 1px 0 rgba(255,255,255,0.65), 0 0 10px rgba(255,255,255,0.5)',
+                    wordBreak: 'break-word',
                   }}>
-                    {leaf.text.length > 28 ? leaf.text.slice(0, 28) + '…' : leaf.text}
+                    {leaf.text.length > 42 ? leaf.text.slice(0, 42) + '…' : leaf.text}
                   </div>
 
                   {/* sparkles around the focused leaf */}
                   {focus && [
-                    { left: -14, top: 6, s: 9, d: '0s' },
-                    { left: -6, top: h - 18, s: 7, d: '0.7s' },
-                    { left: w + 4, top: 12, s: 8, d: '1.1s' },
-                    { left: w - 16, top: -10, s: 7, d: '1.6s' },
+                    { left: -14, top: 10, s: 10, d: '0s' },
+                    { left: -4, top: h - 26, s: 8, d: '0.7s' },
+                    { left: w + 2, top: 18, s: 9, d: '1.1s' },
+                    { left: w - 22, top: -12, s: 8, d: '1.6s' },
                   ].map((sp, k) => (
                     <div key={k} style={{
                       position: 'absolute', left: sp.left, top: sp.top, width: sp.s, height: sp.s,
                       background: '#FFD766', borderRadius: 2,
                       transform: 'rotate(45deg)', animation: `dr-twinkle 2.4s ease-in-out infinite`,
                       animationDelay: sp.d, boxShadow: '0 0 6px rgba(255,215,102,0.9)',
+                      animationPlayState: paused ? 'paused' : 'running',
                     }} />
                   ))}
                 </div>
               </div>
             )
           })}
-
-          {/* breathing marker on the water, kept from the original scene */}
-          <div style={{
-            position: 'absolute', bottom: 14, right: '32%', width: 34, height: 34, borderRadius: '50%',
-            border: '2px solid rgba(255,255,255,0.75)', animation: 'dr-breathe 4s ease-in-out infinite',
-          }} />
         </div>
 
         {/* ===== Card layer ===== */}
@@ -276,8 +334,13 @@ export default function DefusionRiver({ sessionId, role, isLocked }: DefusionRiv
 
             {/* ---- LEFT: compose a thought ---- */}
             <div style={{
-              flex: '0 1 272px', minWidth: 0, maxHeight: '100%', overflowY: 'auto',
-              position: 'relative', marginTop: 16,
+              flex: '0 1 272px', minWidth: 0, maxHeight: '100%',
+              /* `overflow` stays VISIBLE here. The badge below is positioned at
+                 top:-20 to straddle this card's edge, and an overflow of auto or
+                 hidden on the same element clips exactly that overhang — which
+                 is why the leaf icon was sliced in half. The scrolling lives on
+                 the inner wrapper instead. */
+              position: 'relative', marginTop: 16, display: 'flex', flexDirection: 'column',
               background: '#ffffff', border: `1px solid ${BORDER}`, borderRadius: 18,
               padding: '22px 16px 14px', boxShadow: CARD_SHADOW,
             }}>
@@ -292,9 +355,12 @@ export default function DefusionRiver({ sessionId, role, isLocked }: DefusionRiv
                 <LeafIcon size={21} color={GREEN} strokeWidth={2.1} />
               </div>
 
+              {/* Scroll container: keeps the card's own box unclipped. */}
+              <div style={{ minHeight: 0, overflowY: 'auto', display: 'flex', flexDirection: 'column' }}>
+
               <div style={{
                 display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 5,
-                fontSize: 19, fontWeight: 800, color: HEAD, letterSpacing: -0.2, marginBottom: 10,
+                fontSize: 20, fontWeight: 800, color: HEAD, letterSpacing: -0.2, marginBottom: 10,
               }}>
                 Enter your thought
                 <Sparkles size={15} color="#E8B23C" strokeWidth={2.2} />
@@ -313,13 +379,13 @@ export default function DefusionRiver({ sessionId, role, isLocked }: DefusionRiv
                       style={{
                         width: '100%', boxSizing: 'border-box', minHeight: 76,
                         background: '#ffffff', border: `1px solid ${BORDER}`, borderRadius: 14,
-                        padding: '11px 12px 24px', fontSize: 15.5, lineHeight: 1.35, color: INK,
+                        padding: '11px 12px 24px', fontSize: 17, lineHeight: 1.35, color: INK,
                         resize: 'none', outline: 'none', fontFamily: '"DM Sans", sans-serif',
                         transition: 'border-color .15s, box-shadow .15s',
                       }}
                     />
                     <span style={{
-                      position: 'absolute', right: 11, bottom: 9, fontSize: 13, fontWeight: 600,
+                      position: 'absolute', right: 11, bottom: 9, fontSize: 14, fontWeight: 600,
                       color: input.length >= MAX_CHARS ? '#B4632A' : MUTED, pointerEvents: 'none',
                     }}>
                       {input.length} / {MAX_CHARS}
@@ -334,7 +400,7 @@ export default function DefusionRiver({ sessionId, role, isLocked }: DefusionRiv
                       width: '100%', marginTop: 10,
                       display: 'inline-flex', alignItems: 'center', justifyContent: 'center', gap: 9,
                       padding: '12px 18px', borderRadius: 14, border: 'none',
-                      background: GREEN, color: '#ffffff', fontSize: 17, fontWeight: 700,
+                      background: GREEN, color: '#ffffff', fontSize: 18.5, fontWeight: 700,
                       fontFamily: '"DM Sans", sans-serif',
                       cursor: canSubmit ? 'pointer' : 'default',
                       opacity: canSubmit ? 1 : 0.5,
@@ -354,7 +420,7 @@ export default function DefusionRiver({ sessionId, role, isLocked }: DefusionRiv
                       style={{
                         width: '100%', marginTop: 7, padding: 0, border: 'none', background: 'none',
                         display: 'inline-flex', alignItems: 'center', justifyContent: 'center', gap: 6,
-                        fontSize: 14, fontWeight: 600, color: MUTED, cursor: 'pointer',
+                        fontSize: 15.5, fontWeight: 600, color: MUTED, cursor: 'pointer',
                         fontFamily: '"DM Sans", sans-serif',
                       }}
                     >
@@ -368,12 +434,12 @@ export default function DefusionRiver({ sessionId, role, isLocked }: DefusionRiv
                    how the invitation reads. */
                 <div style={{
                   background: '#F7FAF8', border: `1px solid ${BORDER}`, borderRadius: 14,
-                  padding: '12px 13px', fontSize: 15, lineHeight: 1.45, color: INK, minHeight: 76,
+                  padding: '12px 13px', fontSize: 16.5, lineHeight: 1.45, color: INK, minHeight: 76,
                 }}>
                   {thought
                     ? <>Your thought: <strong style={{ color: HEAD }}>“{thought}”</strong></>
                     : <span style={{ color: MUTED }}>Your therapist will place your thought on a leaf.</span>}
-                  <div style={{ marginTop: 8, fontSize: 14, color: MUTED }}>
+                  <div style={{ marginTop: 8, fontSize: 15.5, color: MUTED }}>
                     {isLocked ? 'Your therapist is guiding this exercise.' : 'Follow along with your therapist.'}
                   </div>
                 </div>
@@ -385,9 +451,10 @@ export default function DefusionRiver({ sessionId, role, isLocked }: DefusionRiv
                 padding: '9px 11px',
               }}>
                 <Lightbulb size={15} color="#D89B1E" strokeWidth={2.2} style={{ flexShrink: 0 }} />
-                <span style={{ fontSize: 14, fontWeight: 600, lineHeight: 1.35, color: AMBER_INK }}>
+                <span style={{ fontSize: 15.5, fontWeight: 600, lineHeight: 1.35, color: AMBER_INK }}>
                   It&apos;s okay to have thoughts. You are doing great!
                 </span>
+              </div>
               </div>
             </div>
 
@@ -397,7 +464,7 @@ export default function DefusionRiver({ sessionId, role, isLocked }: DefusionRiv
               background: '#ffffff', border: `1px solid ${BORDER}`, borderRadius: 16,
               padding: '13px 14px', boxShadow: CARD_SHADOW,
             }}>
-              <div style={{ fontSize: 16, fontWeight: 800, color: HEAD, marginBottom: 9 }}>
+              <div style={{ fontSize: 17.5, fontWeight: 800, color: HEAD, marginBottom: 9 }}>
                 Your thought will
               </div>
               {[
@@ -407,14 +474,14 @@ export default function DefusionRiver({ sessionId, role, isLocked }: DefusionRiv
               ].map(({ Icon, tint, text }) => (
                 <div key={text} style={{ display: 'flex', alignItems: 'center', gap: 9, marginBottom: 7 }}>
                   <Icon size={15} color={tint} strokeWidth={2.1} style={{ flexShrink: 0 }} />
-                  <span style={{ fontSize: 15, lineHeight: 1.3, color: INK }}>{text}</span>
+                  <span style={{ fontSize: 16.5, lineHeight: 1.3, color: INK }}>{text}</span>
                 </div>
               ))}
               <div style={{ height: 1, background: BORDER, margin: '11px 0 9px' }} />
-              <div style={{ fontSize: 15, fontWeight: 600, lineHeight: 1.45, color: HEAD }}>
+              <div style={{ fontSize: 16.5, fontWeight: 600, lineHeight: 1.45, color: HEAD }}>
                 You can let it go.
               </div>
-              <div style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 15, fontWeight: 600, color: HEAD }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 16.5, fontWeight: 600, color: HEAD }}>
                 You are in control.
                 <Heart size={13} color="#E8646E" fill="#E8646E" strokeWidth={0} />
               </div>
@@ -429,10 +496,10 @@ export default function DefusionRiver({ sessionId, role, isLocked }: DefusionRiv
               padding: '14px 14px 15px', boxShadow: CARD_SHADOW, textAlign: 'center',
             }}>
               <LeafIcon size={18} color={GREEN} strokeWidth={2.1} />
-              <div style={{ fontSize: 15.5, fontWeight: 800, color: HEAD, margin: '4px 0 8px', lineHeight: 1.25 }}>
+              <div style={{ fontSize: 17, fontWeight: 800, color: HEAD, margin: '4px 0 8px', lineHeight: 1.25 }}>
                 Watch it float…
               </div>
-              <div style={{ fontSize: 15, lineHeight: 1.5, color: INK }}>
+              <div style={{ fontSize: 16.5, lineHeight: 1.5, color: INK }}>
                 Let your thought float down the river. You don&apos;t have to hold on to it.
               </div>
             </div>
@@ -448,7 +515,7 @@ export default function DefusionRiver({ sessionId, role, isLocked }: DefusionRiv
                 background: '#ffffff', border: `1px solid ${BORDER}`, borderRadius: 16,
                 padding: '13px 15px', boxShadow: CARD_SHADOW,
               }}>
-                <div style={{ fontSize: 15, fontWeight: 800, color: HEAD, marginBottom: 7 }}>Help &amp; Tips</div>
+                <div style={{ fontSize: 16.5, fontWeight: 800, color: HEAD, marginBottom: 7 }}>Help &amp; Tips</div>
                 {[
                   'Say the thought out loud, slowly: “I am having the thought that…”',
                   'Notice the thought as an object on the water, not as a fact.',
@@ -457,7 +524,7 @@ export default function DefusionRiver({ sessionId, role, isLocked }: DefusionRiv
                 ].map(t => (
                   <div key={t} style={{ display: 'flex', gap: 8, marginBottom: 6 }}>
                     <span style={{ width: 5, height: 5, borderRadius: '50%', background: GREEN, flexShrink: 0, marginTop: 6 }} />
-                    <span style={{ fontSize: 14.5, lineHeight: 1.4, color: INK }}>{t}</span>
+                    <span style={{ fontSize: 16, lineHeight: 1.4, color: INK }}>{t}</span>
                   </div>
                 ))}
               </div>
@@ -500,7 +567,7 @@ export default function DefusionRiver({ sessionId, role, isLocked }: DefusionRiv
                       border: `1.5px solid ${active ? GREEN : 'transparent'}`,
                       background: active ? MINT : 'transparent',
                       color: active ? HEAD : MUTED,
-                      fontSize: 14, fontWeight: active ? 700 : 600,
+                      fontSize: 15.5, fontWeight: active ? 700 : 600,
                       fontFamily: '"DM Sans", sans-serif',
                       cursor: actionable ? 'pointer' : 'default',
                       whiteSpace: 'nowrap',
@@ -545,7 +612,7 @@ export default function DefusionRiver({ sessionId, role, isLocked }: DefusionRiv
             position: 'absolute', left: '50%', top: '62%', transform: 'translate(-50%,-50%)', zIndex: 0,
             padding: '9px 18px', borderRadius: 999,
             background: 'rgba(255,255,255,0.92)', border: `1px solid ${BORDER}`,
-            boxShadow: CARD_SHADOW, fontSize: 15, fontWeight: 600, color: MUTED, whiteSpace: 'nowrap',
+            boxShadow: CARD_SHADOW, fontSize: 16.5, fontWeight: 600, color: MUTED, whiteSpace: 'nowrap',
           }}>
             {isT ? 'Place a thought on a leaf' : 'Watching the river…'}
           </div>
@@ -558,7 +625,7 @@ export default function DefusionRiver({ sessionId, role, isLocked }: DefusionRiv
 const btnStyle: React.CSSProperties = {
   display: 'inline-flex', alignItems: 'center', gap: 7,
   padding: '10px 15px', borderRadius: 14, border: `1px solid ${BORDER}`,
-  background: '#ffffff', color: '#244a35', fontSize: 15, fontWeight: 600,
+  background: '#ffffff', color: '#244a35', fontSize: 16.5, fontWeight: 600,
   cursor: 'pointer', whiteSpace: 'nowrap', fontFamily: '"DM Sans", sans-serif',
   boxShadow: CARD_SHADOW, transition: 'border-color .15s, color .15s, background .15s',
 }

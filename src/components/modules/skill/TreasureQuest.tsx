@@ -1844,7 +1844,7 @@ function ShapeArt({ shape }: { shape: Shape }) {
           <div style={{ position: 'absolute', top: 0, width: 52, height: 20, borderRadius: '24px 24px 0 0', background: 'linear-gradient(180deg,#a87a4a,#7d5731)' }} />
           <div style={{ position: 'absolute', top: 16, left: 0, width: 6, height: 24, background: '#c9963f', opacity: 0.85 }} />
           <div style={{ position: 'absolute', top: 16, right: 0, width: 6, height: 24, background: '#c9963f', opacity: 0.85 }} />
-          <div style={{ position: 'absolute', top: 15, left: '50%', transform: 'translateX(-50%)', fontSize: 13, color: '#ffe9b0' }}>★</div>
+          <div style={{ position: 'absolute', top: 15, left: '50%', transform: 'translateX(-50%)', fontSize: 14, color: '#ffe9b0' }}>★</div>
         </div>
       )
     case 'key':
@@ -2047,31 +2047,31 @@ export default function TreasureQuest({ sessionId, role, isLocked }: TreasureQue
                 initial={{ scale: 0 }}
                 animate={{ scale: 1 }}
                 transition={{ type: 'spring', stiffness: 320, damping: 16, delay: 0.15 }}
-                style={{ fontSize: 68, lineHeight: 1, zIndex: 2 }}
+                style={{ fontSize: 70, lineHeight: 1, zIndex: 2 }}
               >
                 {scenario.treasureReveal.emoji}
               </motion.div>
-              <div style={{ fontSize: 20, fontWeight: 900, color: '#fff6e2', zIndex: 2 }}>
+              <div style={{ fontSize: 21, fontWeight: 900, color: '#fff6e2', zIndex: 2 }}>
                 {showEn && 'You found it!'}
                 {language === 'both' && ' · '}
                 {showHi && <span style={{ fontFamily: DEVANAGARI }}>तुमने पा लिया!</span>}
               </div>
               <div style={{ maxWidth: 460, textAlign: 'center', zIndex: 2 }}>
-                {showEn && <div style={{ fontSize: 16, fontWeight: 700, color: '#fdf0d8', lineHeight: 1.5 }}>{scenario.treasureReveal.en}</div>}
-                {showHi && <div style={{ fontSize: 16, fontWeight: 600, fontFamily: DEVANAGARI, color: 'rgba(253,240,216,0.8)', lineHeight: 1.6, marginTop: 4 }}>{scenario.treasureReveal.hi}</div>}
+                {showEn && <div style={{ fontSize: 17.5, fontWeight: 700, color: '#fdf0d8', lineHeight: 1.5 }}>{scenario.treasureReveal.en}</div>}
+                {showHi && <div style={{ fontSize: 17.5, fontWeight: 600, fontFamily: DEVANAGARI, color: 'rgba(253,240,216,0.8)', lineHeight: 1.6, marginTop: 4 }}>{scenario.treasureReveal.hi}</div>}
               </div>
 
               {isT && (
                 <div style={{ display: 'flex', flexDirection: 'column', gap: 6, width: 220, marginTop: 10, zIndex: 2 }}>
                   <button
                     onClick={handleNextQuest}
-                    style={{ width: '100%', padding: '8px 0', borderRadius: 50, cursor: 'pointer', fontSize: 14.5, fontWeight: 800, fontFamily: NUNITO, background: 'rgba(74,124,111,0.9)', border: 'none', color: '#fff' }}
+                    style={{ width: '100%', padding: '8px 0', borderRadius: 50, cursor: 'pointer', fontSize: 16, fontWeight: 800, fontFamily: NUNITO, background: 'rgba(74,124,111,0.9)', border: 'none', color: '#fff' }}
                   >
                     Next quest →
                   </button>
                   <button
                     onClick={() => setFqOpen((o) => !o)}
-                    style={{ width: '100%', padding: '7px 0', borderRadius: 50, cursor: 'pointer', fontSize: 13, fontWeight: 800, fontFamily: NUNITO, background: 'rgba(107,92,231,0.85)', border: 'none', color: '#fff' }}
+                    style={{ width: '100%', padding: '7px 0', borderRadius: 50, cursor: 'pointer', fontSize: 14, fontWeight: 800, fontFamily: NUNITO, background: 'rgba(107,92,231,0.85)', border: 'none', color: '#fff' }}
                   >
                     💬 Talk about it
                   </button>
@@ -2080,7 +2080,7 @@ export default function TreasureQuest({ sessionId, role, isLocked }: TreasureQue
                       loadScenario('easy_1', 'easy')
                       logModuleEvent(sessionId, { module: 'treasure-quest', type: 'module_ended', detail: `Therapist ended the module after "${scenario.title_en}".` })
                     }}
-                    style={{ width: '100%', padding: '7px 0', borderRadius: 50, cursor: 'pointer', fontSize: 13, fontWeight: 700, fontFamily: NUNITO, background: 'transparent', border: '1px solid rgba(255,246,226,0.3)', color: 'rgba(255,246,226,0.6)' }}
+                    style={{ width: '100%', padding: '7px 0', borderRadius: 50, cursor: 'pointer', fontSize: 14, fontWeight: 700, fontFamily: NUNITO, background: 'transparent', border: '1px solid rgba(255,246,226,0.3)', color: 'rgba(255,246,226,0.6)' }}
                   >
                     End module
                   </button>
@@ -2089,10 +2089,10 @@ export default function TreasureQuest({ sessionId, role, isLocked }: TreasureQue
 
               {isT && fqOpen && (
                 <div style={{ zIndex: 2, marginTop: 6, width: 'min(90%, 420px)', background: 'rgba(107,92,231,0.9)', border: '1px solid rgba(107,92,231,0.5)', borderRadius: 10, padding: '10px 12px' }}>
-                  <div style={{ fontSize: 13, fontWeight: 800, color: '#fff', marginBottom: 6 }}>💬 Ask the child</div>
+                  <div style={{ fontSize: 14, fontWeight: 800, color: '#fff', marginBottom: 6 }}>💬 Ask the child</div>
                   <ol style={{ margin: 0, paddingLeft: 16, display: 'flex', flexDirection: 'column', gap: 4 }}>
                     {scenario.facilitatorQuestions.map((q, i) => (
-                      <li key={i} style={{ fontSize: 12, fontWeight: 600, color: 'rgba(255,255,255,0.92)', lineHeight: 1.35 }}>
+                      <li key={i} style={{ fontSize: 13, fontWeight: 600, color: 'rgba(255,255,255,0.92)', lineHeight: 1.35 }}>
                         <span style={{ display: 'block' }}>{q.en}</span>
                         <span style={{ display: 'block', fontFamily: DEVANAGARI, color: 'rgba(255,255,255,0.7)' }}>{q.hi}</span>
                       </li>
@@ -2190,8 +2190,8 @@ export default function TreasureQuest({ sessionId, role, isLocked }: TreasureQue
                     style={{ position: 'absolute', top: 72, left: '50%', transform: 'translateX(-50%)', zIndex: 32, width: 'min(76%, 420px)' }}
                   >
                     <div style={{ ...parchment, textAlign: 'center' }}>
-                      {showEn && <div style={{ fontSize: 14.5, fontWeight: 800, color: '#4a2f18' }}>{stageData.onFoundReveal.en}</div>}
-                      {showHi && <div style={{ fontSize: 14.5, fontWeight: 600, fontFamily: DEVANAGARI, color: '#6b5030', marginTop: 2 }}>{stageData.onFoundReveal.hi}</div>}
+                      {showEn && <div style={{ fontSize: 16, fontWeight: 800, color: '#4a2f18' }}>{stageData.onFoundReveal.en}</div>}
+                      {showHi && <div style={{ fontSize: 16, fontWeight: 600, fontFamily: DEVANAGARI, color: '#6b5030', marginTop: 2 }}>{stageData.onFoundReveal.hi}</div>}
                     </div>
                   </motion.div>
                 )}
@@ -2207,7 +2207,7 @@ export default function TreasureQuest({ sessionId, role, isLocked }: TreasureQue
                     style={{
                       position: 'absolute', bottom: 24, left: '50%', transform: 'translateX(-50%)', zIndex: 32,
                       background: 'rgba(250,240,220,0.95)', borderRadius: 999, padding: '5px 14px',
-                      fontSize: 13, fontWeight: 700, color: '#6b5030', whiteSpace: 'nowrap',
+                      fontSize: 14, fontWeight: 700, color: '#6b5030', whiteSpace: 'nowrap',
                     }}
                   >
                     {showEn && 'Not this one — try talking about it again'}
@@ -2219,13 +2219,13 @@ export default function TreasureQuest({ sessionId, role, isLocked }: TreasureQue
 
               {/* Layer 7 — stage header */}
               <div style={{ position: 'absolute', top: 10, left: '50%', transform: 'translateX(-50%)', zIndex: 30, display: 'flex', alignItems: 'center', gap: 8 }}>
-                <div style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '5px 14px', borderRadius: 20, background: 'rgba(250,240,220,0.95)', boxShadow: '0 4px 14px rgba(0,0,0,0.28)', fontSize: 14.5, fontWeight: 800, color: '#5a3a1a', whiteSpace: 'nowrap' }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '5px 14px', borderRadius: 20, background: 'rgba(250,240,220,0.95)', boxShadow: '0 4px 14px rgba(0,0,0,0.28)', fontSize: 16, fontWeight: 800, color: '#5a3a1a', whiteSpace: 'nowrap' }}>
                   <span>🧭</span>
                   {showEn && <span>{scenario.title_en}</span>}
                   {showHi && <span style={{ fontFamily: DEVANAGARI, fontWeight: 600 }}>{scenario.title_hi}</span>}
                   <span style={{ opacity: 0.55 }}>Stage {stageIdx + 1} of {scenario.stages.length}</span>
-                  <span style={{ background: badge.bg, color: badge.color, borderRadius: 999, padding: '1px 7px', fontSize: 11.5, textTransform: 'capitalize' }}>{level}</span>
-                  <span style={{ opacity: 0.45, fontSize: 12 }}>{questIdx + 1}/{levelScenarios.length}</span>
+                  <span style={{ background: badge.bg, color: badge.color, borderRadius: 999, padding: '1px 7px', fontSize: 13, textTransform: 'capitalize' }}>{level}</span>
+                  <span style={{ opacity: 0.45, fontSize: 13 }}>{questIdx + 1}/{levelScenarios.length}</span>
                 </div>
 
                 {isT && (
@@ -2235,7 +2235,7 @@ export default function TreasureQuest({ sessionId, role, isLocked }: TreasureQue
                         key={key}
                         onClick={() => write({ 'moduleState.tqLanguage': key })}
                         style={{
-                          border: 'none', cursor: 'pointer', borderRadius: 999, padding: '3px 8px', fontSize: 11.5, fontWeight: 800,
+                          border: 'none', cursor: 'pointer', borderRadius: 999, padding: '3px 8px', fontSize: 13, fontWeight: 800,
                           fontFamily: key === 'hi' ? DEVANAGARI : NUNITO,
                           background: language === key ? 'rgba(74,124,111,0.3)' : 'transparent',
                           color: language === key ? '#2f5c50' : '#9a8570',
@@ -2256,7 +2256,7 @@ export default function TreasureQuest({ sessionId, role, isLocked }: TreasureQue
                       key={l}
                       onClick={() => loadScenario(scenariosFor(l)[0].id, l)}
                       style={{
-                        padding: '2px 10px', borderRadius: 999, cursor: 'pointer', fontSize: 11.5, fontWeight: 800, textTransform: 'capitalize',
+                        padding: '2px 10px', borderRadius: 999, cursor: 'pointer', fontSize: 13, fontWeight: 800, textTransform: 'capitalize',
                         fontFamily: NUNITO, border: 'none',
                         background: level === l ? 'rgba(74,124,111,0.85)' : 'rgba(250,240,220,0.85)',
                         color: level === l ? '#fff' : '#8a6a4a',
@@ -2273,20 +2273,20 @@ export default function TreasureQuest({ sessionId, role, isLocked }: TreasureQue
               <div style={{ position: 'absolute', top: 78, [isT ? 'left' : 'right']: 16, zIndex: 25, width: 200 } as React.CSSProperties}>
                 <div style={parchment}>
                   <div style={{ position: 'absolute', top: 0, right: 0, width: 0, height: 0, borderStyle: 'solid', borderWidth: '0 14px 14px 0', borderColor: 'transparent rgba(120,80,40,0.2) transparent transparent' }} />
-                  <div style={{ fontSize: 12, fontWeight: 800, textTransform: 'uppercase', color: '#8a5a2a', marginBottom: 6, letterSpacing: 0.3 }}>
+                  <div style={{ fontSize: 13, fontWeight: 800, textTransform: 'uppercase', color: '#8a5a2a', marginBottom: 6, letterSpacing: 0.3 }}>
                     {isSearcher ? '🔍 You are searching this room' : '🗝️ You hold the clue'}
                   </div>
                   {isSearcher ? (
                     <>
-                      {showEn && <div style={{ fontSize: 13, fontWeight: 700, color: '#2c1f0e', lineHeight: 1.4 }}>{stageData.searcherPrompt.en}</div>}
+                      {showEn && <div style={{ fontSize: 14, fontWeight: 700, color: '#2c1f0e', lineHeight: 1.4 }}>{stageData.searcherPrompt.en}</div>}
                       {language === 'both' && <div style={{ height: 1, background: 'rgba(120,80,40,0.18)', margin: '6px 0' }} />}
-                      {showHi && <div style={{ fontSize: 13, fontWeight: 600, fontFamily: DEVANAGARI, color: '#6b5540', lineHeight: 1.5 }}>{stageData.searcherPrompt.hi}</div>}
+                      {showHi && <div style={{ fontSize: 14, fontWeight: 600, fontFamily: DEVANAGARI, color: '#6b5540', lineHeight: 1.5 }}>{stageData.searcherPrompt.hi}</div>}
                     </>
                   ) : (
                     <>
-                      {showEn && <div style={{ fontSize: 13, fontWeight: 700, color: '#2c1f0e', lineHeight: 1.4 }}>{stageData.decoderClue.en}</div>}
+                      {showEn && <div style={{ fontSize: 14, fontWeight: 700, color: '#2c1f0e', lineHeight: 1.4 }}>{stageData.decoderClue.en}</div>}
                       {language === 'both' && <div style={{ height: 1, background: 'rgba(120,80,40,0.18)', margin: '6px 0' }} />}
-                      {showHi && <div style={{ fontSize: 13, fontWeight: 600, fontFamily: DEVANAGARI, color: '#6b5540', lineHeight: 1.5 }}>{stageData.decoderClue.hi}</div>}
+                      {showHi && <div style={{ fontSize: 14, fontWeight: 600, fontFamily: DEVANAGARI, color: '#6b5540', lineHeight: 1.5 }}>{stageData.decoderClue.hi}</div>}
                     </>
                   )}
                 </div>
@@ -2294,7 +2294,7 @@ export default function TreasureQuest({ sessionId, role, isLocked }: TreasureQue
 
               {/* locked / waiting hint */}
               {!canClick && !foundHere && (
-                <div style={{ position: 'absolute', bottom: 24, left: 16, zIndex: 30, fontSize: 11.5, fontWeight: 700, color: 'rgba(255,240,215,0.75)', textShadow: '0 1px 3px rgba(0,0,0,0.7)' }}>
+                <div style={{ position: 'absolute', bottom: 24, left: 16, zIndex: 30, fontSize: 13, fontWeight: 700, color: 'rgba(255,240,215,0.75)', textShadow: '0 1px 3px rgba(0,0,0,0.7)' }}>
                   {isLocked && !isT ? 'Therapist is controlling' : isSearcher ? '' : 'Your partner is searching — tell them what your clue says'}
                 </div>
               )}

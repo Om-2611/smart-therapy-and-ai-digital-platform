@@ -54,6 +54,86 @@ const L3: Record<string, string[]> = {
   unsure: ['hesitant', 'doubtful', 'torn'],
 }
 
+/* ---- Body sensations --------------------------------------------------
+   The section used to print "Where do you feel X in your body?" and stop
+   there. That question presumes an emotion lives in one place, which is not
+   how interoception works and is hard for a child to answer — most feelings
+   show up as several sensations at once, and some show up as an absence.
+
+   So the question becomes "What do you notice in your body?" and the answer
+   becomes a pick-list. Wording is deliberately plain and concrete: "tummy",
+   not "abdomen"; "buzzy", not "hyperaroused". Every option is something a
+   child can check against their own body right now. */
+interface Sensation { id: string; emoji: string; label: string }
+
+const SENSATIONS: Record<string, Sensation> = {
+  racingHeart:  { id: 'racingHeart',  emoji: '💓', label: 'Racing heart' },
+  tightChest:   { id: 'tightChest',   emoji: '🫁', label: 'Tight chest' },
+  fastBreath:   { id: 'fastBreath',   emoji: '💨', label: 'Fast breathing' },
+  butterflies:  { id: 'butterflies',  emoji: '🦋', label: 'Butterflies in tummy' },
+  sickTummy:    { id: 'sickTummy',    emoji: '🤢', label: 'Sick or churny tummy' },
+  shakyHands:   { id: 'shakyHands',   emoji: '🤲', label: 'Shaky hands' },
+  tenseMuscles: { id: 'tenseMuscles', emoji: '💪', label: 'Tense muscles' },
+  clenchedJaw:  { id: 'clenchedJaw',  emoji: '😬', label: 'Clenched jaw or fists' },
+  hotFace:      { id: 'hotFace',      emoji: '🔥', label: 'Hot face' },
+  cold:         { id: 'cold',         emoji: '🧊', label: 'Cold or shivery' },
+  dizzy:        { id: 'dizzy',        emoji: '💫', label: 'Dizzy or spinny' },
+  headache:     { id: 'headache',     emoji: '🤕', label: 'Aching head' },
+  lumpThroat:   { id: 'lumpThroat',   emoji: '😖', label: 'Lump in throat' },
+  teary:        { id: 'teary',        emoji: '💧', label: 'Teary eyes' },
+  heavy:        { id: 'heavy',        emoji: '🪨', label: 'Heavy body' },
+  tired:        { id: 'tired',        emoji: '🥱', label: 'Tired, low energy' },
+  frozen:       { id: 'frozen',       emoji: '🧍', label: 'Frozen still' },
+  fidgety:      { id: 'fidgety',      emoji: '🦵', label: 'Fidgety legs' },
+  buzzy:        { id: 'buzzy',        emoji: '⚡', label: 'Buzzy energy' },
+  light:        { id: 'light',        emoji: '🎈', label: 'Light and floaty' },
+  warm:         { id: 'warm',         emoji: '☀️', label: 'Warm feeling' },
+  relaxed:      { id: 'relaxed',      emoji: '😌', label: 'Relaxed body' },
+  bigSmile:     { id: 'bigSmile',     emoji: '😄', label: 'Big smile' },
+  nothingMuch:  { id: 'nothingMuch',  emoji: '🌫️', label: 'Not much at all' },
+}
+
+/* Which sensations to offer, by emotion family. Offering all 24 every time
+   would be a reading test; each family shows the handful that actually fit it.
+   `nothingMuch` is on every list on purpose — "I do not notice anything" is a
+   real and common answer, especially with numbness, and a list that cannot
+   express it teaches a child to invent a sensation to please the adult. */
+const SENSATIONS_BY_FAMILY: Record<string, string[]> = {
+  scared:    ['racingHeart', 'tightChest', 'fastBreath', 'butterflies', 'shakyHands', 'sickTummy', 'frozen', 'dizzy', 'nothingMuch'],
+  angry:     ['hotFace', 'tenseMuscles', 'clenchedJaw', 'racingHeart', 'fastBreath', 'headache', 'fidgety', 'tightChest', 'nothingMuch'],
+  bad:       ['heavy', 'tired', 'lumpThroat', 'teary', 'tightChest', 'cold', 'sickTummy', 'frozen', 'nothingMuch'],
+  good:      ['warm', 'relaxed', 'light', 'bigSmile', 'buzzy', 'fastBreath', 'racingHeart', 'fidgety', 'nothingMuch'],
+  disgusted: ['sickTummy', 'lumpThroat', 'hotFace', 'tenseMuscles', 'cold', 'heavy', 'frozen', 'nothingMuch'],
+  surprised: ['racingHeart', 'frozen', 'dizzy', 'butterflies', 'fastBreath', 'buzzy', 'hotFace', 'nothingMuch'],
+}
+
+/* A general set for a word typed freehand that is not in the taxonomy. */
+const SENSATIONS_GENERAL = [
+  'racingHeart', 'tightChest', 'butterflies', 'tenseMuscles', 'shakyHands',
+  'warm', 'relaxed', 'heavy', 'tired', 'buzzy', 'hotFace', 'nothingMuch',
+]
+
+/* Walk the taxonomy to find which L1 family a word belongs to, at any depth,
+   so "heartbroken" resolves to `bad` and gets the low-and-heavy list rather
+   than the generic one. Free text is matched case-insensitively. */
+function familyOf(word: string): string | null {
+  const w = word.trim().toLowerCase()
+  if (!w) return null
+  if (L1.includes(w)) return w
+  for (const root of L1) {
+    const l2 = L2[root] || []
+    if (l2.includes(w)) return root
+    for (const mid of l2) if ((L3[mid] || []).includes(w)) return root
+  }
+  return null
+}
+
+function sensationsFor(word: string): Sensation[] {
+  const fam = familyOf(word)
+  const ids = (fam && SENSATIONS_BY_FAMILY[fam]) || SENSATIONS_GENERAL
+  return ids.map(id => SENSATIONS[id]).filter(Boolean)
+}
+
 /* ---- Palette ----------------------------------------------------------
    This module renders on ModuleStage's WHITE canvas, so every colour is
    stated literally and dark-on-light. The shared `--ink-*` CSS vars are
@@ -102,6 +182,10 @@ export default function EmotionWheel({ sessionId, role, isLocked }: EmotionWheel
   const [selected, setSelected] = useState('')
   const [highlighted, setHighlighted] = useState<string[]>([])
   const [comparePrompt, setComparePrompt] = useState<string[]>([])
+  /* Sensations picked per slot, keyed '0' and '1'. Shared, because the person
+     answering "what do you notice in your body" is the client, and the pair
+     itself has to reach their screen for them to answer it. */
+  const [sensations, setSensations] = useState<Record<string, string[]>>({})
 
   const write = useCallback(async (d: Record<string, unknown>) => {
     try { await updateDoc(doc(db, 'liveSessions', sessionId), { ...d, 'timestamps.updatedAt': new Date().toISOString() }) } catch {}
@@ -115,6 +199,10 @@ export default function EmotionWheel({ sessionId, role, isLocked }: EmotionWheel
       if (Array.isArray(s.ewPath)) setPath(s.ewPath)
       if (typeof s.ewSelected === 'string') setSelected(s.ewSelected)
       if (Array.isArray(s.ewHighlighted)) setHighlighted(s.ewHighlighted)
+      if (Array.isArray(s.ewComparePair)) setComparePrompt(s.ewComparePair as string[])
+      if (s.ewSensations && typeof s.ewSensations === 'object') {
+        setSensations(s.ewSensations as Record<string, string[]>)
+      }
     })
     return () => unsub()
   }, [sessionId])
@@ -146,6 +234,35 @@ export default function EmotionWheel({ sessionId, role, isLocked }: EmotionWheel
     const next = highlighted.includes(word) ? highlighted.filter(w => w !== word) : [...highlighted, word]
     write({ 'moduleState.ewHighlighted': next })
   }, [isT, highlighted, write])
+
+  /* Therapist sets the pair; changing it clears the answers, because a
+     sensation picked for "angry" means nothing once the slot says "grateful". */
+  const setPair = useCallback((a: string, b: string) => {
+    if (!isT) return
+    setComparePrompt([a, b])
+    write({ 'moduleState.ewComparePair': [a, b], 'moduleState.ewSensations': {} })
+  }, [isT, write])
+
+  const toggleSensation = useCallback((slot: number, id: string) => {
+    if (!canInteract) return
+    const key = String(slot)
+    const cur = sensations[key] || []
+    const next = cur.includes(id) ? cur.filter(x => x !== id) : [...cur, id]
+    const merged = { ...sensations, [key]: next }
+    setSensations(merged)
+    write({ 'moduleState.ewSensations': merged })
+    if (!cur.includes(id)) {
+      const em = comparePrompt[slot]
+      const label = SENSATIONS[id]?.label
+      if (em && label) {
+        logModuleEvent(sessionId, {
+          module: 'emotion-wheel',
+          type: 'body_sensation',
+          detail: `Noticed "${label}" in the body when feeling "${em}"`,
+        })
+      }
+    }
+  }, [canInteract, sensations, comparePrompt, write, sessionId])
 
   const options = level === 1 ? L1 : level === 2 ? (L2[path[0]] || []) : (L3[path[1]] || [])
   // Level 1 is laid out in the mockup's reading order; the taxonomy list itself is untouched.
@@ -191,7 +308,7 @@ export default function EmotionWheel({ sessionId, role, isLocked }: EmotionWheel
             boxShadow: 'inset 0 0 0 1.5px rgba(255,255,255,0.75)',
           }} />
         </div>
-        <div style={{ fontSize: 17, fontWeight: 500, color: INK_MUTED, textAlign: 'center' }}>
+        <div style={{ fontSize: 18.5, fontWeight: 500, color: INK_MUTED, textAlign: 'center' }}>
           Choose an emotion to explore deeper.
         </div>
       </div>
@@ -207,7 +324,7 @@ export default function EmotionWheel({ sessionId, role, isLocked }: EmotionWheel
             display: 'inline-flex', alignItems: 'center', gap: 4,
             padding: '6px 12px 6px 8px', borderRadius: 999,
             border: `1px solid ${LINE}`, background: '#ffffff',
-            fontSize: 15, fontWeight: 600, color: INK_MUTED,
+            fontSize: 16.5, fontWeight: 600, color: INK_MUTED,
             fontFamily: '"DM Sans", sans-serif', cursor: 'pointer',
             boxShadow: '0 1px 4px rgba(20,30,45,0.05)',
           }}>
@@ -219,7 +336,7 @@ export default function EmotionWheel({ sessionId, role, isLocked }: EmotionWheel
           padding: '6px 14px', borderRadius: 999,
           background: level > 1 ? rootPalette.tint : '#F8FAFC',
           border: `1px solid ${level > 1 ? rootPalette.accent : LINE}`,
-          fontSize: 15, fontWeight: 700, letterSpacing: 0.1,
+          fontSize: 16.5, fontWeight: 700, letterSpacing: 0.1,
           color: level > 1 ? rootPalette.accent : INK_FAINT,
           textTransform: 'capitalize',
         }}>
@@ -281,7 +398,7 @@ export default function EmotionWheel({ sessionId, role, isLocked }: EmotionWheel
                       width: 20, height: 20, borderRadius: '50%',
                       display: 'flex', alignItems: 'center', justifyContent: 'center',
                       background: '#FEF3C7', border: `1px solid ${AMBER}`,
-                      fontSize: 12, color: '#92400E', lineHeight: 1,
+                      fontSize: 13, color: '#92400E', lineHeight: 1,
                     }}>★</span>
                   )}
 
@@ -308,7 +425,7 @@ export default function EmotionWheel({ sessionId, role, isLocked }: EmotionWheel
                       padding: '2px 9px', borderRadius: 999, cursor: 'pointer',
                       border: `1px solid ${isHi ? AMBER : LINE}`,
                       background: isHi ? '#FFFBEB' : '#ffffff',
-                      fontSize: 12.5, fontWeight: 700,
+                      fontSize: 13.5, fontWeight: 700,
                       color: isHi ? '#92400E' : INK_FAINT,
                       fontFamily: '"DM Sans", sans-serif',
                     }}>
@@ -321,7 +438,7 @@ export default function EmotionWheel({ sessionId, role, isLocked }: EmotionWheel
           })}
 
           {ordered.length === 0 && (
-            <span style={{ fontSize: 15, color: INK_FAINT, padding: '20px 0' }}>
+            <span style={{ fontSize: 16.5, color: INK_FAINT, padding: '20px 0' }}>
               No further shades here — this is as specific as the wheel goes.
             </span>
           )}
@@ -338,16 +455,16 @@ export default function EmotionWheel({ sessionId, role, isLocked }: EmotionWheel
           background: rootPalette.tint, border: `1.5px solid ${rootPalette.accent}`,
           boxShadow: '0 4px 14px rgba(20,30,45,0.06)',
         }}>
-          <span aria-hidden style={{ fontSize: 32, lineHeight: 1 }}>{rootPalette.emoji}</span>
+          <span aria-hidden style={{ fontSize: 33, lineHeight: 1 }}>{rootPalette.emoji}</span>
           <span>
             <span style={{
-              display: 'block', fontSize: 12.5, fontWeight: 800, letterSpacing: 1.3,
+              display: 'block', fontSize: 13.5, fontWeight: 800, letterSpacing: 1.3,
               textTransform: 'uppercase', color: INK_FAINT,
             }}>
               You named it
             </span>
             <span style={{
-              display: 'block', marginTop: 2, fontSize: 26.5, fontWeight: 800,
+              display: 'block', marginTop: 2, fontSize: 28, fontWeight: 800,
               letterSpacing: -0.3, textTransform: 'capitalize', color: rootPalette.accent,
             }}>
               {selected}
@@ -369,7 +486,7 @@ export default function EmotionWheel({ sessionId, role, isLocked }: EmotionWheel
           }}>
             <Lightbulb size={18} color={AMBER} fill="#FCD34D" />
           </span>
-          <span style={{ fontSize: 16.5, fontWeight: 500, lineHeight: 1.45, color: INK_BODY }}>
+          <span style={{ fontSize: 18, fontWeight: 500, lineHeight: 1.45, color: INK_BODY }}>
             There are many shades to every emotion.<br />
             Let&apos;s explore them together, one layer at a time.
           </span>
@@ -377,36 +494,93 @@ export default function EmotionWheel({ sessionId, role, isLocked }: EmotionWheel
       )}
 
       {/* ---- Therapist compare tool (local-only prompt, unchanged) ---- */}
-      {isT && (
+      {/* ---- Compare two emotions: what the body notices ----
+           Visible to BOTH roles now. The therapist still chooses the pair, but
+           the person answering "what do you notice in your body" is the client,
+           so the question has to reach their screen. It was therapist-only,
+           which meant nobody could actually answer it. */}
+      {(isT || (comparePrompt[0] && comparePrompt[1])) && (
         <div style={{
-          flexShrink: 0, display: 'flex', flexDirection: 'column', gap: 8,
-          padding: '10px 14px 12px', borderRadius: 16,
+          flexShrink: 0, display: 'flex', flexDirection: 'column', gap: 9,
+          padding: '11px 14px 13px', borderRadius: 16,
           background: '#ffffff', border: `1px solid ${LINE}`,
           boxShadow: '0 2px 10px rgba(20,30,45,0.05)',
         }}>
           <div style={{
-            fontSize: 12.5, fontWeight: 800, letterSpacing: 1.3,
+            fontSize: 13.5, fontWeight: 800, letterSpacing: 1.3,
             textTransform: 'uppercase', color: INK_FAINT,
           }}>
             Compare two emotions (body sensation)
           </div>
-          <div style={{ display: 'flex', gap: 8 }}>
-            <input className="ew-input" placeholder="Emotion A" value={comparePrompt[0] || ''}
-              onChange={e => setComparePrompt([e.target.value, comparePrompt[1] || ''])} style={inputStyle} />
-            <input className="ew-input" placeholder="Emotion B" value={comparePrompt[1] || ''}
-              onChange={e => setComparePrompt([comparePrompt[0] || '', e.target.value])} style={inputStyle} />
-          </div>
-          {comparePrompt[0] && comparePrompt[1] && (
+
+          {isT && (
             <div style={{ display: 'flex', gap: 8 }}>
-              {comparePrompt.map((em, i) => (
-                <div key={i} style={{
-                  flex: 1, padding: '9px 12px', borderRadius: 12,
-                  background: '#F8FAFC', border: `1px solid ${LINE}`,
-                  fontSize: 15, lineHeight: 1.4, color: INK_BODY, textAlign: 'center',
-                }}>
-                  Where do you feel <strong style={{ textTransform: 'capitalize', color: INK }}>{em}</strong> in your body?
-                </div>
-              ))}
+              <input className="ew-input" placeholder="Emotion A" value={comparePrompt[0] || ''}
+                onChange={e => setPair(e.target.value, comparePrompt[1] || '')} style={inputStyle} />
+              <input className="ew-input" placeholder="Emotion B" value={comparePrompt[1] || ''}
+                onChange={e => setPair(comparePrompt[0] || '', e.target.value)} style={inputStyle} />
+            </div>
+          )}
+
+          {comparePrompt[0] && comparePrompt[1] && (
+            <div style={{ display: 'flex', gap: 10, alignItems: 'flex-start' }}>
+              {comparePrompt.map((em, i) => {
+                const picked = sensations[String(i)] || []
+                const opts = sensationsFor(em)
+                return (
+                  <div key={i} style={{
+                    flex: 1, minWidth: 0, padding: '11px 12px 12px', borderRadius: 14,
+                    background: '#F8FAFC', border: `1px solid ${LINE}`,
+                  }}>
+                    <div style={{
+                      fontSize: 16.5, lineHeight: 1.4, color: INK_BODY,
+                      textAlign: 'center', marginBottom: 9,
+                    }}>
+                      What do you notice in your body when you feel{' '}
+                      <strong style={{ textTransform: 'capitalize', color: INK }}>{em}</strong>?
+                    </div>
+
+                    <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6, justifyContent: 'center' }}>
+                      {opts.map(sn => {
+                        const on = picked.includes(sn.id)
+                        return (
+                          <button
+                            key={sn.id}
+                            onClick={() => toggleSensation(i, sn.id)}
+                            disabled={!canInteract}
+                            aria-pressed={on}
+                            style={{
+                              display: 'inline-flex', alignItems: 'center', gap: 6,
+                              padding: '7px 12px', borderRadius: 999,
+                              border: `1.5px solid ${on ? AMBER : LINE}`,
+                              background: on ? '#FEF6E7' : '#ffffff',
+                              color: on ? '#8A4B08' : INK_MUTED,
+                              fontSize: 15, fontWeight: on ? 800 : 600,
+                              fontFamily: '"DM Sans", sans-serif',
+                              cursor: canInteract ? 'pointer' : 'default',
+                              transition: 'background .12s, border-color .12s, color .12s',
+                            }}
+                          >
+                            <span aria-hidden style={{ fontSize: 16, lineHeight: 1 }}>{sn.emoji}</span>
+                            {sn.label}
+                          </button>
+                        )
+                      })}
+                    </div>
+
+                    {/* Several sensations at once is the normal answer, so the
+                        count is shown rather than implying one right pick. */}
+                    <div style={{
+                      marginTop: 9, textAlign: 'center', fontSize: 14, fontWeight: 600,
+                      color: picked.length ? '#8A4B08' : INK_FAINT,
+                    }}>
+                      {picked.length
+                        ? `${picked.length} noticed`
+                        : 'Pick as many as you notice'}
+                    </div>
+                  </div>
+                )
+              })}
             </div>
           )}
         </div>
@@ -418,7 +592,7 @@ export default function EmotionWheel({ sessionId, role, isLocked }: EmotionWheel
 const inputStyle: React.CSSProperties = {
   flex: 1, minWidth: 0, boxSizing: 'border-box', outline: 'none',
   background: '#ffffff', border: `1px solid ${LINE}`, borderRadius: 12,
-  padding: '9px 12px', fontSize: 15, color: INK_BODY,
+  padding: '9px 12px', fontSize: 16.5, color: INK_BODY,
   fontFamily: '"DM Sans", sans-serif',
   transition: 'border-color .15s, box-shadow .15s',
 }

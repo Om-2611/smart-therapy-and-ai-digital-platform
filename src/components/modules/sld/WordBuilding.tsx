@@ -708,7 +708,7 @@ export default function WordBuilding({ sessionId, role, isLocked }: WordBuilding
                           border: active ? `1.5px solid ${GREEN}` : '1.5px solid transparent',
                           background: active ? '#F3FBF5' : 'transparent',
                           color: active ? GREEN_DEEP : INK_BODY,
-                          fontSize: 17,
+                          fontSize: 18.5,
                           fontWeight: 600,
                           fontFamily: "'DM Sans', sans-serif",
                           cursor: isT ? 'pointer' : 'default',
@@ -772,7 +772,7 @@ export default function WordBuilding({ sessionId, role, isLocked }: WordBuilding
                     border: 'none',
                     background: GREEN,
                     color: '#ffffff',
-                    fontSize: 17,
+                    fontSize: 18.5,
                     fontWeight: 600,
                     fontFamily: "'DM Sans', sans-serif",
                     cursor: 'pointer',
@@ -803,7 +803,7 @@ export default function WordBuilding({ sessionId, role, isLocked }: WordBuilding
                   boxShadow: CARD_SHADOW,
                 }}
               >
-                <span style={{ fontSize: 16, fontWeight: 600, color: MUTED, flexShrink: 0 }}>Custom word</span>
+                <span style={{ fontSize: 17.5, fontWeight: 600, color: MUTED, flexShrink: 0 }}>Custom word</span>
                 <input
                   className="wb-input"
                   value={customInput}
@@ -818,7 +818,7 @@ export default function WordBuilding({ sessionId, role, isLocked }: WordBuilding
                     borderRadius: 14,
                     padding: '13px 16px',
                     color: INK,
-                    fontSize: 17,
+                    fontSize: 18.5,
                     fontFamily: "'DM Sans', sans-serif",
                     outline: 'none',
                     transition: 'border-color .15s, box-shadow .15s',
@@ -834,7 +834,7 @@ export default function WordBuilding({ sessionId, role, isLocked }: WordBuilding
                     border: 'none',
                     background: GREEN,
                     color: '#ffffff',
-                    fontSize: 17,
+                    fontSize: 18.5,
                     fontWeight: 600,
                     fontFamily: "'DM Sans', sans-serif",
                     cursor: 'pointer',
@@ -864,8 +864,8 @@ export default function WordBuilding({ sessionId, role, isLocked }: WordBuilding
                   boxShadow: CARD_SHADOW,
                 }}
               >
-                <span style={{ fontSize: 36 }}>🔤</span>
-                <span style={{ fontSize: 17, fontWeight: 500, color: INK_BODY, textAlign: 'center' }}>
+                <span style={{ fontSize: 37 }}>🔤</span>
+                <span style={{ fontSize: 18.5, fontWeight: 500, color: INK_BODY, textAlign: 'center' }}>
                   {isT
                     ? difficulty === 'custom'
                       ? 'Type a word above and press Set word'
@@ -893,9 +893,9 @@ export default function WordBuilding({ sessionId, role, isLocked }: WordBuilding
                   boxShadow: CARD_SHADOW,
                 }}
               >
-                <span style={{ fontSize: 42.5 }}>🎉</span>
-                <span style={{ fontSize: 22, fontWeight: 700, color: GREEN_DEEP }}>Activity complete!</span>
-                <span style={{ fontSize: 17, fontWeight: 500, color: INK_BODY }}>
+                <span style={{ fontSize: 44 }}>🎉</span>
+                <span style={{ fontSize: 23.5, fontWeight: 700, color: GREEN_DEEP }}>Activity complete!</span>
+                <span style={{ fontSize: 18.5, fontWeight: 500, color: INK_BODY }}>
                   {wordsDone} of {goal} words built
                 </span>
                 {isT && (
@@ -912,7 +912,7 @@ export default function WordBuilding({ sessionId, role, isLocked }: WordBuilding
                       border: 'none',
                       background: GREEN,
                       color: '#ffffff',
-                      fontSize: 17,
+                      fontSize: 18.5,
                       fontWeight: 600,
                       fontFamily: "'DM Sans', sans-serif",
                       cursor: 'pointer',
@@ -962,7 +962,7 @@ export default function WordBuilding({ sessionId, role, isLocked }: WordBuilding
                       border: 'none',
                       background: 'transparent',
                       color: GREEN_DEEP,
-                      fontSize: 17,
+                      fontSize: 18.5,
                       fontWeight: 600,
                       fontFamily: "'DM Sans', sans-serif",
                       cursor: 'pointer',
@@ -994,7 +994,7 @@ export default function WordBuilding({ sessionId, role, isLocked }: WordBuilding
                             display: 'flex',
                             alignItems: 'center',
                             justifyContent: 'center',
-                            fontSize: 34,
+                            fontSize: 35,
                             fontWeight: 700,
                             lineHeight: 1,
                             color: isWrong ? '#B3441C' : INK,
@@ -1054,7 +1054,7 @@ export default function WordBuilding({ sessionId, role, isLocked }: WordBuilding
                             display: 'flex',
                             alignItems: 'center',
                             justifyContent: 'center',
-                            fontSize: 36,
+                            fontSize: 37,
                             fontWeight: 700,
                             lineHeight: 1,
                             color: INK,
@@ -1146,7 +1146,7 @@ export default function WordBuilding({ sessionId, role, isLocked }: WordBuilding
                   boxShadow: CARD_SHADOW,
                 }}
               >
-                <span style={{ fontSize: 17, fontWeight: 600, color: INK_BODY, flexShrink: 0 }}>Progress</span>
+                <span style={{ fontSize: 18.5, fontWeight: 600, color: INK_BODY, flexShrink: 0 }}>Progress</span>
                 {!isCustom && (
                 <div style={{ flex: '1 1 220px', minWidth: 160, position: 'relative', height: 14, display: 'flex', alignItems: 'center' }}>
                   <div style={{ width: '100%', height: 12, borderRadius: 999, background: '#E9EEF4', overflow: 'hidden' }}>
@@ -1190,7 +1190,7 @@ export default function WordBuilding({ sessionId, role, isLocked }: WordBuilding
                     marginLeft: isCustom ? 'auto' : 0,
                     paddingLeft: 20,
                     borderLeft: `1px solid ${BORDER}`,
-                    fontSize: 17,
+                    fontSize: 18.5,
                     fontWeight: 600,
                     color: INK_BODY,
                   }}
@@ -1210,7 +1210,7 @@ export default function WordBuilding({ sessionId, role, isLocked }: WordBuilding
               position: 'absolute',
               left: `${ce.x}%`,
               top: '45%',
-              fontSize: 28.5,
+              fontSize: 30,
               zIndex: 20,
               pointerEvents: 'none',
               animation: 'wbFloatUp 1.6s ease forwards',
@@ -1234,7 +1234,7 @@ export default function WordBuilding({ sessionId, role, isLocked }: WordBuilding
             display: 'flex',
             alignItems: 'center',
             justifyContent: 'center',
-            fontSize: 36,
+            fontSize: 37,
             fontWeight: 700,
             lineHeight: 1,
             fontFamily: "'DM Sans', sans-serif",
@@ -1292,7 +1292,7 @@ function ActionPill({
         border: `1px solid ${edge}`,
         background: bg,
         color: ink,
-        fontSize: 17,
+        fontSize: 18.5,
         fontWeight: 600,
         fontFamily: "'DM Sans', sans-serif",
         cursor: disabled ? 'default' : 'pointer',

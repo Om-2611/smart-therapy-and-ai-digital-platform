@@ -3,7 +3,7 @@
 import { useState, useEffect, useCallback } from 'react'
 import type { CSSProperties } from 'react'
 import { doc, onSnapshot, updateDoc } from 'firebase/firestore'
-import { Plus, Search, Shield, Scale, ArrowDown, Lightbulb } from 'lucide-react'
+import { Plus, Search, Shield, Scale, ArrowDown, Lightbulb, Pencil, Check, ArrowRight } from 'lucide-react'
 import { db } from '@/lib/firebase'
 import { logModuleEvent } from '@/lib/sessionEvents'
 
@@ -75,6 +75,20 @@ export default function ThoughtChallenger({ sessionId, role, isLocked }: Thought
   const [bounceId, setBounceId] = useState<string | null>(null)
   const [saved, setSaved] = useState(false)
 
+  /* Belief ratings and completion. The reframe used to be the end of the road:
+     it appeared and nothing followed it, so the activity had no close. The
+     "before" rating is attached to the thought rather than added as a step —
+     the four-step flow is unchanged — and it is what makes the summary able to
+     report a CHANGE rather than a bare number. */
+  const [beliefBefore, setBeliefBefore] = useState<number | null>(null)
+  const [beliefAfter, setBeliefAfter] = useState<number | null>(null)
+  const [completed, setCompleted] = useState(false)
+
+  /* Local-only reframe editing. The draft is held here and only written on
+     save, so a half-typed edit never reaches the other screen. */
+  const [editingReframe, setEditingReframe] = useState(false)
+  const [reframeDraft, setReframeDraft] = useState('')
+
   /* Purely local disclosure state for the two composer rows — the mockup shows
      the buttons alone, so the inputs stay folded away until asked for. Nothing
      here is persisted; no new Firestore field is introduced. */
@@ -92,6 +106,9 @@ export default function ThoughtChallenger({ sessionId, role, isLocked }: Thought
       if (typeof s.tcThought === 'string') setThought(s.tcThought)
       if (Array.isArray(s.tcCards)) setCards(s.tcCards)
       if (typeof s.tcReframe === 'string') setReframe(s.tcReframe)
+      setBeliefBefore(typeof s.tcBeliefBefore === 'number' ? s.tcBeliefBefore : null)
+      setBeliefAfter(typeof s.tcBeliefAfter === 'number' ? s.tcBeliefAfter : null)
+      if (typeof s.tcCompleted === 'boolean') setCompleted(s.tcCompleted)
     })
     return () => unsub()
   }, [sessionId])
@@ -150,6 +167,52 @@ export default function ThoughtChallenger({ sessionId, role, isLocked }: Thought
     })
   }, [isT, cards, write, sessionId])
 
+  const setBelief = useCallback((which: 'before' | 'after', n: number) => {
+    if (!canInteract || completed) return
+    const key = which === 'before' ? 'moduleState.tcBeliefBefore' : 'moduleState.tcBeliefAfter'
+    if (which === 'before') setBeliefBefore(n); else setBeliefAfter(n)
+    write({ [key]: n })
+  }, [canInteract, completed, write])
+
+  const startEditReframe = useCallback(() => {
+    if (!isT) return
+    setReframeDraft(reframe)
+    setEditingReframe(true)
+  }, [isT, reframe])
+
+  const saveReframeEdit = useCallback(() => {
+    const t = reframeDraft.trim()
+    if (!isT || !t) return
+    setReframe(t)
+    setEditingReframe(false)
+    write({ 'moduleState.tcReframe': t })
+    logModuleEvent(sessionId, {
+      module: 'thought-challenger',
+      type: 'reframe_edited',
+      detail: `Edited the balanced reframe to: "${t}"`,
+    })
+  }, [isT, reframeDraft, write, sessionId])
+
+  const completeActivity = useCallback(() => {
+    if (!isT || !reframe) return
+    setCompleted(true)
+    write({ 'moduleState.tcCompleted': true })
+    const shift = beliefBefore != null && beliefAfter != null
+      ? `belief in the thought moved ${beliefBefore} -> ${beliefAfter} out of 10`
+      : 'belief rating not recorded'
+    logModuleEvent(sessionId, {
+      module: 'thought-challenger',
+      type: 'activity_completed',
+      detail: `Completed the thought record for "${thought}" — ${shift}`,
+    })
+  }, [isT, reframe, beliefBefore, beliefAfter, thought, write, sessionId])
+
+  const reopenActivity = useCallback(() => {
+    if (!isT) return
+    setCompleted(false)
+    write({ 'moduleState.tcCompleted': false })
+  }, [isT, write])
+
   const saveNotes = useCallback(async () => {
     if (!isT) return
     try {
@@ -163,6 +226,10 @@ export default function ThoughtChallenger({ sessionId, role, isLocked }: Thought
   }, [isT, sessionId, thought, reframe])
 
   const pool = cards.filter(c => c.bin === 'pool')
+  const forCount = cards.filter(c => c.bin === 'for').length
+  const againstCount = cards.filter(c => c.bin === 'against').length
+  const unclearCount = cards.filter(c => c.bin === 'unclear').length
+  const readyToComplete = !!reframe && beliefBefore != null && beliefAfter != null
 
   /* Submit wrappers: they only fold the composer away, the write path itself is
      the untouched callback above. */
@@ -191,22 +258,30 @@ export default function ThoughtChallenger({ sessionId, role, isLocked }: Thought
       `}</style>
 
       {/* ============ TOP ROW: thought column · How to Play ============ */}
-      <div style={{ flexShrink: 0, display: 'flex', alignItems: 'flex-start', gap: 16 }}>
+      {/* maxHeight + an internally scrolling left column: the reframe, ratings
+          and summary can grow without ever squeezing the evidence bins below.
+          The module's overall footprint is unchanged. */}
+      <div style={{ flexShrink: 0, minHeight: 0, maxHeight: '62%', display: 'flex', alignItems: 'flex-start', gap: 16 }}>
 
         {/* ---- LEFT: identity mark, actions, current thought ---- */}
-        <div style={{ flex: 1, minWidth: 0, display: 'flex', flexDirection: 'column', gap: 10 }}>
+        <div className="tc-scroll-y" style={{
+          flex: 1, minWidth: 0, maxHeight: '100%', overflowY: 'auto', paddingRight: 2,
+          display: 'flex', flexDirection: 'column', gap: 12,
+        }}>
 
           {/* The module title itself lives in ModuleStage's header — this is the
               subtitle only, paired with the brain-in-a-speech-bubble mark. */}
           <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
             <BrainBubble />
-            <div style={{ fontSize: 17, fontWeight: 500, lineHeight: 1.35, color: INK_SOFT, minWidth: 0 }}>
+            <div style={{ fontSize: 18.5, fontWeight: 500, lineHeight: 1.35, color: INK_SOFT, minWidth: 0 }}>
               Explore your thought and discover the evidence.
             </div>
           </div>
 
-          {isT && (
-            <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
+          {/* Setup actions retire once the activity is finished — a completed
+              record should not still be offering to change its own thought. */}
+          {isT && !completed && (
+            <div style={{ display: 'flex', alignItems: 'center', gap: 9, flexWrap: 'wrap' }}>
               <button
                 onClick={() => setThoughtOpen(o => !o)}
                 style={solidBtn(VIOLET, 'rgba(109,40,217,0.28)')}
@@ -214,7 +289,21 @@ export default function ThoughtChallenger({ sessionId, role, isLocked }: Thought
                 <Plus size={17} strokeWidth={2.8} color="#ffffff" />
                 Add Thought
               </button>
-              <button onClick={generateReframe} style={ghostBtn}>Generate reframe</button>
+              {/* Generating from an unsorted pile produced "Some some evidence
+                  may be true, but other evidence shows..." — the sentence needs
+                  at least one card on one side to say anything. */}
+              <button
+                onClick={generateReframe}
+                disabled={forCount + againstCount === 0}
+                title={forCount + againstCount === 0 ? 'Sort at least one evidence card first' : undefined}
+                style={{
+                  ...ghostBtn,
+                  opacity: forCount + againstCount === 0 ? 0.45 : 1,
+                  cursor: forCount + againstCount === 0 ? 'default' : 'pointer',
+                }}
+              >
+                {reframe ? 'Regenerate reframe' : 'Generate reframe'}
+              </button>
             </div>
           )}
 
@@ -245,45 +334,227 @@ export default function ThoughtChallenger({ sessionId, role, isLocked }: Thought
             <Sparkle size={11} top={72} right={92} opacity={0.32} />
             <Sparkle size={12} top={80} right={40} opacity={0.28} />
 
-            <div style={{
-              fontSize: 12.5, fontWeight: 800, letterSpacing: 1.4, textTransform: 'uppercase',
-              color: VIOLET, marginBottom: 8,
-            }}>
-              Current thought
-            </div>
+            <div style={microLabel(VIOLET)}>Current thought</div>
             <div style={{
               position: 'relative',
               fontFamily: '"DM Serif Display", Georgia, serif', fontStyle: 'italic', fontWeight: 700,
-              fontSize: 26.5, lineHeight: 1.3,
+              fontSize: 28, lineHeight: 1.3,
               color: thought ? VIOLET_DEEP : '#8B7CC0',
               wordBreak: 'break-word',
             }}>
               {thought ? `“${thought}”` : (isT ? 'Set a thought to begin…' : 'Waiting for therapist…')}
             </div>
+
+            {/* Belief BEFORE the work. Captured here rather than as a fifth step
+                so the flow is untouched, and so the closing summary can report a
+                change instead of a lone number. */}
+            {thought && !completed && (
+              <div style={{ position: 'relative', marginTop: 16, paddingTop: 13, borderTop: '1px solid #E2D8FB' }}>
+                <div style={{ ...microLabel(VIOLET), marginBottom: 7 }}>
+                  How much do you believe it right now?
+                </div>
+                <BeliefScale
+                  value={beliefBefore}
+                  accent={VIOLET}
+                  disabled={!canInteract}
+                  onPick={n => setBelief('before', n)}
+                />
+              </div>
+            )}
           </div>
 
           {/* ---- Balanced reframe (only once generated) ---- */}
-          {reframe && (
+          {reframe && !completed && (
             <div style={{
-              background: '#F2FCF5', border: '1px solid #CBEFD8', borderRadius: 16, padding: '12px 16px 14px',
+              background: '#F2FCF5', border: '1px solid #CBEFD8', borderRadius: 16, padding: '14px 18px 16px',
             }}>
-              <div style={{
-                fontSize: 12, fontWeight: 800, letterSpacing: 1.3, textTransform: 'uppercase',
-                color: GREEN, marginBottom: 6,
-              }}>
-                Balanced reframe
+              <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 8 }}>
+                <div style={{ ...microLabel(GREEN), marginBottom: 0 }}>Balanced reframe</div>
+                {isT && !editingReframe && (
+                  <button
+                    onClick={startEditReframe}
+                    style={{
+                      marginLeft: 'auto', display: 'inline-flex', alignItems: 'center', gap: 6,
+                      padding: '5px 12px', borderRadius: 9, border: '1px solid #BBE8CC',
+                      background: '#ffffff', color: GREEN, fontSize: 14.5, fontWeight: 700,
+                      fontFamily: '"DM Sans", sans-serif', cursor: 'pointer',
+                    }}
+                  >
+                    <Pencil size={14} strokeWidth={2.6} /> Edit
+                  </button>
+                )}
               </div>
-              <div style={{
-                fontFamily: '"DM Serif Display", Georgia, serif', fontStyle: 'italic',
-                fontSize: 17, lineHeight: 1.4, color: '#14532D',
-              }}>
-                {reframe}
-              </div>
-              {isT && (
-                <button onClick={saveNotes} style={{ ...ghostBtn, marginTop: 10, borderColor: '#BBE8CC', color: GREEN }}>
-                  {saved ? 'Saved ✓' : 'Save to session notes'}
-                </button>
+
+              {editingReframe ? (
+                <>
+                  {/* eslint-disable-next-line jsx-a11y/no-autofocus */}
+                  <textarea
+                    autoFocus
+                    className="tc-input"
+                    value={reframeDraft}
+                    onChange={e => setReframeDraft(e.target.value)}
+                    rows={3}
+                    style={{
+                      ...inputStyle, width: '100%', resize: 'vertical', lineHeight: 1.45,
+                      fontFamily: '"DM Sans", sans-serif',
+                    }}
+                  />
+                  <div style={{ display: 'flex', gap: 8, marginTop: 10 }}>
+                    <button onClick={saveReframeEdit} disabled={!reframeDraft.trim()}
+                      style={{ ...chipBtn(GREEN), opacity: reframeDraft.trim() ? 1 : 0.45 }}>
+                      Save reframe
+                    </button>
+                    <button onClick={() => setEditingReframe(false)}
+                      style={{ ...ghostBtn, borderColor: HAIRLINE, color: INK_SOFT }}>
+                      Cancel
+                    </button>
+                  </div>
+                </>
+              ) : (
+                <div style={{
+                  fontFamily: '"DM Serif Display", Georgia, serif', fontStyle: 'italic',
+                  fontSize: 18.5, lineHeight: 1.45, color: '#14532D',
+                }}>
+                  {reframe}
+                </div>
               )}
+
+              {/* Belief AFTER the reframe. */}
+              {!editingReframe && (
+                <div style={{ marginTop: 16, paddingTop: 13, borderTop: '1px solid #CBEFD8' }}>
+                  <div style={{ ...microLabel(GREEN), marginBottom: 7 }}>
+                    How much do you believe the thought now?
+                  </div>
+                  <BeliefScale
+                    value={beliefAfter}
+                    accent={GREEN}
+                    disabled={!canInteract}
+                    onPick={n => setBelief('after', n)}
+                  />
+                </div>
+              )}
+
+              {/* Button hierarchy: completing is the primary act, saving notes a
+                  secondary one, so they are no longer two identical ghosts. */}
+              {isT && !editingReframe && (
+                <div style={{ display: 'flex', alignItems: 'center', gap: 9, marginTop: 16, flexWrap: 'wrap' }}>
+                  <button
+                    onClick={completeActivity}
+                    disabled={!readyToComplete}
+                    title={readyToComplete ? undefined : 'Rate your belief before and after to finish'}
+                    style={{
+                      ...solidBtn(GREEN, 'rgba(22,163,74,0.28)'),
+                      padding: '11px 22px',
+                      opacity: readyToComplete ? 1 : 0.45,
+                      cursor: readyToComplete ? 'pointer' : 'default',
+                    }}
+                  >
+                    <Check size={18} strokeWidth={3} color="#ffffff" />
+                    Complete Activity
+                  </button>
+                  <button onClick={saveNotes} style={{ ...ghostBtn, borderColor: '#BBE8CC', color: GREEN }}>
+                    {saved ? 'Saved ✓' : 'Save to session notes'}
+                  </button>
+                </div>
+              )}
+            </div>
+          )}
+
+          {/* ---- Completed: the closing summary ---- */}
+          {completed && (
+            <div style={{
+              background: '#F2FCF5', border: '1.5px solid #A7E3BE', borderRadius: 16,
+              padding: '16px 18px 18px',
+            }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: 9, marginBottom: 13 }}>
+                <span style={{
+                  width: 28, height: 28, borderRadius: '50%', flexShrink: 0,
+                  display: 'flex', alignItems: 'center', justifyContent: 'center', background: GREEN,
+                }}>
+                  <Check size={17} strokeWidth={3.2} color="#ffffff" />
+                </span>
+                <span style={{ fontSize: 20, fontWeight: 800, letterSpacing: -0.2, color: '#14532D' }}>
+                  Activity complete
+                </span>
+                {isT && (
+                  <button onClick={reopenActivity}
+                    style={{
+                      marginLeft: 'auto', padding: '5px 12px', borderRadius: 9,
+                      border: `1px solid ${HAIRLINE}`, background: '#ffffff', color: INK_SOFT,
+                      fontSize: 14, fontWeight: 700, fontFamily: '"DM Sans", sans-serif', cursor: 'pointer',
+                    }}
+                  >Reopen</button>
+                )}
+              </div>
+
+              <div style={{ display: 'flex', flexDirection: 'column', gap: 13 }}>
+                <div>
+                  <div style={{ ...microLabel(INK_FAINT), marginBottom: 5 }}>Original thought</div>
+                  <div style={{
+                    fontFamily: '"DM Serif Display", Georgia, serif', fontStyle: 'italic',
+                    fontSize: 17.5, lineHeight: 1.4, color: VIOLET_DEEP, wordBreak: 'break-word',
+                  }}>{thought ? `“${thought}”` : '—'}</div>
+                </div>
+
+                <div>
+                  <div style={{ ...microLabel(INK_FAINT), marginBottom: 6 }}>Evidence gathered</div>
+                  <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
+                    {[
+                      { n: forCount, label: 'For', accent: GREEN, tint: '#F2FCF5', border: '#CBEFD8' },
+                      { n: againstCount, label: 'Against', accent: BLUE, tint: '#F1F6FE', border: '#CFE0FB' },
+                      { n: unclearCount, label: 'Unclear', accent: VIOLET_BRIGHT, tint: '#F7F3FE', border: '#DFD3FB' },
+                    ].map(b => (
+                      <span key={b.label} style={{
+                        display: 'inline-flex', alignItems: 'baseline', gap: 6,
+                        padding: '6px 13px', borderRadius: 999,
+                        background: b.tint, border: `1px solid ${b.border}`,
+                      }}>
+                        <span style={{ fontSize: 19, fontWeight: 800, color: b.accent, fontVariantNumeric: 'tabular-nums' }}>{b.n}</span>
+                        <span style={{ fontSize: 15, fontWeight: 600, color: INK_SOFT }}>{b.label}</span>
+                      </span>
+                    ))}
+                  </div>
+                </div>
+
+                <div>
+                  <div style={{ ...microLabel(INK_FAINT), marginBottom: 5 }}>Balanced reframe</div>
+                  <div style={{
+                    fontFamily: '"DM Serif Display", Georgia, serif', fontStyle: 'italic',
+                    fontSize: 17.5, lineHeight: 1.45, color: '#14532D',
+                  }}>{reframe || '—'}</div>
+                </div>
+
+                <div>
+                  <div style={{ ...microLabel(INK_FAINT), marginBottom: 6 }}>Belief in the thought</div>
+                  {beliefBefore != null && beliefAfter != null ? (
+                    <div style={{ display: 'flex', alignItems: 'center', gap: 11, flexWrap: 'wrap' }}>
+                      <span style={{ fontSize: 26, fontWeight: 800, color: VIOLET, fontVariantNumeric: 'tabular-nums' }}>
+                        {beliefBefore}
+                      </span>
+                      <ArrowRight size={19} strokeWidth={2.6} color={INK_FAINT} />
+                      <span style={{ fontSize: 26, fontWeight: 800, color: GREEN, fontVariantNumeric: 'tabular-nums' }}>
+                        {beliefAfter}
+                      </span>
+                      <span style={{ fontSize: 15.5, fontWeight: 600, color: INK_SOFT }}>out of 10</span>
+                      {/* The delta is the point of the exercise, so it is stated
+                          rather than left for the reader to subtract. */}
+                      {beliefAfter !== beliefBefore && (
+                        <span style={{
+                          padding: '4px 11px', borderRadius: 999,
+                          background: beliefAfter < beliefBefore ? '#F2FCF5' : '#FEF6DF',
+                          border: `1px solid ${beliefAfter < beliefBefore ? '#CBEFD8' : '#FBE3A6'}`,
+                          color: beliefAfter < beliefBefore ? GREEN : '#B45309',
+                          fontSize: 14.5, fontWeight: 800,
+                        }}>
+                          {beliefAfter < beliefBefore ? '↓' : '↑'} {Math.abs(beliefBefore - beliefAfter)} point{Math.abs(beliefBefore - beliefAfter) === 1 ? '' : 's'}
+                        </span>
+                      )}
+                    </div>
+                  ) : (
+                    <div style={{ fontSize: 15.5, fontWeight: 500, color: INK_FAINT }}>Not rated</div>
+                  )}
+                </div>
+              </div>
             </div>
           )}
         </div>
@@ -302,7 +573,7 @@ export default function ThoughtChallenger({ sessionId, role, isLocked }: Thought
             }}>
               <Lightbulb size={16} color="#D97706" fill="#FCD34D" />
             </span>
-            <span style={{ fontSize: 19, fontWeight: 800, letterSpacing: -0.2, color: INK }}>How to Play</span>
+            <span style={{ fontSize: 20, fontWeight: 800, letterSpacing: -0.2, color: INK }}>How to Play</span>
           </div>
 
           <ol style={{ margin: 0, padding: 0, listStyle: 'none', display: 'flex', flexDirection: 'column', gap: 9 }}>
@@ -311,11 +582,11 @@ export default function ThoughtChallenger({ sessionId, role, isLocked }: Thought
                 <span style={{
                   width: 21, height: 21, borderRadius: '50%', flexShrink: 0, marginTop: 1,
                   display: 'flex', alignItems: 'center', justifyContent: 'center',
-                  background: VIOLET, color: '#ffffff', fontSize: 13, fontWeight: 700,
+                  background: VIOLET, color: '#ffffff', fontSize: 14, fontWeight: 700,
                 }}>
                   {i + 1}
                 </span>
-                <span style={{ fontSize: 15, lineHeight: 1.45, fontWeight: 500, color: '#334155' }}>{s}</span>
+                <span style={{ fontSize: 16.5, lineHeight: 1.45, fontWeight: 500, color: '#334155' }}>{s}</span>
               </li>
             ))}
           </ol>
@@ -342,13 +613,13 @@ export default function ThoughtChallenger({ sessionId, role, isLocked }: Thought
               Add Evidence
             </button>
           ) : (
-            <div style={{ fontSize: 12.5, fontWeight: 800, letterSpacing: 1.3, textTransform: 'uppercase', color: INK_FAINT }}>
+            <div style={{ fontSize: 13.5, fontWeight: 800, letterSpacing: 1.3, textTransform: 'uppercase', color: INK_FAINT }}>
               Evidence cards
             </div>
           )}
           <div style={{ flex: 1 }} />
           <div style={{ display: 'flex', alignItems: 'center', gap: 6, flexShrink: 0 }}>
-            <span style={{ fontSize: 14.5, fontWeight: 600, color: '#64748B' }}>
+            <span style={{ fontSize: 16, fontWeight: 600, color: '#64748B' }}>
               Add as many evidence cards as you can!
             </span>
             <CurlyArrow />
@@ -377,7 +648,7 @@ export default function ThoughtChallenger({ sessionId, role, isLocked }: Thought
         }}>
           {pool.length === 0 && (
             <div style={{
-              display: 'flex', alignItems: 'center', fontSize: 14.5, fontWeight: 500, color: INK_FAINT, paddingLeft: 2,
+              display: 'flex', alignItems: 'center', fontSize: 16, fontWeight: 500, color: INK_FAINT, paddingLeft: 2,
             }}>
               {isT ? 'No evidence cards yet — add one to get started.' : 'No evidence cards yet.'}
             </div>
@@ -429,13 +700,13 @@ export default function ThoughtChallenger({ sessionId, role, isLocked }: Thought
                 </span>
                 <div style={{ minWidth: 0, flex: 1 }}>
                   <div style={{
-                    fontSize: 16.5, fontWeight: 800, letterSpacing: -0.2, lineHeight: 1.2,
+                    fontSize: 18, fontWeight: 800, letterSpacing: -0.2, lineHeight: 1.2,
                     color: bin.accent, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis',
                   }}>
                     {bin.label}
                   </div>
                   <div style={{
-                    fontSize: 14, fontWeight: 500, color: '#64748B', marginTop: 2,
+                    fontSize: 15.5, fontWeight: 500, color: '#64748B', marginTop: 2,
                     whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis',
                   }}>
                     {bin.sub}
@@ -444,7 +715,7 @@ export default function ThoughtChallenger({ sessionId, role, isLocked }: Thought
                 <span style={{
                   minWidth: 22, height: 22, padding: '0 6px', borderRadius: 999, flexShrink: 0,
                   display: 'flex', alignItems: 'center', justifyContent: 'center',
-                  background: bin.accent, color: '#ffffff', fontSize: 14, fontWeight: 700,
+                  background: bin.accent, color: '#ffffff', fontSize: 15.5, fontWeight: 700,
                   fontVariantNumeric: 'tabular-nums',
                 }}>
                   {binCards.length}
@@ -466,7 +737,7 @@ export default function ThoughtChallenger({ sessionId, role, isLocked }: Thought
                 {binCards.length === 0 ? (
                   <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 4, pointerEvents: 'none' }}>
                     <ArrowDown size={19} strokeWidth={2.4} color={bin.accent} />
-                    <span style={{ fontSize: 15.5, fontWeight: 700, color: bin.accent }}>Drag and Drop</span>
+                    <span style={{ fontSize: 17, fontWeight: 700, color: bin.accent }}>Drag and Drop</span>
                   </div>
                 ) : (
                   binCards.map(c => (
@@ -551,7 +822,7 @@ function BinIcon({ id }: { id: Exclude<Bin, 'pool'> }) {
     <span style={{
       width: 19, height: 19, borderRadius: '50%', border: '1.8px solid #ffffff',
       display: 'flex', alignItems: 'center', justifyContent: 'center',
-      color: '#ffffff', fontSize: 14.5, fontWeight: 800, lineHeight: 1,
+      color: '#ffffff', fontSize: 16, fontWeight: 800, lineHeight: 1,
     }}>
       ?
     </span>
@@ -648,25 +919,67 @@ const magnifierStyle: CSSProperties = {
 const solidBtn = (bg: string, glow: string): CSSProperties => ({
   display: 'inline-flex', alignItems: 'center', gap: 8,
   padding: '10px 20px 10px 16px', borderRadius: 12, border: 'none',
-  background: bg, color: '#ffffff', fontSize: 16, fontWeight: 700,
+  background: bg, color: '#ffffff', fontSize: 17.5, fontWeight: 700,
   fontFamily: '"DM Sans", sans-serif', cursor: 'pointer', whiteSpace: 'nowrap',
   boxShadow: `0 5px 14px ${glow}`,
 })
 
 const chipBtn = (bg: string): CSSProperties => ({
   padding: '9px 16px', borderRadius: 10, border: 'none',
-  background: bg, color: '#ffffff', fontSize: 15, fontWeight: 700,
+  background: bg, color: '#ffffff', fontSize: 16.5, fontWeight: 700,
   fontFamily: '"DM Sans", sans-serif', cursor: 'pointer', whiteSpace: 'nowrap', flexShrink: 0,
 })
 
 const ghostBtn: CSSProperties = {
   padding: '9px 14px', borderRadius: 12, border: '1px solid #DDD6FE',
-  background: '#ffffff', color: VIOLET, fontSize: 15, fontWeight: 700,
+  background: '#ffffff', color: VIOLET, fontSize: 16.5, fontWeight: 700,
   fontFamily: '"DM Sans", sans-serif', cursor: 'pointer', whiteSpace: 'nowrap',
+}
+
+/* The small uppercase section label. It was repeated inline at three slightly
+   different sizes and letter-spacings; stating it once keeps the new sections
+   typographically identical to the old ones. */
+const microLabel = (color: string): CSSProperties => ({
+  fontSize: 13, fontWeight: 800, letterSpacing: 1.3, textTransform: 'uppercase',
+  color, marginBottom: 8,
+})
+
+/** 1-10 belief rating. Ten taps, no slider — precise on a touch screen and
+    readable at a glance from the other side of a video call. */
+function BeliefScale({ value, accent, disabled, onPick }: {
+  value: number | null
+  accent: string
+  disabled: boolean
+  onPick: (n: number) => void
+}) {
+  return (
+    <div style={{ display: 'flex', gap: 5, flexWrap: 'wrap' }}>
+      {Array.from({ length: 10 }, (_, i) => i + 1).map(n => {
+        const on = value === n
+        return (
+          <button
+            key={n}
+            onClick={() => onPick(n)}
+            disabled={disabled}
+            aria-pressed={on}
+            style={{
+              width: 33, height: 33, borderRadius: 9, flexShrink: 0,
+              border: `1.5px solid ${on ? accent : HAIRLINE}`,
+              background: on ? accent : '#ffffff',
+              color: on ? '#ffffff' : INK_SOFT,
+              fontSize: 15, fontWeight: 800, fontFamily: '"DM Sans", sans-serif',
+              cursor: disabled ? 'default' : 'pointer',
+              transition: 'background .12s, border-color .12s, color .12s',
+            }}
+          >{n}</button>
+        )
+      })}
+    </div>
+  )
 }
 
 const inputStyle: CSSProperties = {
   flex: 1, minWidth: 0, background: '#ffffff', border: `1px solid ${HAIRLINE}`, borderRadius: 10,
-  padding: '9px 12px', fontSize: 15, color: '#1E293B', outline: 'none',
+  padding: '9px 12px', fontSize: 16.5, color: '#1E293B', outline: 'none',
   fontFamily: '"DM Sans", sans-serif', transition: 'border-color .15s, box-shadow .15s',
 }

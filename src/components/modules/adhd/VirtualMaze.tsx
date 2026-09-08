@@ -476,7 +476,7 @@ export default function VirtualMaze({ sessionId, role, isLocked }: VirtualMazePr
     border: `1.5px solid ${active ? accent : UI.border}`,
     background: active ? tint : UI.card,
     color: active ? accent : UI.ink,
-    fontSize: 15,
+    fontSize: 16.5,
     fontWeight: 600,
     letterSpacing: -0.1,
     cursor: 'pointer',
@@ -486,7 +486,7 @@ export default function VirtualMaze({ sessionId, role, isLocked }: VirtualMazePr
   })
 
   const microLabel: React.CSSProperties = {
-    fontSize: 12.5,
+    fontSize: 13.5,
     fontWeight: 700,
     letterSpacing: 0.7,
     textTransform: 'uppercase',
@@ -539,10 +539,10 @@ export default function VirtualMaze({ sessionId, role, isLocked }: VirtualMazePr
                 transition: 'all 0.15s',
               }}
             >
-              <span style={{ fontSize: 15, fontWeight: 700, color: active ? UI.coralInk : UI.ink, letterSpacing: -0.2 }}>
+              <span style={{ fontSize: 16.5, fontWeight: 700, color: active ? UI.coralInk : UI.ink, letterSpacing: -0.2 }}>
                 {d.label}
               </span>
-              <span style={{ fontSize: 12.5, fontWeight: 600, color: active ? UI.coral : UI.muted }}>
+              <span style={{ fontSize: 13.5, fontWeight: 600, color: active ? UI.coral : UI.muted }}>
                 {d.size}
               </span>
             </button>
@@ -609,7 +609,7 @@ export default function VirtualMaze({ sessionId, role, isLocked }: VirtualMazePr
 
   /* ---- Compact stats line ---- */
   const statItem = (icon: React.ReactNode, text: string, tone: string = UI.inkSoft) => (
-    <span style={{ display: 'flex', alignItems: 'center', gap: 6, color: tone, fontSize: 14.5, fontWeight: 600 }}>
+    <span style={{ display: 'flex', alignItems: 'center', gap: 6, color: tone, fontSize: 16, fontWeight: 600 }}>
       {icon}
       <span style={{ fontVariantNumeric: 'tabular-nums' }}>{text}</span>
     </span>
@@ -646,7 +646,7 @@ export default function VirtualMaze({ sessionId, role, isLocked }: VirtualMazePr
               border: `1px solid ${timeRemaining <= 10 ? UI.coral : UI.border}`,
               background: timeRemaining <= 10 ? UI.coralSoft : UI.card,
               color: timeRemaining <= 10 ? UI.coralInk : UI.ink,
-              fontSize: 14.5,
+              fontSize: 16,
               fontWeight: 700,
               fontVariantNumeric: 'tabular-nums',
               animation: timeRemaining <= 10 ? 'vmTimerPulse 1s ease infinite' : 'none',
@@ -875,7 +875,7 @@ export default function VirtualMaze({ sessionId, role, isLocked }: VirtualMazePr
               background: UI.card,
               border: `1px solid ${UI.border}`,
               boxShadow: UI.shadow,
-              fontSize: 13,
+              fontSize: 14,
               fontWeight: 700,
               color: UI.inkSoft,
               textAlign: 'center',
@@ -929,7 +929,7 @@ export default function VirtualMaze({ sessionId, role, isLocked }: VirtualMazePr
     border: 'none',
     background: bg,
     color: '#ffffff',
-    fontSize: 15,
+    fontSize: 16.5,
     fontWeight: 700,
     cursor: 'pointer',
     boxShadow: UI.shadowKey,
@@ -941,7 +941,7 @@ export default function VirtualMaze({ sessionId, role, isLocked }: VirtualMazePr
     border: `1px solid ${UI.border}`,
     background: UI.card,
     color: UI.ink,
-    fontSize: 15,
+    fontSize: 16.5,
     fontWeight: 700,
     cursor: 'pointer',
     boxShadow: UI.shadow,
@@ -984,7 +984,7 @@ export default function VirtualMaze({ sessionId, role, isLocked }: VirtualMazePr
             <div style={{ ...microLabel, marginBottom: 10 }}>Virtual Maze</div>
             {isTherapist ? (
               <>
-                <div style={{ fontSize: 16, fontWeight: 700, color: UI.ink, marginBottom: 14 }}>
+                <div style={{ fontSize: 17.5, fontWeight: 700, color: UI.ink, marginBottom: 14 }}>
                   Pick a difficulty, then build the board.
                 </div>
                 <button onClick={() => handleGenerateMaze()} style={solidBtn(UI.ink)}>
@@ -992,7 +992,7 @@ export default function VirtualMaze({ sessionId, role, isLocked }: VirtualMazePr
                 </button>
               </>
             ) : (
-              <div style={{ fontSize: 15, fontWeight: 600, color: UI.inkSoft }}>
+              <div style={{ fontSize: 16.5, fontWeight: 600, color: UI.inkSoft }}>
                 Waiting for your therapist to set up the maze…
               </div>
             )}
@@ -1038,24 +1038,24 @@ export default function VirtualMaze({ sessionId, role, isLocked }: VirtualMazePr
 
             {completed && !timeUp && overlayShell(
               <>
-                <div style={{ fontSize: 22, fontWeight: 800, color: UI.ink, letterSpacing: -0.4, marginBottom: 4 }}>
+                <div style={{ fontSize: 23.5, fontWeight: 800, color: UI.ink, letterSpacing: -0.4, marginBottom: 4 }}>
                   Maze complete
                 </div>
-                <div style={{ fontSize: 20, marginBottom: 8 }}>{getRating(wrongMoves).stars}</div>
-                <div style={{ fontSize: 15, fontWeight: 700, color: UI.greenInk, marginBottom: 12 }}>
+                <div style={{ fontSize: 21, marginBottom: 8 }}>{getRating(wrongMoves).stars}</div>
+                <div style={{ fontSize: 16.5, fontWeight: 700, color: UI.greenInk, marginBottom: 12 }}>
                   {getRating(wrongMoves).text}
                 </div>
                 <div style={{ display: 'flex', justifyContent: 'center', gap: 14, marginBottom: 18 }}>
                   <div>
                     <div style={microLabel}>Time</div>
-                    <div style={{ fontSize: 17, fontWeight: 800, color: UI.ink, fontVariantNumeric: 'tabular-nums' }}>
+                    <div style={{ fontSize: 18.5, fontWeight: 800, color: UI.ink, fontVariantNumeric: 'tabular-nums' }}>
                       {formatTime(completionTime)}
                     </div>
                   </div>
                   <div style={{ width: 1, background: UI.border }} />
                   <div>
                     <div style={microLabel}>Wrong moves</div>
-                    <div style={{ fontSize: 17, fontWeight: 800, color: UI.ink, fontVariantNumeric: 'tabular-nums' }}>
+                    <div style={{ fontSize: 18.5, fontWeight: 800, color: UI.ink, fontVariantNumeric: 'tabular-nums' }}>
                       {wrongMoves}
                     </div>
                   </div>
@@ -1077,20 +1077,20 @@ export default function VirtualMaze({ sessionId, role, isLocked }: VirtualMazePr
 
             {timeUp && overlayShell(
               <>
-                <div style={{ fontSize: 22, fontWeight: 800, color: UI.coralInk, letterSpacing: -0.4, marginBottom: 12 }}>
+                <div style={{ fontSize: 23.5, fontWeight: 800, color: UI.coralInk, letterSpacing: -0.4, marginBottom: 12 }}>
                   Time&rsquo;s up
                 </div>
                 <div style={{ display: 'flex', justifyContent: 'center', gap: 14, marginBottom: 18 }}>
                   <div>
                     <div style={microLabel}>Wrong moves</div>
-                    <div style={{ fontSize: 17, fontWeight: 800, color: UI.ink, fontVariantNumeric: 'tabular-nums' }}>
+                    <div style={{ fontSize: 18.5, fontWeight: 800, color: UI.ink, fontVariantNumeric: 'tabular-nums' }}>
                       {wrongMoves}
                     </div>
                   </div>
                   <div style={{ width: 1, background: UI.border }} />
                   <div>
                     <div style={microLabel}>Cells visited</div>
-                    <div style={{ fontSize: 17, fontWeight: 800, color: UI.ink, fontVariantNumeric: 'tabular-nums' }}>
+                    <div style={{ fontSize: 18.5, fontWeight: 800, color: UI.ink, fontVariantNumeric: 'tabular-nums' }}>
                       {visited.length}
                     </div>
                   </div>

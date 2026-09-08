@@ -24,6 +24,103 @@ const BP_BG = (file: string) => `/assets/modules/Background/${encodeURIComponent
 /* Pastel dawn sky the balloon mockup floats its worries in. */
 const BP_SCENE = BP_BG('worry balloon popping.png')
 
+/* ---------------------------------------------------------------------------
+   Sound. The module shipped silent — there was no audio of any kind here.
+
+   Bubble wrap is played by dragging across the sheet, so pops fire in rapid
+   overlapping bursts. One shared <audio> element cannot do that: restarting it
+   cuts the previous pop off mid-tail and a fast drag turns into a stutter. The
+   delivered pop is therefore decoded ONCE into an AudioBuffer and every pop gets
+   its own source node, so they layer the way real bubble wrap does.
+
+   No burst sound was delivered for the balloons, so it is synthesised rather
+   than faked with the bubble pop: filtered noise with a fast decay, which is
+   what a bursting balloon actually is.
+
+   All of it is decorative. Every call is wrapped so a blocked, unsupported or
+   suspended AudioContext can never stop a bubble from popping.
+--------------------------------------------------------------------------- */
+const POP_SFX = `/assets/modules/SLD/${encodeURIComponent('Bubble Splash assets')}/bubble_pop.wav`
+
+let bpCtx: AudioContext | null = null
+let popBuf: AudioBuffer | null = null
+let popPending = false
+
+function audio(): AudioContext | null {
+  try {
+    if (typeof window === 'undefined') return null
+    const Ctor = window.AudioContext ||
+      (window as unknown as { webkitAudioContext?: typeof AudioContext }).webkitAudioContext
+    if (!Ctor) return null
+    if (!bpCtx) bpCtx = new Ctor()
+    // Browsers hold a context suspended until a user gesture. Popping IS the
+    // gesture, so resuming here is enough to get sound from the first pop.
+    if (bpCtx.state === 'suspended') void bpCtx.resume().catch(() => {})
+    return bpCtx
+  } catch { return null }
+}
+
+function loadPop() {
+  const c = audio()
+  if (!c || popBuf || popPending) return
+  popPending = true
+  fetch(POP_SFX)
+    .then((r) => r.arrayBuffer())
+    .then((b) => c.decodeAudioData(b))
+    .then((buf) => { popBuf = buf })
+    .catch(() => { popPending = false })
+}
+
+/** Bubble pop. Overlaps cleanly — each call builds its own source node. */
+function playPop() {
+  const c = audio()
+  if (!c) return
+  if (!popBuf) { loadPop(); return }
+  try {
+    const src = c.createBufferSource()
+    const g = c.createGain()
+    src.buffer = popBuf
+    // Small random rate shift so a fast drag reads as many bubbles rather than
+    // one sample on repeat.
+    src.playbackRate.value = 0.92 + Math.random() * 0.16
+    g.gain.value = 0.5
+    src.connect(g).connect(c.destination)
+    src.start()
+  } catch { /* decorative */ }
+}
+
+/** Balloon burst — broader and louder than a bubble, and over faster. */
+function playBurst() {
+  const c = audio()
+  if (!c) return
+  try {
+    const dur = 0.25
+    const n = Math.floor(c.sampleRate * dur)
+    const buf = c.createBuffer(1, n, c.sampleRate)
+    const d = buf.getChannelData(0)
+    // White noise under a steep decay curve is the crack of a balloon.
+    for (let i = 0; i < n; i++) d[i] = (Math.random() * 2 - 1) * Math.pow(1 - i / n, 6)
+    const src = c.createBufferSource()
+    src.buffer = buf
+    const bp = c.createBiquadFilter()
+    bp.type = 'bandpass'
+    bp.frequency.value = 1100
+    bp.Q.value = 0.7
+    const g = c.createGain()
+    g.gain.setValueAtTime(0.55, c.currentTime)
+    g.gain.exponentialRampToValueAtTime(0.0001, c.currentTime + dur)
+    src.connect(bp).connect(g).connect(c.destination)
+    src.start()
+  } catch { /* decorative */ }
+}
+
+/* Naming a worry is optional — this is a stress-relief exercise first. Launching
+   with an empty list floats this many unlabelled balloons so the mode is
+   playable straight away. The Launch button used to render only once a worry had
+   been typed, which left an empty list stuck on "Add worries in the panel" with
+   no way forward: the mode looked completely broken. */
+const FREE_BALLOONS = 8
+
 const GRID_MAP: Record<string, { cols: number; rows: number; total: number }> = {
   small: { cols: 6, rows: 8, total: 48 },
   medium: { cols: 8, rows: 10, total: 80 },
@@ -100,41 +197,44 @@ function rowColor(row: number, a: number): string {
 }
 
 /**
- * Position the balloons and report how tall the canvas must be to show them all.
+ * Lay the balloons out in rising lanes.
  *
- * The canvas is `position: relative` and every balloon is absolutely positioned,
- * so the canvas contributes NO content height. It relied on `flex: 1`, which does
- * nothing because the real parent (GlassModulePanel's .gm-canvas) is a block box,
- * not a flex column. The canvas therefore collapsed to 0px and `overflow: hidden`
- * clipped every balloon — the launch worked, the balloons existed, and nothing was
- * ever visible. Returning `height` lets the canvas claim the space it needs; the
- * board now scales the layer down when that height exceeds the board.
+ * They used to sit in a fixed grid and bob in place, so nothing ever rose and
+ * the "catch it on the way up" game did not exist. Each balloon now gets a
+ * horizontal lane, a rise duration and a stagger, and the CSS animation carries
+ * it from below the board to above it.
+ *
+ * The rise LOOPS: a balloon that reaches the top comes back around instead of
+ * leaving the round unfinishable. This is a stress-relief exercise, so there is
+ * no failure state and no way to strand a worry you cannot reach.
+ *
+ * Everything here is derived from the index, never Math.random, because both
+ * screens lay out independently and must agree on where each balloon is.
  */
-function balloonLayout(worries: string[], w: number, h: number) {
-  if (worries.length === 0) return { items: [], height: 0 }
+function balloonLayout(worries: string[], w: number) {
+  if (worries.length === 0) return { items: [] }
   const width = Math.max(240, w)
   const n = worries.length
-  const cols = Math.max(1, Math.min(4, Math.ceil(Math.sqrt(n * 1.4))))
-  const gap = Math.max(84, Math.floor(width / (cols + 1)))
-  const rowH = 118
+  const lanes = Math.max(1, Math.min(5, Math.round(width / 120)))
+  const laneW = width / lanes
   const items = worries.map((worry, i) => {
-    const col = i % cols
-    const row = Math.floor(i / cols)
+    const size = 64 + (i % 4) * 5
+    // Deterministic offset inside the lane so the column does not look ruled.
+    const jitter = ((i * 37) % 100) / 100
+    const x = Math.max(4, Math.min(width - size - 4, (i % lanes) * laneW + (laneW - size) * jitter))
     return {
       id: `b${i}`,
       worry,
-      x: Math.max(4, Math.min(width - 84, gap * (col + 1) - 40 + (row % 2) * 12)),
-      y: 14 + row * rowH + (i % 3) * 6,
+      x,
+      size,
       color: WORRY_COLORS[i % WORRY_COLORS.length],
-      size: 70 + (i % 4) * 4,
-      dur: 3.5 + (i % 5) * 0.3,
-      del: (i % 6) * 0.5,
+      dur: 11 + (i % 5) * 1.7,
+      // Negative delay starts each balloon already in flight, spread over the
+      // climb, so the board is full on launch instead of empty for 11 seconds.
+      del: -((i * 13) / n),
     }
   })
-  const rows = Math.ceil(n / cols)
-  // Tallest balloon + its string, plus the row offsets.
-  const height = Math.max(h, 14 + rows * rowH + 40)
-  return { items, height }
+  return { items }
 }
 
 /* --------------------------------------------------------------------------
@@ -223,7 +323,7 @@ function InfoCard({ icon, tint, title, children }: { icon: ReactNode; tint: stri
         {icon}
       </span>
       <div style={{ flex: 1, minWidth: 0 }}>
-        {title && <div style={{ fontSize: 14.5, fontWeight: 800, color: INK, lineHeight: 1.2, marginBottom: 2 }}>{title}</div>}
+        {title && <div style={{ fontSize: 16, fontWeight: 800, color: INK, lineHeight: 1.2, marginBottom: 2 }}>{title}</div>}
         {children}
       </div>
     </div>
@@ -301,13 +401,24 @@ export default function BoxPopping({ sessionId, role, isLocked }: BoxPoppingProp
 
   useEffect(() => () => { isDrag.current = false; if (toastT.current) clearTimeout(toastT.current) }, [])
 
+  /* What the balloon board actually floats: the typed worries, or a set of
+     blank balloons when none were named. */
+  const balloonTexts = useMemo(
+    () => (worries.length > 0 ? worries : Array.from({ length: FREE_BALLOONS }, () => '')),
+    [worries],
+  )
+
+  // Decode the pop sample up front so the very first pop is audible rather than
+  // silent-then-loading.
+  useEffect(() => { loadPop() }, [])
+
   const effectivePopped = useMemo(() => {
     if (mode === 'wrap') return popped.filter(id => /^r\d+-c\d+$/.test(id))
     return popped.filter(id => /^b\d+$/.test(id))
   }, [popped, mode])
 
   const poppedSet = useMemo(() => new Set(effectivePopped), [effectivePopped])
-  const total = mode === 'wrap' ? (GRID_MAP[gridSize] || GRID_MAP.medium).total : worries.length
+  const total = mode === 'wrap' ? (GRID_MAP[gridSize] || GRID_MAP.medium).total : balloonTexts.length
   const cnt = effectivePopped.length
   const pct = total > 0 ? Math.round((cnt / total) * 100) : 0
   const allDone = total > 0 && cnt >= total
@@ -339,6 +450,7 @@ export default function BoxPopping({ sessionId, role, isLocked }: BoxPoppingProp
   const popCell = useCallback((id: string) => {
     if (!canInteract || gPopped.current.has(id) || poppedSet.has(id)) return
     gPopped.current.add(id)
+    playPop()
     setAnimating(prev => new Set(prev).add(id))
     const row = parseInt(id.split('-')[0].slice(1), 10)
     const el = cRef.current?.querySelector(`[data-cell="${id}"]`)
@@ -364,6 +476,7 @@ export default function BoxPopping({ sessionId, role, isLocked }: BoxPoppingProp
 
   const popBalloon = useCallback((id: string, worry: string, x: number, y: number) => {
     if (!canInteract || poppedSet.has(id)) return
+    playBurst()
     setAnimating(prev => new Set(prev).add(id))
 
     const k = ++pk.current
@@ -374,13 +487,13 @@ export default function BoxPopping({ sessionId, role, isLocked }: BoxPoppingProp
     setConfettis(prev => [...prev, ...dots])
     setTimeout(() => setConfettis(prev => prev.filter(q => !dots.find(r => r.id === q.id))), 650)
 
-    const ft = { id: `ft${k}`, x, y: y - 10, text: `Bye bye, ${worry}! 👋` }
+    // An unnamed balloon has no worry to say goodbye to.
+    const ft = { id: `ft${k}`, x, y: y - 10, text: worry ? `Bye bye, ${worry}! 👋` : 'Released! 🎈' }
     setFloaters(prev => [...prev, ft])
     setTimeout(() => setFloaters(prev => prev.filter(f => f.id !== ft.id)), 1600)
 
-    // Must outlast the 1.6s release animation, or the balloon is unmounted
-    // mid-flight and appears to vanish instead of floating away.
-    setTimeout(() => setAnimating(prev => { const n = new Set(prev); n.delete(id); return n }), 1650)
+    // Must outlast the 340ms burst, or the balloon is unmounted mid-pop.
+    setTimeout(() => setAnimating(prev => { const n = new Set(prev); n.delete(id); return n }), 380)
     write({ 'moduleState.bpPopped': arrayUnion(id) })
   }, [canInteract, poppedSet, write])
 
@@ -432,10 +545,14 @@ export default function BoxPopping({ sessionId, role, isLocked }: BoxPoppingProp
   const iA = intensity === 'gentle' ? 0.3 : intensity === 'satisfying' ? 0.5 : 0.4
 
   const balloonView = useMemo(() => {
-    if (mode !== 'balloon' || !launched) return { items: [], height: 0 }
-    return balloonLayout(worries, canvasW || 380, 0)
-  }, [worries, launched, mode, canvasW])
+    if (mode !== 'balloon' || !launched) return { items: [] }
+    return balloonLayout(balloonTexts, canvasW || 380)
+  }, [balloonTexts, launched, mode, canvasW])
   const balloons = balloonView.items
+
+  /* How far a balloon travels: the full board plus its own height, so it starts
+     fully below the bottom edge and finishes fully above the top one. */
+  const riseDist = (canvasH || 420) + 170
 
   /* ---- Board geometry -----------------------------------------------------
      The board never scrolls, so the bubble sheet is sized to whichever axis
@@ -457,12 +574,6 @@ export default function BoxPopping({ sessionId, role, isLocked }: BoxPoppingProp
     : 10
   const dotSize = Math.max(2, Math.round(cell * 0.1))
 
-  // Scale the balloon layer down when its natural height outruns the board,
-  // so a full set of worries can never spill past the card.
-  const bScale = balloonView.height > 0 && canvasH > 0
-    ? Math.min(1, canvasH / balloonView.height)
-    : 1
-
   const meta = MODE_META[mode]
 
   /* ---- Shared control styles --------------------------------------------- */
@@ -474,7 +585,7 @@ export default function BoxPopping({ sessionId, role, isLocked }: BoxPoppingProp
     border: `1px solid ${on ? GREEN : BORDER}`,
     background: on ? GREEN : '#ffffff',
     color: on ? '#ffffff' : GREEN,
-    fontSize: 15,
+    fontSize: 16.5,
     fontWeight: 700,
     cursor: isT ? 'pointer' : 'default',
     boxShadow: on ? '0 4px 12px rgba(31,122,68,0.26)' : CARD_SHADOW,
@@ -487,7 +598,7 @@ export default function BoxPopping({ sessionId, role, isLocked }: BoxPoppingProp
     border: `1px solid ${on ? GREEN : BORDER}`,
     background: on ? 'rgba(31,122,68,0.10)' : '#ffffff',
     color: on ? GREEN : MUTED,
-    fontSize: 12.5,
+    fontSize: 13.5,
     fontWeight: 700,
     textTransform: 'capitalize',
     cursor: 'pointer',
@@ -499,7 +610,7 @@ export default function BoxPopping({ sessionId, role, isLocked }: BoxPoppingProp
     border: `1px solid ${BORDER}`,
     background: '#ffffff',
     color: INK_BODY,
-    fontSize: 12.5,
+    fontSize: 13.5,
     fontWeight: 700,
     cursor: 'pointer',
     display: 'inline-flex',
@@ -513,7 +624,7 @@ export default function BoxPopping({ sessionId, role, isLocked }: BoxPoppingProp
     const art = m === 'wrap' ? <BubbleClusterArt size={44} /> : <BalloonArt size={44} />
     const label = m === 'wrap' ? <>Bubble<br />Popping</> : <>Balloon<br />Popping</>
     const text = (
-      <span style={{ fontSize: 16, fontWeight: 800, lineHeight: 1.13, letterSpacing: -0.2, color: accent, textAlign: m === 'wrap' ? 'left' : 'right' }}>
+      <span style={{ fontSize: 17.5, fontWeight: 800, lineHeight: 1.13, letterSpacing: -0.2, color: accent, textAlign: m === 'wrap' ? 'left' : 'right' }}>
         {label}
       </span>
     )
@@ -562,27 +673,27 @@ export default function BoxPopping({ sessionId, role, isLocked }: BoxPoppingProp
       }}
     >
       <InfoCard icon={<Clock size={15} strokeWidth={2.3} color={INK_BODY} />} tint="#eef1f6">
-        <div style={{ fontSize: 19.5, fontWeight: 800, color: INK, lineHeight: 1.1, fontVariantNumeric: 'tabular-nums' }}>
+        <div style={{ fontSize: 20.5, fontWeight: 800, color: INK, lineHeight: 1.1, fontVariantNumeric: 'tabular-nums' }}>
           <ElapsedClock />
         </div>
-        <div style={{ fontSize: 12.5, fontWeight: 600, color: MUTED, marginTop: 1 }}>Time Elapsed</div>
+        <div style={{ fontSize: 13.5, fontWeight: 600, color: MUTED, marginTop: 1 }}>Time Elapsed</div>
       </InfoCard>
 
       <InfoCard icon={<Target size={15} strokeWidth={2.3} color="#EA580C" />} tint="#FFF1E6" title="Goal">
-        <div style={{ fontSize: 13, fontWeight: 600, lineHeight: 1.4, color: INK_BODY }}>{meta.goal}</div>
+        <div style={{ fontSize: 14, fontWeight: 600, lineHeight: 1.4, color: INK_BODY }}>{meta.goal}</div>
       </InfoCard>
 
       <InfoCard icon={<Sparkles size={15} strokeWidth={2.3} color={VIOLET} />} tint="#F2ECFE" title="Focus">
         {FOCUS_LINES.map(line => (
-          <div key={line} style={{ fontSize: 13, fontWeight: 600, lineHeight: 1.45, color: INK_BODY }}>{line}</div>
+          <div key={line} style={{ fontSize: 14, fontWeight: 600, lineHeight: 1.45, color: INK_BODY }}>{line}</div>
         ))}
       </InfoCard>
 
       <InfoCard icon={<Volume2 size={15} strokeWidth={2.3} color={GREEN} />} tint="#E8F5EE" title="Instructions">
-        <div style={{ fontSize: 13, fontWeight: 600, lineHeight: 1.4, color: INK_BODY }}>
+        <div style={{ fontSize: 14, fontWeight: 600, lineHeight: 1.4, color: INK_BODY }}>
           {mode === 'wrap' ? 'Press and drag to pop a whole row.' : 'Tap a balloon to let that worry go.'}
         </div>
-        <div style={{ fontSize: 13, fontWeight: 600, lineHeight: 1.4, color: MUTED, marginTop: 2 }}>
+        <div style={{ fontSize: 14, fontWeight: 600, lineHeight: 1.4, color: MUTED, marginTop: 2 }}>
           Keep the volume at max
         </div>
       </InfoCard>
@@ -599,10 +710,10 @@ export default function BoxPopping({ sessionId, role, isLocked }: BoxPoppingProp
         }}
       >
         <div style={{ display: 'flex', alignItems: 'baseline', justifyContent: 'space-between', gap: 6 }}>
-          <span style={{ fontSize: 14.5, fontWeight: 800, color: INK }}>{cnt} / {total}</span>
-          <span style={{ fontSize: 13, fontWeight: 800, color: GREEN }}>{pct}%</span>
+          <span style={{ fontSize: 16, fontWeight: 800, color: INK }}>{cnt} / {total}</span>
+          <span style={{ fontSize: 14, fontWeight: 800, color: GREEN }}>{pct}%</span>
         </div>
-        <div style={{ fontSize: 12.5, fontWeight: 600, color: MUTED, margin: '1px 0 6px' }}>
+        <div style={{ fontSize: 13.5, fontWeight: 600, color: MUTED, margin: '1px 0 6px' }}>
           {mode === 'wrap' ? 'bubbles popped' : 'worries released'}
         </div>
         <div style={{ width: '100%', height: 6, borderRadius: 999, background: '#eef1f4', overflow: 'hidden' }}>
@@ -627,13 +738,14 @@ export default function BoxPopping({ sessionId, role, isLocked }: BoxPoppingProp
         >
           <div style={{ display: 'flex', alignItems: 'center', gap: 7 }}>
             <BalloonArt size={22} />
-            <span style={{ fontSize: 15, fontWeight: 800, color: VIOLET }}>Worry Balloons</span>
+            <span style={{ fontSize: 16.5, fontWeight: 800, color: VIOLET }}>Worry Balloons</span>
           </div>
 
           {!launched && (
             <>
-              <div style={{ fontSize: 12.5, fontWeight: 600, lineHeight: 1.4, color: MUTED }}>
-                Type a worry that&apos;s on your mind and pop it to feel lighter.
+              <div style={{ fontSize: 13.5, fontWeight: 600, lineHeight: 1.4, color: MUTED }}>
+                Type a worry that&apos;s on your mind and pop it to feel lighter — or
+                just launch the balloons and pop away.
               </div>
               <input
                 className="bp-input"
@@ -649,7 +761,7 @@ export default function BoxPopping({ sessionId, role, isLocked }: BoxPoppingProp
                 style={{
                   width: '100%', boxSizing: 'border-box',
                   background: '#ffffff', border: `1px solid ${BORDER}`, borderRadius: 10,
-                  padding: '7px 9px', color: INK, fontSize: 13, fontWeight: 600, outline: 'none',
+                  padding: '7px 9px', color: INK, fontSize: 14, fontWeight: 600, outline: 'none',
                 }}
               />
               <button
@@ -663,7 +775,7 @@ export default function BoxPopping({ sessionId, role, isLocked }: BoxPoppingProp
                 style={{
                   display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6,
                   padding: '8px 10px', borderRadius: 10, border: 'none',
-                  background: VIOLET, color: '#ffffff', fontSize: 14, fontWeight: 700,
+                  background: VIOLET, color: '#ffffff', fontSize: 15.5, fontWeight: 700,
                   cursor: (!inputVal.trim() || worries.length >= 12) ? 'default' : 'pointer',
                   opacity: (!inputVal.trim() || worries.length >= 12) ? 0.45 : 1,
                   boxShadow: '0 4px 12px rgba(124,58,237,0.26)',
@@ -680,7 +792,7 @@ export default function BoxPopping({ sessionId, role, isLocked }: BoxPoppingProp
                       style={{
                         display: 'inline-flex', alignItems: 'center', gap: 4,
                         background: '#F5F6FA', border: `1px solid ${BORDER}`, borderRadius: 999,
-                        padding: '2px 4px 2px 8px', fontSize: 12, fontWeight: 600, color: INK_BODY, maxWidth: '100%',
+                        padding: '2px 4px 2px 8px', fontSize: 13, fontWeight: 600, color: INK_BODY, maxWidth: '100%',
                       }}
                     >
                       <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', maxWidth: 96 }}>{w}</span>
@@ -688,36 +800,39 @@ export default function BoxPopping({ sessionId, role, isLocked }: BoxPoppingProp
                         type="button"
                         onClick={() => { const n = worries.filter((_, j) => j !== i); setWorries(n); write({ 'moduleState.bpWorries': n, 'moduleState.bpPopped': [], 'moduleState.bpEndMood': '' }) }}
                         aria-label={`Remove ${w}`}
-                        style={{ background: 'none', border: 'none', color: MUTED, cursor: 'pointer', padding: '0 2px', fontSize: 13, lineHeight: 1 }}
+                        style={{ background: 'none', border: 'none', color: MUTED, cursor: 'pointer', padding: '0 2px', fontSize: 14, lineHeight: 1 }}
                       >✕</button>
                     </span>
                   ))}
                 </div>
               )}
 
-              {worries.length > 0 && (
-                <button
-                  type="button"
-                  onClick={() => write({ 'moduleState.bpLaunched': true })}
-                  style={{
-                    display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6,
-                    padding: '8px 10px', borderRadius: 10, border: 'none',
-                    background: GREEN, color: '#ffffff', fontSize: 14, fontWeight: 700, cursor: 'pointer',
-                    boxShadow: '0 4px 12px rgba(31,122,68,0.26)',
-                  }}
-                >
-                  <Rocket size={13} strokeWidth={2.4} /> Launch ({worries.length})
-                </button>
-              )}
+              <button
+                type="button"
+                onClick={() => write({ 'moduleState.bpLaunched': true })}
+                style={{
+                  display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6,
+                  padding: '8px 10px', borderRadius: 10, border: 'none',
+                  background: GREEN, color: '#ffffff', fontSize: 15.5, fontWeight: 700, cursor: 'pointer',
+                  boxShadow: '0 4px 12px rgba(31,122,68,0.26)',
+                }}
+              >
+                <Rocket size={13} strokeWidth={2.4} />
+                {worries.length > 0 ? `Launch (${worries.length})` : `Just pop (${FREE_BALLOONS})`}
+              </button>
             </>
           )}
 
           {launched && (
             <>
-              <div style={{ fontSize: 12.5, fontWeight: 600, color: MUTED }}>
-                {worries.length} balloon{worries.length === 1 ? '' : 's'} · {cnt} popped
+              <div style={{ fontSize: 13.5, fontWeight: 600, color: MUTED }}>
+                {balloonTexts.length} balloon{balloonTexts.length === 1 ? '' : 's'} · {cnt} popped
               </div>
-              <button type="button" onClick={() => write({ 'moduleState.bpLaunched': false })} style={{ ...ghostBtn, justifyContent: 'center' }}>
+              {/* Clearing the popped list matters: balloon ids are positional
+                  (b0, b1, ...), so re-landing and launching a different number of
+                  balloons would otherwise show fresh ones as already popped. The
+                  worry-remove handler clears it for the same reason. */}
+              <button type="button" onClick={() => write({ 'moduleState.bpLaunched': false, 'moduleState.bpPopped': [] })} style={{ ...ghostBtn, justifyContent: 'center' }}>
                 Re-land balloons
               </button>
             </>
@@ -727,7 +842,7 @@ export default function BoxPopping({ sessionId, role, isLocked }: BoxPoppingProp
 
       {mode === 'balloon' && (
         <InfoCard icon={<Lightbulb size={15} strokeWidth={2.3} color="#B45309" />} tint="#FEF6E0" title="Tip">
-          <div style={{ fontSize: 13, fontWeight: 600, lineHeight: 1.4, color: INK_BODY }}>
+          <div style={{ fontSize: 14, fontWeight: 600, lineHeight: 1.4, color: INK_BODY }}>
             You can pop as many worries as you want.
           </div>
         </InfoCard>
@@ -754,20 +869,27 @@ export default function BoxPopping({ sessionId, role, isLocked }: BoxPoppingProp
         .cp {animation:cp .3s ease forwards}
         @keyframes cp {0%{transform:scale(1)}30%{transform:scale(.75)}55%{transform:scale(.88)}75%{transform:scale(.82)}100%{transform:scale(1)}}
         @keyframes pb {0%{opacity:1;transform:translate(0,0)scale(1)}100%{opacity:0;transform:translate(var(--dx),var(--dy))scale(0)}}
-        @keyframes bb {0%,100%{transform:translate(-4px,0)rotate(-2deg)}50%{transform:translate(4px,-10px)rotate(2deg)}}
-        /* Release, not just a pop: the balloon swells, lifts, drifts sideways and
-           fades as it floats off — the "letting go of a worry" metaphor. */
-        @keyframes bp {
-          0%{transform:translate(0,0)scale(1);opacity:1}
-          12%{transform:translate(0,-4px)scale(1.12);opacity:1}
-          45%{transform:translate(14px,-90px)scale(.95)rotate(6deg);opacity:.85}
-          75%{transform:translate(-10px,-190px)scale(.85)rotate(-5deg);opacity:.45}
-          100%{transform:translate(6px,-280px)scale(.7)rotate(3deg);opacity:0}
+        /* The climb. --rise is the board height plus the balloon's own, set per
+           balloon, so one keyframe set serves every board size. The sideways
+           sway is what stops five lanes looking like an escalator. */
+        @keyframes brise {
+          0%{transform:translate(0,0)rotate(-2deg)}
+          25%{transform:translate(10px,calc(var(--rise) * -0.25))rotate(2deg)}
+          50%{transform:translate(0,calc(var(--rise) * -0.5))rotate(-2deg)}
+          75%{transform:translate(-10px,calc(var(--rise) * -0.75))rotate(2deg)}
+          100%{transform:translate(0,calc(var(--rise) * -1))rotate(-2deg)}
+        }
+        /* The pop: a quick swell then gone. Applied to an INNER wrapper while the
+           outer climb is paused, so it bursts where it was clicked. */
+        @keyframes bburst {
+          0%{transform:scale(1);opacity:1}
+          40%{transform:scale(1.3);opacity:1}
+          100%{transform:scale(.15);opacity:0}
         }
         @keyframes cb {0%{transform:translate(0,0)scale(1);opacity:1}100%{transform:translate(var(--cdx),var(--cdy))scale(0);opacity:0}}
         @keyframes fu {0%{transform:translateY(0);opacity:1}100%{transform:translateY(-40px);opacity:0}}
-        .bb-a {animation:bb ease-in-out infinite}
-        .bp-a {animation:bp 1.6s cubic-bezier(.33,.0,.55,1) forwards !important}
+        .bb-rise {animation-name:brise;animation-timing-function:linear;animation-iteration-count:infinite}
+        .bb-burst {animation:bburst .34s cubic-bezier(.3,0,.6,1) forwards}
         .bp-input::placeholder { color:#9aa3ad; font-weight:500; }
         .bp-input:focus { border-color:${VIOLET}; box-shadow:0 0 0 3px rgba(124,58,237,0.14); }
         .bp-scroll { scrollbar-width: thin; scrollbar-color:#d7dde3 transparent; }
@@ -959,36 +1081,41 @@ export default function BoxPopping({ sessionId, role, isLocked }: BoxPoppingProp
             )}
 
             {mode === 'balloon' && launched && (
-              <div
-                style={{
-                  position: 'absolute',
-                  left: 0,
-                  right: 0,
-                  top: 0,
-                  height: balloonView.height || '100%',
-                  transform: `scale(${bScale})`,
-                  transformOrigin: 'top center',
-                }}
-              >
+              <div style={{ position: 'absolute', inset: 0, overflow: 'hidden' }}>
                 {balloons.map(b => {
                   const isP = poppedSet.has(b.id)
                   const isA = animating.has(b.id)
                   if (isP && !isA) return null
                   return (
                     <div key={b.id} data-balloon={b.id}
-                      className={isA ? 'bp-a' : 'bb-a'}
+                      className="bb-rise"
                       style={{
-                        position: 'absolute', left: b.x, top: b.y, display: 'flex', flexDirection: 'column', alignItems: 'center',
-                        cursor: canInteract && !isP ? 'pointer' : 'default', animationDuration: isA ? '1.6s' : `${b.dur}s`,
-                        animationDelay: isA ? '0s' : `${b.del}s`, pointerEvents: isP ? 'none' : 'auto', zIndex: isA ? 10 : 2,
-                        animationFillMode: isA ? 'forwards' : undefined,
-                      }}
+                        position: 'absolute', left: b.x, bottom: -150,
+                        display: 'flex', flexDirection: 'column', alignItems: 'center',
+                        cursor: canInteract && !isP ? 'pointer' : 'default',
+                        animationDuration: `${b.dur}s`,
+                        animationDelay: `${b.del}s`,
+                        // Freeze the climb while the burst plays, so the balloon
+                        // pops exactly where it was clicked.
+                        animationPlayState: isA ? 'paused' : 'running',
+                        pointerEvents: isP ? 'none' : 'auto',
+                        zIndex: isA ? 10 : 2,
+                        ['--rise' as string]: `${riseDist}px`,
+                      } as React.CSSProperties}
                       onPointerDown={e => {
                         if (isP || isA || !canInteract) return
                         e.stopPropagation()
-                        popBalloon(b.id, b.worry, b.x, b.y)
+                        // Read the live position: a rising balloon is nowhere
+                        // near its layout coords by the time it is clicked, and
+                        // the confetti has to land on it.
+                        const cr = cRef.current?.getBoundingClientRect()
+                        const r = (e.currentTarget as HTMLElement).getBoundingClientRect()
+                        const px = cr ? r.left - cr.left : b.x
+                        const py = cr ? r.top - cr.top : 0
+                        popBalloon(b.id, b.worry, px, py)
                       }}
                     >
+                    <div className={isA ? 'bb-burst' : undefined} style={{ display: 'flex', flexDirection: 'column', alignItems: 'center' }}>
                       <div style={{
                         width: b.size, height: b.size * 1.15,
                         borderRadius: '50% 50% 50% 50% / 40% 40% 60% 60%',
@@ -999,11 +1126,12 @@ export default function BoxPopping({ sessionId, role, isLocked }: BoxPoppingProp
                       }}>
                         {/* Dark text on a pastel balloon — never white-on-light. */}
                         <span style={{
-                          fontSize: 12.5, fontWeight: 700, color: '#1f2937', textAlign: 'center', lineHeight: 1.22,
+                          fontSize: 13.5, fontWeight: 700, color: '#1f2937', textAlign: 'center', lineHeight: 1.22,
                           overflow: 'hidden', display: '-webkit-box', WebkitLineClamp: 3, WebkitBoxOrient: 'vertical', wordBreak: 'break-word',
                         }}>{b.worry}</span>
                       </div>
                       <div style={{ width: 2, height: 30, background: 'rgba(120,110,140,0.45)', borderRadius: 1, marginTop: -2 }} />
+                      </div>
                     </div>
                   )
                 })}
@@ -1016,7 +1144,7 @@ export default function BoxPopping({ sessionId, role, isLocked }: BoxPoppingProp
 
                 {floaters.map(f => (
                   <div key={f.id} style={{
-                    position: 'absolute', left: f.x, top: f.y, fontSize: 13, fontWeight: 700, color: INK_BODY,
+                    position: 'absolute', left: f.x, top: f.y, fontSize: 14, fontWeight: 700, color: INK_BODY,
                     background: 'rgba(255,255,255,0.88)', border: `1px solid ${BORDER}`, borderRadius: 999, padding: '3px 9px',
                     pointerEvents: 'none', zIndex: 20, whiteSpace: 'nowrap', animation: 'fu 1.5s ease forwards',
                   }}>{f.text}</div>
@@ -1029,9 +1157,9 @@ export default function BoxPopping({ sessionId, role, isLocked }: BoxPoppingProp
                 <div style={{
                   padding: '10px 18px', borderRadius: 999,
                   background: 'rgba(255,255,255,0.9)', border: `1px solid ${BORDER}`, boxShadow: CARD_SHADOW,
-                  fontSize: 15, fontWeight: 700, color: INK_BODY, textAlign: 'center',
+                  fontSize: 16.5, fontWeight: 700, color: INK_BODY, textAlign: 'center',
                 }}>
-                  {isT ? 'Add worries in the panel, then launch the balloons.' : 'Your therapist is setting up…'}
+                  {isT ? 'Launch the balloons from the panel — naming a worry is optional.' : 'Your therapist is setting up…'}
                 </div>
               </div>
             )}
@@ -1049,7 +1177,7 @@ export default function BoxPopping({ sessionId, role, isLocked }: BoxPoppingProp
         <div style={{ flexShrink: 0, display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap', paddingTop: 7, borderTop: `1px solid ${BORDER}` }}>
           {mode === 'wrap' && (
             <>
-              <span style={{ fontSize: 12, fontWeight: 700, color: MUTED, letterSpacing: 0.3, textTransform: 'uppercase' }}>Pop feel</span>
+              <span style={{ fontSize: 13, fontWeight: 700, color: MUTED, letterSpacing: 0.3, textTransform: 'uppercase' }}>Pop feel</span>
               {['gentle', 'normal', 'satisfying'].map(v => (
                 <button key={v} type="button" onClick={() => write({ 'moduleState.bpIntensity': v })} style={smallPill(intensity === v)}>
                   {v}
@@ -1058,7 +1186,7 @@ export default function BoxPopping({ sessionId, role, isLocked }: BoxPoppingProp
             </>
           )}
           {mode === 'balloon' && (
-            <span style={{ fontSize: 12.5, fontWeight: 600, color: MUTED }}>
+            <span style={{ fontSize: 13.5, fontWeight: 600, color: MUTED }}>
               {worries.length} worr{worries.length === 1 ? 'y' : 'ies'} · {cnt} released
             </span>
           )}
@@ -1086,20 +1214,20 @@ export default function BoxPopping({ sessionId, role, isLocked }: BoxPoppingProp
             padding: '22px 30px', borderRadius: 22, maxWidth: 420,
             background: '#ffffff', border: `1px solid ${BORDER}`, boxShadow: '0 18px 44px rgba(20,30,45,0.16)',
           }}>
-            <div style={{ fontSize: 40.5, lineHeight: 1 }}>🎉</div>
-            <div style={{ fontSize: 21, fontWeight: 800, letterSpacing: -0.4, color: INK, textAlign: 'center' }}>
+            <div style={{ fontSize: 41.5, lineHeight: 1 }}>🎉</div>
+            <div style={{ fontSize: 22.5, fontWeight: 800, letterSpacing: -0.4, color: INK, textAlign: 'center' }}>
               {mode === 'wrap' ? 'All bubbles popped!' : 'You released all your worries!'}
             </div>
             {mode === 'balloon' && !endMood && (
               <>
-                <div style={{ fontSize: 15, fontWeight: 600, color: MUTED }}>How do you feel now?</div>
+                <div style={{ fontSize: 16.5, fontWeight: 600, color: MUTED }}>How do you feel now?</div>
                 <div style={{ display: 'flex', gap: 9 }}>
                   {MOOD_EMOJIS.map(e => (
                     <button key={e} type="button"
                       onClick={() => { setEndMood(e); write({ 'moduleState.bpEndMood': e }); logModuleEvent(sessionId, { module: 'virtual-box-popping', type: 'mood_check', detail: `Reported feeling "${e}" after releasing worries` }) }}
                       style={{
                         background: '#ffffff', border: `1px solid ${BORDER}`,
-                        borderRadius: 12, padding: '7px 9px', cursor: 'pointer', fontSize: 23,
+                        borderRadius: 12, padding: '7px 9px', cursor: 'pointer', fontSize: 24.5,
                         boxShadow: CARD_SHADOW, transition: 'all 0.15s',
                       }}
                     >{e}</button>
@@ -1108,13 +1236,13 @@ export default function BoxPopping({ sessionId, role, isLocked }: BoxPoppingProp
               </>
             )}
             {mode === 'balloon' && endMood && (
-              <div style={{ fontSize: 16, fontWeight: 700, color: INK_BODY }}>You chose {endMood}</div>
+              <div style={{ fontSize: 17.5, fontWeight: 700, color: INK_BODY }}>You chose {endMood}</div>
             )}
             {(mode === 'wrap' || endMood) && isT && (
               <button type="button" onClick={resetAll}
                 style={{
                   marginTop: 2, padding: '9px 22px', borderRadius: 11, border: 'none',
-                  background: GREEN, color: '#ffffff', fontSize: 15, fontWeight: 700, cursor: 'pointer',
+                  background: GREEN, color: '#ffffff', fontSize: 16.5, fontWeight: 700, cursor: 'pointer',
                   boxShadow: '0 5px 14px rgba(31,122,68,0.28)',
                 }}
               >Start again</button>
@@ -1128,7 +1256,7 @@ export default function BoxPopping({ sessionId, role, isLocked }: BoxPoppingProp
         <div style={{
           position: 'absolute', top: '50%', left: '50%', transform: 'translate(-50%,-50%)',
           background: 'rgba(17,24,39,0.9)', borderRadius: 12,
-          padding: '9px 18px', color: '#ffffff', fontSize: 15, fontWeight: 700, zIndex: 100, pointerEvents: 'none',
+          padding: '9px 18px', color: '#ffffff', fontSize: 16.5, fontWeight: 700, zIndex: 100, pointerEvents: 'none',
           boxShadow: '0 10px 26px rgba(20,30,45,0.28)',
         }}>
           {toast.msg}

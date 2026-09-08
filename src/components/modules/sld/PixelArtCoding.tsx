@@ -984,7 +984,7 @@ export default function PixelArtCoding({ sessionId, role, isLocked }: PixelArtCo
               <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
                 <div style={{
                   display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8,
-                  fontSize: 16, fontWeight: 700, color: GREEN_DEEP, letterSpacing: 0.2,
+                  fontSize: 17.5, fontWeight: 700, color: GREEN_DEEP, letterSpacing: 0.2,
                 }}>
                   <span aria-hidden>🌱</span> Choose a Shape
                 </div>
@@ -1024,7 +1024,7 @@ export default function PixelArtCoding({ sessionId, role, isLocked }: PixelArtCo
                             alt="" aria-hidden
                             style={{ width: 46, height: 46, objectFit: 'contain', display: 'block' }}
                           />
-                          <span style={{ fontSize: 15, fontWeight: on ? 700 : 600, color: on ? GREEN_DEEP : INK }}>
+                          <span style={{ fontSize: 16.5, fontWeight: on ? 700 : 600, color: on ? GREEN_DEEP : INK }}>
                             {s.label}
                           </span>
                         </button>
@@ -1054,7 +1054,7 @@ export default function PixelArtCoding({ sessionId, role, isLocked }: PixelArtCo
                         style={{
                           ...CARD,
                           padding: '11px 16px', borderRadius: 14, cursor: 'pointer',
-                          fontSize: 15, fontWeight: 700, fontFamily: FONT,
+                          fontSize: 16.5, fontWeight: 700, fontFamily: FONT,
                           border: on ? `2px solid ${GREEN}` : `1px solid ${BORDER}`,
                           background: on ? MINT_2 : '#ffffff',
                           color: on ? GREEN_DEEP : MUTED,
@@ -1112,7 +1112,7 @@ export default function PixelArtCoding({ sessionId, role, isLocked }: PixelArtCo
                             style={{
                               ...CARD,
                               width: 46, height: 46, borderRadius: 13, cursor: 'pointer',
-                              fontSize: 17, fontWeight: 700, fontFamily: FONT,
+                              fontSize: 18.5, fontWeight: 700, fontFamily: FONT,
                               border: on ? `2px solid ${GREEN}` : `1px solid ${BORDER}`,
                               background: on ? MINT_2 : '#ffffff',
                               color: on ? GREEN_DEEP : INK,
@@ -1148,10 +1148,10 @@ export default function PixelArtCoding({ sessionId, role, isLocked }: PixelArtCo
                           transition: 'all .15s',
                         }}
                       >
-                        <span style={{ fontSize: 16, fontWeight: 700, color: on ? GREEN_DEEP : INK_DEEP, lineHeight: 1.1 }}>
+                        <span style={{ fontSize: 17.5, fontWeight: 700, color: on ? GREEN_DEEP : INK_DEEP, lineHeight: 1.1 }}>
                           {s.size}
                         </span>
-                        <span style={{ fontSize: 14.5, fontWeight: 600, color: on ? GREEN : MUTED, lineHeight: 1.1 }}>
+                        <span style={{ fontSize: 16, fontWeight: 600, color: on ? GREEN : MUTED, lineHeight: 1.1 }}>
                           {s.label}
                         </span>
                       </button>
@@ -1168,11 +1168,11 @@ export default function PixelArtCoding({ sessionId, role, isLocked }: PixelArtCo
                     display: 'inline-flex', alignItems: 'center', gap: 8,
                     padding: '12px 20px', borderRadius: 999, cursor: 'pointer',
                     background: '#FFF5F4', border: `1px solid rgba(239,68,68,0.32)`,
-                    color: '#D93A3A', fontSize: 15.5, fontWeight: 700, fontFamily: FONT,
+                    color: '#D93A3A', fontSize: 17, fontWeight: 700, fontFamily: FONT,
                     boxShadow: '0 2px 10px rgba(239,68,68,0.12)',
                   }}
                 >
-                  <span aria-hidden style={{ fontSize: 17 }}>↻</span> Reset Grid
+                  <span aria-hidden style={{ fontSize: 18.5 }}>↻</span> Reset Grid
                 </button>
               </div>
             )}
@@ -1182,7 +1182,7 @@ export default function PixelArtCoding({ sessionId, role, isLocked }: PixelArtCo
               <div style={{ display: 'flex', justifyContent: 'center' }}>
                 <span style={{
                   padding: '9px 18px', borderRadius: 999, background: '#ffffff',
-                  border: `1px solid ${BORDER}`, fontSize: 15, fontWeight: 600, color: MUTED,
+                  border: `1px solid ${BORDER}`, fontSize: 16.5, fontWeight: 600, color: MUTED,
                   boxShadow: '0 2px 8px rgba(31,59,44,0.06)',
                 }}>
                   Therapist is controlling
@@ -1208,7 +1208,7 @@ export default function PixelArtCoding({ sessionId, role, isLocked }: PixelArtCo
                         padding: '13px 14px', borderRadius: 12, border: 'none',
                         background: t.active ? MINT_2 : 'transparent',
                         color: t.active ? GREEN_DEEP : INK,
-                        fontSize: 16.5, fontWeight: t.active ? 700 : 600, fontFamily: FONT,
+                        fontSize: 18, fontWeight: t.active ? 700 : 600, fontFamily: FONT,
                         textAlign: 'left', cursor: t.enabled ? 'pointer' : 'default',
                         opacity: t.enabled || t.active ? 1 : 0.42,
                         marginTop: i === 0 ? 0 : 4,
@@ -1233,7 +1233,7 @@ export default function PixelArtCoding({ sessionId, role, isLocked }: PixelArtCo
                   <div style={{ ...CARD, padding: 16, display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 12 }}>
                     <div style={{ display: 'flex', alignItems: 'center', gap: 8, alignSelf: 'flex-start' }}>
                       <Target size={17} color={GREEN} strokeWidth={2.3} />
-                      <span style={{ fontSize: 16, fontWeight: 700, color: GREEN_DEEP }}>Your Target</span>
+                      <span style={{ fontSize: 17.5, fontWeight: 700, color: GREEN_DEEP }}>Your Target</span>
                     </div>
                     <div
                       role="img"
@@ -1257,7 +1257,7 @@ export default function PixelArtCoding({ sessionId, role, isLocked }: PixelArtCo
                         ))
                       )}
                     </div>
-                    <div style={{ fontSize: 15, lineHeight: 1.5, color: MUTED, textAlign: 'center' }}>
+                    <div style={{ fontSize: 16.5, lineHeight: 1.5, color: MUTED, textAlign: 'center' }}>
                       Recreate the pixel art by filling the grid!
                     </div>
                   </div>
@@ -1344,7 +1344,7 @@ export default function PixelArtCoding({ sessionId, role, isLocked }: PixelArtCo
                     }}>
                       <Wand2 size={16} color="#ffffff" strokeWidth={2.3} />
                     </span>
-                    <span style={{ fontSize: 15.5, lineHeight: 1.5, fontWeight: 600, color: INK }}>
+                    <span style={{ fontSize: 17, lineHeight: 1.5, fontWeight: 600, color: INK }}>
                       {mode === 'paint'
                         ? 'Select a color and click or drag to fill cells'
                         : 'Stack blocks below, then press Run to watch the robot paint'}
@@ -1363,7 +1363,7 @@ export default function PixelArtCoding({ sessionId, role, isLocked }: PixelArtCo
                         }}
                       />
                     ))}
-                    <span aria-hidden style={{ fontSize: 22, marginLeft: 2, animation: 'pacPoint 1.6s ease-in-out infinite' }}>
+                    <span aria-hidden style={{ fontSize: 23.5, marginLeft: 2, animation: 'pacPoint 1.6s ease-in-out infinite' }}>
                       👆
                     </span>
                   </div>
@@ -1384,24 +1384,24 @@ export default function PixelArtCoding({ sessionId, role, isLocked }: PixelArtCo
                     display: 'flex', flexDirection: 'column', gap: 9,
                   }}>
                     <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 12 }}>
-                      <span style={{ fontSize: 16, fontWeight: 700, color: GREEN_DEEP }}>How it works</span>
+                      <span style={{ fontSize: 17.5, fontWeight: 700, color: GREEN_DEEP }}>How it works</span>
                       <button
                         onClick={() => setShowCodeHelp(false)}
-                        style={{ background: 'none', border: 'none', color: MUTED, cursor: 'pointer', fontSize: 15, fontWeight: 600, padding: 0, fontFamily: FONT }}
+                        style={{ background: 'none', border: 'none', color: MUTED, cursor: 'pointer', fontSize: 16.5, fontWeight: 600, padding: 0, fontFamily: FONT }}
                       >
                         Got it ✕
                       </button>
                     </div>
-                    <div style={{ fontSize: 15.5, color: INK, lineHeight: 1.55 }}>
+                    <div style={{ fontSize: 17, color: INK, lineHeight: 1.55 }}>
                       The green square is your robot. Tap blocks to tell it where to go, then press Run.
                     </div>
                     <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
                       {['➡', '➡', '🎨'].map((g, i) => (
-                        <span key={i} style={{ padding: '5px 11px', borderRadius: 10, background: MINT_2, fontSize: 16 }}>
+                        <span key={i} style={{ padding: '5px 11px', borderRadius: 10, background: MINT_2, fontSize: 17.5 }}>
                           {g}
                         </span>
                       ))}
-                      <span style={{ fontSize: 15, color: MUTED }}>
+                      <span style={{ fontSize: 16.5, color: MUTED }}>
                         = move right, right, then colour that square
                       </span>
                     </div>
@@ -1411,7 +1411,7 @@ export default function PixelArtCoding({ sessionId, role, isLocked }: PixelArtCo
                 {/* Plain-English readout of the program being built, plus what the
                     ghost markers on the grid mean. */}
                 {program.length > 0 && !isRunning && (
-                  <div style={{ fontSize: 15, color: MUTED, lineHeight: 1.5 }}>
+                  <div style={{ fontSize: 16.5, color: MUTED, lineHeight: 1.5 }}>
                     {projection.blocked ? (
                       <span style={{ color: '#C2410C', fontWeight: 600 }}>
                         ⚠ This program walks off the grid — remove a move block.
@@ -1442,16 +1442,16 @@ export default function PixelArtCoding({ sessionId, role, isLocked }: PixelArtCo
                           display: 'flex', alignItems: 'center', gap: 7,
                           padding: '8px 12px', borderRadius: 999,
                           background: MINT_2, color: GREEN_DEEP,
-                          fontSize: 16, fontWeight: 600, whiteSpace: 'nowrap', flexShrink: 0,
+                          fontSize: 17.5, fontWeight: 600, whiteSpace: 'nowrap', flexShrink: 0,
                         }}
                       >
                         <span>{c?.label || cmd}</span>
-                        <span style={{ fontSize: 15, color: GREEN }}>{c?.name}</span>
+                        <span style={{ fontSize: 16.5, color: GREEN }}>{c?.name}</span>
                         {canInteract && !isRunning && (
                           <button
                             onClick={() => handleRemoveCommand(i)}
                             aria-label={`Remove ${c?.name || cmd}`}
-                            style={{ background: 'none', border: 'none', color: MUTED, cursor: 'pointer', padding: 0, fontSize: 15, lineHeight: 1, fontFamily: FONT }}
+                            style={{ background: 'none', border: 'none', color: MUTED, cursor: 'pointer', padding: 0, fontSize: 16.5, lineHeight: 1, fontFamily: FONT }}
                           >
                             ✕
                           </button>
@@ -1460,7 +1460,7 @@ export default function PixelArtCoding({ sessionId, role, isLocked }: PixelArtCo
                     )
                   })}
                   {program.length === 0 && programStatus === 'idle' && (
-                    <span style={{ fontSize: 15, color: MUTED }}>
+                    <span style={{ fontSize: 16.5, color: MUTED }}>
                       Click blocks below to build your program
                     </span>
                   )}
@@ -1483,8 +1483,8 @@ export default function PixelArtCoding({ sessionId, role, isLocked }: PixelArtCo
                         transition: 'all .15s',
                       }}
                     >
-                      <span style={{ display: 'block', fontSize: 20, lineHeight: 1.2 }}>{cmd.label}</span>
-                      <span style={{ display: 'block', fontSize: 14.5, fontWeight: 600, color: MUTED, lineHeight: 1.4, marginTop: 2 }}>{cmd.name}</span>
+                      <span style={{ display: 'block', fontSize: 21, lineHeight: 1.2 }}>{cmd.label}</span>
+                      <span style={{ display: 'block', fontSize: 16, fontWeight: 600, color: MUTED, lineHeight: 1.4, marginTop: 2 }}>{cmd.name}</span>
                     </button>
                   ))}
                 </div>
@@ -1497,7 +1497,7 @@ export default function PixelArtCoding({ sessionId, role, isLocked }: PixelArtCo
                       disabled={program.length === 0}
                       style={{
                         flex: 1, padding: '13px 0', borderRadius: 999, border: 'none',
-                        fontSize: 16, fontWeight: 700, fontFamily: FONT,
+                        fontSize: 17.5, fontWeight: 700, fontFamily: FONT,
                         cursor: program.length > 0 ? 'pointer' : 'default',
                         opacity: program.length > 0 ? 1 : 0.45,
                         background: GREEN, color: '#ffffff',
@@ -1511,7 +1511,7 @@ export default function PixelArtCoding({ sessionId, role, isLocked }: PixelArtCo
                       onClick={handleStop}
                       style={{
                         flex: 1, padding: '13px 0', borderRadius: 999, border: 'none',
-                        fontSize: 16, fontWeight: 700, fontFamily: FONT, cursor: 'pointer',
+                        fontSize: 17.5, fontWeight: 700, fontFamily: FONT, cursor: 'pointer',
                         background: CORAL, color: '#ffffff',
                         boxShadow: '0 5px 14px rgba(239,68,68,0.26)',
                       }}
@@ -1524,7 +1524,7 @@ export default function PixelArtCoding({ sessionId, role, isLocked }: PixelArtCo
                     style={{
                       flex: 1, padding: '13px 0', borderRadius: 999,
                       border: `1px solid ${BORDER}`, background: '#ffffff',
-                      fontSize: 16, fontWeight: 700, fontFamily: FONT, cursor: 'pointer',
+                      fontSize: 17.5, fontWeight: 700, fontFamily: FONT, cursor: 'pointer',
                       color: INK,
                     }}
                   >
@@ -1534,12 +1534,12 @@ export default function PixelArtCoding({ sessionId, role, isLocked }: PixelArtCo
 
                 {/* Program status */}
                 {programStatus === 'out-of-bounds' && (
-                  <div style={{ textAlign: 'center', fontSize: 16, fontWeight: 700, color: '#D93A3A', animation: 'pacFadeInOut 2s ease forwards' }}>
+                  <div style={{ textAlign: 'center', fontSize: 17.5, fontWeight: 700, color: '#D93A3A', animation: 'pacFadeInOut 2s ease forwards' }}>
                     Out of bounds!
                   </div>
                 )}
                 {programStatus === 'complete' && (
-                  <div style={{ textAlign: 'center', fontSize: 16, fontWeight: 700, color: GREEN_DEEP, animation: 'pacFadeInOut 2s ease forwards' }}>
+                  <div style={{ textAlign: 'center', fontSize: 17.5, fontWeight: 700, color: GREEN_DEEP, animation: 'pacFadeInOut 2s ease forwards' }}>
                     Program complete!
                   </div>
                 )}
@@ -1551,7 +1551,7 @@ export default function PixelArtCoding({ sessionId, role, isLocked }: PixelArtCo
               ...CARD, position: 'relative', padding: '16px 20px',
               display: 'flex', alignItems: 'center', flexWrap: 'wrap', gap: 16,
             }}>
-              <span style={{ fontSize: 16.5, fontWeight: 700, color: INK_DEEP, flexShrink: 0 }}>
+              <span style={{ fontSize: 18, fontWeight: 700, color: INK_DEEP, flexShrink: 0 }}>
                 Progress
               </span>
 
@@ -1568,12 +1568,12 @@ export default function PixelArtCoding({ sessionId, role, isLocked }: PixelArtCo
 
               <span style={{
                 flexShrink: 0, padding: '7px 14px', borderRadius: 999,
-                background: MINT_2, color: GREEN_DEEP, fontSize: 16, fontWeight: 700,
+                background: MINT_2, color: GREEN_DEEP, fontSize: 17.5, fontWeight: 700,
               }}>
                 {celebrating ? 100 : matchPct ?? 0}%
               </span>
 
-              <span style={{ flexShrink: 0, fontSize: 16, fontWeight: 600, color: MUTED }}>
+              <span style={{ flexShrink: 0, fontSize: 17.5, fontWeight: 600, color: MUTED }}>
                 {celebrating
                   ? 'Perfect match!'
                   : matchedCells !== null
@@ -1584,7 +1584,7 @@ export default function PixelArtCoding({ sessionId, role, isLocked }: PixelArtCo
               <span style={{
                 flexShrink: 0, marginLeft: 'auto', padding: '7px 14px', borderRadius: 999,
                 background: MINT, border: `1px solid rgba(22,163,74,0.22)`,
-                fontSize: 15.5, fontWeight: 700, color: GREEN_DEEP,
+                fontSize: 17, fontWeight: 700, color: GREEN_DEEP,
               }}>
                 ✓ {score} completed
               </span>
@@ -1597,7 +1597,7 @@ export default function PixelArtCoding({ sessionId, role, isLocked }: PixelArtCo
                     position: 'absolute',
                     left: `${e.x}%`,
                     bottom: 0,
-                    fontSize: 26.5,
+                    fontSize: 28,
                     zIndex: 10,
                     pointerEvents: 'none',
                     animation: 'pacFloatUp 1.6s ease forwards',
