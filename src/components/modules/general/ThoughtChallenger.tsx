@@ -200,7 +200,7 @@ export default function ThoughtChallenger({ sessionId, role, isLocked }: Thought
               subtitle only, paired with the brain-in-a-speech-bubble mark. */}
           <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
             <BrainBubble />
-            <div style={{ fontSize: 15, fontWeight: 500, lineHeight: 1.35, color: INK_SOFT, minWidth: 0 }}>
+            <div style={{ fontSize: 17, fontWeight: 500, lineHeight: 1.35, color: INK_SOFT, minWidth: 0 }}>
               Explore your thought and discover the evidence.
             </div>
           </div>
@@ -246,7 +246,7 @@ export default function ThoughtChallenger({ sessionId, role, isLocked }: Thought
             <Sparkle size={12} top={80} right={40} opacity={0.28} />
 
             <div style={{
-              fontSize: 10.5, fontWeight: 800, letterSpacing: 1.4, textTransform: 'uppercase',
+              fontSize: 12.5, fontWeight: 800, letterSpacing: 1.4, textTransform: 'uppercase',
               color: VIOLET, marginBottom: 8,
             }}>
               Current thought
@@ -254,7 +254,7 @@ export default function ThoughtChallenger({ sessionId, role, isLocked }: Thought
             <div style={{
               position: 'relative',
               fontFamily: '"DM Serif Display", Georgia, serif', fontStyle: 'italic', fontWeight: 700,
-              fontSize: 24, lineHeight: 1.3,
+              fontSize: 26.5, lineHeight: 1.3,
               color: thought ? VIOLET_DEEP : '#8B7CC0',
               wordBreak: 'break-word',
             }}>
@@ -268,14 +268,14 @@ export default function ThoughtChallenger({ sessionId, role, isLocked }: Thought
               background: '#F2FCF5', border: '1px solid #CBEFD8', borderRadius: 16, padding: '12px 16px 14px',
             }}>
               <div style={{
-                fontSize: 10, fontWeight: 800, letterSpacing: 1.3, textTransform: 'uppercase',
+                fontSize: 12, fontWeight: 800, letterSpacing: 1.3, textTransform: 'uppercase',
                 color: GREEN, marginBottom: 6,
               }}>
                 Balanced reframe
               </div>
               <div style={{
                 fontFamily: '"DM Serif Display", Georgia, serif', fontStyle: 'italic',
-                fontSize: 15, lineHeight: 1.4, color: '#14532D',
+                fontSize: 17, lineHeight: 1.4, color: '#14532D',
               }}>
                 {reframe}
               </div>
@@ -302,7 +302,7 @@ export default function ThoughtChallenger({ sessionId, role, isLocked }: Thought
             }}>
               <Lightbulb size={16} color="#D97706" fill="#FCD34D" />
             </span>
-            <span style={{ fontSize: 16.5, fontWeight: 800, letterSpacing: -0.2, color: INK }}>How to Play</span>
+            <span style={{ fontSize: 19, fontWeight: 800, letterSpacing: -0.2, color: INK }}>How to Play</span>
           </div>
 
           <ol style={{ margin: 0, padding: 0, listStyle: 'none', display: 'flex', flexDirection: 'column', gap: 9 }}>
@@ -311,11 +311,11 @@ export default function ThoughtChallenger({ sessionId, role, isLocked }: Thought
                 <span style={{
                   width: 21, height: 21, borderRadius: '50%', flexShrink: 0, marginTop: 1,
                   display: 'flex', alignItems: 'center', justifyContent: 'center',
-                  background: VIOLET, color: '#ffffff', fontSize: 11, fontWeight: 700,
+                  background: VIOLET, color: '#ffffff', fontSize: 13, fontWeight: 700,
                 }}>
                   {i + 1}
                 </span>
-                <span style={{ fontSize: 12.5, lineHeight: 1.45, fontWeight: 500, color: '#334155' }}>{s}</span>
+                <span style={{ fontSize: 15, lineHeight: 1.45, fontWeight: 500, color: '#334155' }}>{s}</span>
               </li>
             ))}
           </ol>
@@ -342,13 +342,13 @@ export default function ThoughtChallenger({ sessionId, role, isLocked }: Thought
               Add Evidence
             </button>
           ) : (
-            <div style={{ fontSize: 10.5, fontWeight: 800, letterSpacing: 1.3, textTransform: 'uppercase', color: INK_FAINT }}>
+            <div style={{ fontSize: 12.5, fontWeight: 800, letterSpacing: 1.3, textTransform: 'uppercase', color: INK_FAINT }}>
               Evidence cards
             </div>
           )}
           <div style={{ flex: 1 }} />
           <div style={{ display: 'flex', alignItems: 'center', gap: 6, flexShrink: 0 }}>
-            <span style={{ fontSize: 12, fontWeight: 600, color: '#64748B' }}>
+            <span style={{ fontSize: 14.5, fontWeight: 600, color: '#64748B' }}>
               Add as many evidence cards as you can!
             </span>
             <CurlyArrow />
@@ -377,7 +377,7 @@ export default function ThoughtChallenger({ sessionId, role, isLocked }: Thought
         }}>
           {pool.length === 0 && (
             <div style={{
-              display: 'flex', alignItems: 'center', fontSize: 12, fontWeight: 500, color: INK_FAINT, paddingLeft: 2,
+              display: 'flex', alignItems: 'center', fontSize: 14.5, fontWeight: 500, color: INK_FAINT, paddingLeft: 2,
             }}>
               {isT ? 'No evidence cards yet — add one to get started.' : 'No evidence cards yet.'}
             </div>
@@ -429,13 +429,13 @@ export default function ThoughtChallenger({ sessionId, role, isLocked }: Thought
                 </span>
                 <div style={{ minWidth: 0, flex: 1 }}>
                   <div style={{
-                    fontSize: 14.5, fontWeight: 800, letterSpacing: -0.2, lineHeight: 1.2,
+                    fontSize: 16.5, fontWeight: 800, letterSpacing: -0.2, lineHeight: 1.2,
                     color: bin.accent, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis',
                   }}>
                     {bin.label}
                   </div>
                   <div style={{
-                    fontSize: 11.5, fontWeight: 500, color: '#64748B', marginTop: 2,
+                    fontSize: 14, fontWeight: 500, color: '#64748B', marginTop: 2,
                     whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis',
                   }}>
                     {bin.sub}
@@ -444,7 +444,7 @@ export default function ThoughtChallenger({ sessionId, role, isLocked }: Thought
                 <span style={{
                   minWidth: 22, height: 22, padding: '0 6px', borderRadius: 999, flexShrink: 0,
                   display: 'flex', alignItems: 'center', justifyContent: 'center',
-                  background: bin.accent, color: '#ffffff', fontSize: 11.5, fontWeight: 700,
+                  background: bin.accent, color: '#ffffff', fontSize: 14, fontWeight: 700,
                   fontVariantNumeric: 'tabular-nums',
                 }}>
                   {binCards.length}
@@ -466,7 +466,7 @@ export default function ThoughtChallenger({ sessionId, role, isLocked }: Thought
                 {binCards.length === 0 ? (
                   <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 4, pointerEvents: 'none' }}>
                     <ArrowDown size={19} strokeWidth={2.4} color={bin.accent} />
-                    <span style={{ fontSize: 13.5, fontWeight: 700, color: bin.accent }}>Drag and Drop</span>
+                    <span style={{ fontSize: 15.5, fontWeight: 700, color: bin.accent }}>Drag and Drop</span>
                   </div>
                 ) : (
                   binCards.map(c => (
@@ -551,7 +551,7 @@ function BinIcon({ id }: { id: Exclude<Bin, 'pool'> }) {
     <span style={{
       width: 19, height: 19, borderRadius: '50%', border: '1.8px solid #ffffff',
       display: 'flex', alignItems: 'center', justifyContent: 'center',
-      color: '#ffffff', fontSize: 12, fontWeight: 800, lineHeight: 1,
+      color: '#ffffff', fontSize: 14.5, fontWeight: 800, lineHeight: 1,
     }}>
       ?
     </span>
@@ -648,25 +648,25 @@ const magnifierStyle: CSSProperties = {
 const solidBtn = (bg: string, glow: string): CSSProperties => ({
   display: 'inline-flex', alignItems: 'center', gap: 8,
   padding: '10px 20px 10px 16px', borderRadius: 12, border: 'none',
-  background: bg, color: '#ffffff', fontSize: 14, fontWeight: 700,
+  background: bg, color: '#ffffff', fontSize: 16, fontWeight: 700,
   fontFamily: '"DM Sans", sans-serif', cursor: 'pointer', whiteSpace: 'nowrap',
   boxShadow: `0 5px 14px ${glow}`,
 })
 
 const chipBtn = (bg: string): CSSProperties => ({
   padding: '9px 16px', borderRadius: 10, border: 'none',
-  background: bg, color: '#ffffff', fontSize: 12.5, fontWeight: 700,
+  background: bg, color: '#ffffff', fontSize: 15, fontWeight: 700,
   fontFamily: '"DM Sans", sans-serif', cursor: 'pointer', whiteSpace: 'nowrap', flexShrink: 0,
 })
 
 const ghostBtn: CSSProperties = {
   padding: '9px 14px', borderRadius: 12, border: '1px solid #DDD6FE',
-  background: '#ffffff', color: VIOLET, fontSize: 12.5, fontWeight: 700,
+  background: '#ffffff', color: VIOLET, fontSize: 15, fontWeight: 700,
   fontFamily: '"DM Sans", sans-serif', cursor: 'pointer', whiteSpace: 'nowrap',
 }
 
 const inputStyle: CSSProperties = {
   flex: 1, minWidth: 0, background: '#ffffff', border: `1px solid ${HAIRLINE}`, borderRadius: 10,
-  padding: '9px 12px', fontSize: 12.5, color: '#1E293B', outline: 'none',
+  padding: '9px 12px', fontSize: 15, color: '#1E293B', outline: 'none',
   fontFamily: '"DM Sans", sans-serif', transition: 'border-color .15s, box-shadow .15s',
 }

@@ -164,7 +164,7 @@ export default function DefusionRiver({ sessionId, role, isLocked }: DefusionRiv
             }}>
               <Icon size={17} color={tint} strokeWidth={2.1} style={{ flexShrink: 0 }} />
               <span style={{
-                fontSize: 14.5, lineHeight: 1.35,
+                fontSize: 16.5, lineHeight: 1.35,
                 fontWeight: active ? 700 : 500,
                 color: active ? HEAD : INK_SOFT,
                 overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap',
@@ -294,7 +294,7 @@ export default function DefusionRiver({ sessionId, role, isLocked }: DefusionRiv
 
               <div style={{
                 display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 5,
-                fontSize: 16.5, fontWeight: 800, color: HEAD, letterSpacing: -0.2, marginBottom: 10,
+                fontSize: 19, fontWeight: 800, color: HEAD, letterSpacing: -0.2, marginBottom: 10,
               }}>
                 Enter your thought
                 <Sparkles size={15} color="#E8B23C" strokeWidth={2.2} />
@@ -313,13 +313,13 @@ export default function DefusionRiver({ sessionId, role, isLocked }: DefusionRiv
                       style={{
                         width: '100%', boxSizing: 'border-box', minHeight: 76,
                         background: '#ffffff', border: `1px solid ${BORDER}`, borderRadius: 14,
-                        padding: '11px 12px 24px', fontSize: 13.5, lineHeight: 1.35, color: INK,
+                        padding: '11px 12px 24px', fontSize: 15.5, lineHeight: 1.35, color: INK,
                         resize: 'none', outline: 'none', fontFamily: '"DM Sans", sans-serif',
                         transition: 'border-color .15s, box-shadow .15s',
                       }}
                     />
                     <span style={{
-                      position: 'absolute', right: 11, bottom: 9, fontSize: 11, fontWeight: 600,
+                      position: 'absolute', right: 11, bottom: 9, fontSize: 13, fontWeight: 600,
                       color: input.length >= MAX_CHARS ? '#B4632A' : MUTED, pointerEvents: 'none',
                     }}>
                       {input.length} / {MAX_CHARS}
@@ -334,7 +334,7 @@ export default function DefusionRiver({ sessionId, role, isLocked }: DefusionRiv
                       width: '100%', marginTop: 10,
                       display: 'inline-flex', alignItems: 'center', justifyContent: 'center', gap: 9,
                       padding: '12px 18px', borderRadius: 14, border: 'none',
-                      background: GREEN, color: '#ffffff', fontSize: 15, fontWeight: 700,
+                      background: GREEN, color: '#ffffff', fontSize: 17, fontWeight: 700,
                       fontFamily: '"DM Sans", sans-serif',
                       cursor: canSubmit ? 'pointer' : 'default',
                       opacity: canSubmit ? 1 : 0.5,
@@ -354,7 +354,7 @@ export default function DefusionRiver({ sessionId, role, isLocked }: DefusionRiv
                       style={{
                         width: '100%', marginTop: 7, padding: 0, border: 'none', background: 'none',
                         display: 'inline-flex', alignItems: 'center', justifyContent: 'center', gap: 6,
-                        fontSize: 11.5, fontWeight: 600, color: MUTED, cursor: 'pointer',
+                        fontSize: 14, fontWeight: 600, color: MUTED, cursor: 'pointer',
                         fontFamily: '"DM Sans", sans-serif',
                       }}
                     >
@@ -368,12 +368,12 @@ export default function DefusionRiver({ sessionId, role, isLocked }: DefusionRiv
                    how the invitation reads. */
                 <div style={{
                   background: '#F7FAF8', border: `1px solid ${BORDER}`, borderRadius: 14,
-                  padding: '12px 13px', fontSize: 13, lineHeight: 1.45, color: INK, minHeight: 76,
+                  padding: '12px 13px', fontSize: 15, lineHeight: 1.45, color: INK, minHeight: 76,
                 }}>
                   {thought
                     ? <>Your thought: <strong style={{ color: HEAD }}>“{thought}”</strong></>
                     : <span style={{ color: MUTED }}>Your therapist will place your thought on a leaf.</span>}
-                  <div style={{ marginTop: 8, fontSize: 11.5, color: MUTED }}>
+                  <div style={{ marginTop: 8, fontSize: 14, color: MUTED }}>
                     {isLocked ? 'Your therapist is guiding this exercise.' : 'Follow along with your therapist.'}
                   </div>
                 </div>
@@ -385,7 +385,7 @@ export default function DefusionRiver({ sessionId, role, isLocked }: DefusionRiv
                 padding: '9px 11px',
               }}>
                 <Lightbulb size={15} color="#D89B1E" strokeWidth={2.2} style={{ flexShrink: 0 }} />
-                <span style={{ fontSize: 11.5, fontWeight: 600, lineHeight: 1.35, color: AMBER_INK }}>
+                <span style={{ fontSize: 14, fontWeight: 600, lineHeight: 1.35, color: AMBER_INK }}>
                   It&apos;s okay to have thoughts. You are doing great!
                 </span>
               </div>
@@ -397,7 +397,7 @@ export default function DefusionRiver({ sessionId, role, isLocked }: DefusionRiv
               background: '#ffffff', border: `1px solid ${BORDER}`, borderRadius: 16,
               padding: '13px 14px', boxShadow: CARD_SHADOW,
             }}>
-              <div style={{ fontSize: 14, fontWeight: 800, color: HEAD, marginBottom: 9 }}>
+              <div style={{ fontSize: 16, fontWeight: 800, color: HEAD, marginBottom: 9 }}>
                 Your thought will
               </div>
               {[
@@ -407,14 +407,14 @@ export default function DefusionRiver({ sessionId, role, isLocked }: DefusionRiv
               ].map(({ Icon, tint, text }) => (
                 <div key={text} style={{ display: 'flex', alignItems: 'center', gap: 9, marginBottom: 7 }}>
                   <Icon size={15} color={tint} strokeWidth={2.1} style={{ flexShrink: 0 }} />
-                  <span style={{ fontSize: 12.5, lineHeight: 1.3, color: INK }}>{text}</span>
+                  <span style={{ fontSize: 15, lineHeight: 1.3, color: INK }}>{text}</span>
                 </div>
               ))}
               <div style={{ height: 1, background: BORDER, margin: '11px 0 9px' }} />
-              <div style={{ fontSize: 12.5, fontWeight: 600, lineHeight: 1.45, color: HEAD }}>
+              <div style={{ fontSize: 15, fontWeight: 600, lineHeight: 1.45, color: HEAD }}>
                 You can let it go.
               </div>
-              <div style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 12.5, fontWeight: 600, color: HEAD }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 15, fontWeight: 600, color: HEAD }}>
                 You are in control.
                 <Heart size={13} color="#E8646E" fill="#E8646E" strokeWidth={0} />
               </div>
@@ -429,10 +429,10 @@ export default function DefusionRiver({ sessionId, role, isLocked }: DefusionRiv
               padding: '14px 14px 15px', boxShadow: CARD_SHADOW, textAlign: 'center',
             }}>
               <LeafIcon size={18} color={GREEN} strokeWidth={2.1} />
-              <div style={{ fontSize: 13.5, fontWeight: 800, color: HEAD, margin: '4px 0 8px', lineHeight: 1.25 }}>
+              <div style={{ fontSize: 15.5, fontWeight: 800, color: HEAD, margin: '4px 0 8px', lineHeight: 1.25 }}>
                 Watch it float…
               </div>
-              <div style={{ fontSize: 12.5, lineHeight: 1.5, color: INK }}>
+              <div style={{ fontSize: 15, lineHeight: 1.5, color: INK }}>
                 Let your thought float down the river. You don&apos;t have to hold on to it.
               </div>
             </div>
@@ -448,7 +448,7 @@ export default function DefusionRiver({ sessionId, role, isLocked }: DefusionRiv
                 background: '#ffffff', border: `1px solid ${BORDER}`, borderRadius: 16,
                 padding: '13px 15px', boxShadow: CARD_SHADOW,
               }}>
-                <div style={{ fontSize: 13, fontWeight: 800, color: HEAD, marginBottom: 7 }}>Help &amp; Tips</div>
+                <div style={{ fontSize: 15, fontWeight: 800, color: HEAD, marginBottom: 7 }}>Help &amp; Tips</div>
                 {[
                   'Say the thought out loud, slowly: “I am having the thought that…”',
                   'Notice the thought as an object on the water, not as a fact.',
@@ -457,7 +457,7 @@ export default function DefusionRiver({ sessionId, role, isLocked }: DefusionRiv
                 ].map(t => (
                   <div key={t} style={{ display: 'flex', gap: 8, marginBottom: 6 }}>
                     <span style={{ width: 5, height: 5, borderRadius: '50%', background: GREEN, flexShrink: 0, marginTop: 6 }} />
-                    <span style={{ fontSize: 12, lineHeight: 1.4, color: INK }}>{t}</span>
+                    <span style={{ fontSize: 14.5, lineHeight: 1.4, color: INK }}>{t}</span>
                   </div>
                 ))}
               </div>
@@ -500,7 +500,7 @@ export default function DefusionRiver({ sessionId, role, isLocked }: DefusionRiv
                       border: `1.5px solid ${active ? GREEN : 'transparent'}`,
                       background: active ? MINT : 'transparent',
                       color: active ? HEAD : MUTED,
-                      fontSize: 11.5, fontWeight: active ? 700 : 600,
+                      fontSize: 14, fontWeight: active ? 700 : 600,
                       fontFamily: '"DM Sans", sans-serif',
                       cursor: actionable ? 'pointer' : 'default',
                       whiteSpace: 'nowrap',
@@ -545,7 +545,7 @@ export default function DefusionRiver({ sessionId, role, isLocked }: DefusionRiv
             position: 'absolute', left: '50%', top: '62%', transform: 'translate(-50%,-50%)', zIndex: 0,
             padding: '9px 18px', borderRadius: 999,
             background: 'rgba(255,255,255,0.92)', border: `1px solid ${BORDER}`,
-            boxShadow: CARD_SHADOW, fontSize: 12.5, fontWeight: 600, color: MUTED, whiteSpace: 'nowrap',
+            boxShadow: CARD_SHADOW, fontSize: 15, fontWeight: 600, color: MUTED, whiteSpace: 'nowrap',
           }}>
             {isT ? 'Place a thought on a leaf' : 'Watching the river…'}
           </div>
@@ -558,7 +558,7 @@ export default function DefusionRiver({ sessionId, role, isLocked }: DefusionRiv
 const btnStyle: React.CSSProperties = {
   display: 'inline-flex', alignItems: 'center', gap: 7,
   padding: '10px 15px', borderRadius: 14, border: `1px solid ${BORDER}`,
-  background: '#ffffff', color: '#244a35', fontSize: 13, fontWeight: 600,
+  background: '#ffffff', color: '#244a35', fontSize: 15, fontWeight: 600,
   cursor: 'pointer', whiteSpace: 'nowrap', fontFamily: '"DM Sans", sans-serif',
   boxShadow: CARD_SHADOW, transition: 'border-color .15s, color .15s, background .15s',
 }

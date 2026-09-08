@@ -24,7 +24,7 @@ export function ThoughtBubble({ text, triggerAt, position }: ThoughtBubbleProps)
         style={{
           background: '#fff', border: '2.5px solid #2a2420', borderRadius: '20px 20px 20px 4px',
           padding: '6px 16px', boxShadow: '3px 4px 0 rgba(0,0,0,0.12)',
-          fontFamily: "'Nunito', 'DM Sans', sans-serif", fontWeight: 900, fontSize: 15,
+          fontFamily: "'Nunito', 'DM Sans', sans-serif", fontWeight: 900, fontSize: 17,
           color: '#c8602a', whiteSpace: 'nowrap', lineHeight: 1,
         }}
       >

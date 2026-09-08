@@ -24,8 +24,8 @@ import { MODULE_CATEGORIES } from '@/lib/modules'
 function VideoTile({
   trackRef,
   name,
-  width = 140,
-  height = 70,
+  width = 188,
+  height = 112,
 }: {
   trackRef: TrackReference | undefined
   name: string
@@ -54,10 +54,10 @@ function VideoTile({
         <span
           style={{
             position: 'absolute',
-            bottom: 5,
-            right: 5,
-            width: 9,
-            height: 9,
+            bottom: 6,
+            right: 6,
+            width: 11,
+            height: 11,
             borderRadius: '50%',
             background: RC.green,
             border: '1.5px solid rgba(255,255,255,0.9)',
@@ -84,15 +84,22 @@ function VideoTile({
           </div>
         )}
       </div>
-      <div style={{ marginTop: 3, textAlign: 'center', fontSize: 10, fontWeight: 600, color: RC.inkMuted }}>
+      <div style={{ marginTop: 5, textAlign: 'center', fontSize: 17, fontWeight: 600, color: RC.inkMuted }}>
         {name}
       </div>
     </div>
   )
 }
 
-/** Floor for the activity canvas; below this the stage scrolls instead of squeezing. */
-const MODULE_MIN_HEIGHT = 560
+/** Floor for the activity canvas; below this the stage scrolls instead of squeezing.
+    Kept low enough that the whole stage — video row, header, canvas and the
+    session room's own bars — fits a laptop viewport at 100% zoom. The canvas
+    still grows to fill a taller window; this is only the point at which it stops
+    shrinking.
+
+    Raised from 360 alongside the larger camera tiles and type: the activity
+    body now needs more room before it starts clipping its own controls. */
+const MODULE_MIN_HEIGHT = 420
 
 /** Registry lookup: the module's display identity and its category tint. */
 function moduleIdentity(moduleId: string | null) {
@@ -156,7 +163,7 @@ export default function ModuleStage({
     border: `1px solid ${RC.border}`,
     background: RC.panel,
     color: RC.ink,
-    fontSize: 10,
+    fontSize: 12,
     fontWeight: 600,
     cursor: 'pointer',
   }
@@ -199,13 +206,13 @@ export default function ModuleStage({
           flexShrink: 0,
           display: 'flex',
           alignItems: 'flex-start',
-          gap: 18,
-          padding: '14px 16px 10px',
+          gap: 14,
+          padding: '9px 14px 7px',
           borderBottom: `1px solid ${RC.border}`,
         }}
       >
         {/* LEFT: self */}
-        <VideoTile trackRef={selfTrack} name={selfName} width={150} height={92} />
+        <VideoTile trackRef={selfTrack} name={selfName} width={188} height={112} />
 
         {/* CENTRE: title, then the live status line */}
         <div style={{ flex: 1, minWidth: 0, display: 'flex', flexDirection: 'column', gap: 8, paddingTop: 2 }}>
@@ -219,7 +226,7 @@ export default function ModuleStage({
                 display: 'flex',
                 alignItems: 'center',
                 justifyContent: 'center',
-                fontSize: 21,
+                fontSize: 23,
                 background: id?.iconBg ?? RC.tile,
                 border: `1px solid ${id?.iconBorder ?? RC.border}`,
               }}
@@ -229,7 +236,7 @@ export default function ModuleStage({
             <div style={{ minWidth: 0 }}>
               <div
                 style={{
-                  fontSize: 22,
+                  fontSize: 27.5,
                   fontWeight: 800,
                   letterSpacing: -0.4,
                   lineHeight: 1.15,
@@ -243,7 +250,7 @@ export default function ModuleStage({
               </div>
               <div
                 style={{
-                  fontSize: 11.5,
+                  fontSize: 15.5,
                   fontWeight: 600,
                   color: RC.inkMuted,
                   whiteSpace: 'nowrap',
@@ -258,11 +265,11 @@ export default function ModuleStage({
 
           <div style={{ display: 'flex', alignItems: 'center', gap: 9 }}>
             <span style={{ width: 7, height: 7, borderRadius: '50%', background: RC.red, display: 'inline-block' }} />
-            <span style={{ fontSize: 11, fontWeight: 600, fontVariantNumeric: 'tabular-nums', color: RC.ink, fontFamily: 'monospace' }}>
+            <span style={{ fontSize: 13, fontWeight: 600, fontVariantNumeric: 'tabular-nums', color: RC.ink, fontFamily: 'monospace' }}>
               {timerStr}
             </span>
             <span style={{ width: 1, height: 11, background: RC.border, display: 'inline-block' }} />
-            <span style={{ display: 'flex', alignItems: 'center', gap: 5, fontSize: 11, fontWeight: 600, color: RC.greenDark }}>
+            <span style={{ display: 'flex', alignItems: 'center', gap: 5, fontSize: 13, fontWeight: 600, color: RC.greenDark }}>
               <span style={{ width: 6, height: 6, borderRadius: '50%', background: RC.green, display: 'inline-block' }} />
               {onlineCount} online
             </span>
@@ -271,7 +278,7 @@ export default function ModuleStage({
 
         {/* RIGHT: other participant */}
         <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-end', gap: 7, flexShrink: 0 }}>
-          <VideoTile trackRef={otherTrack} name={otherName} width={196} height={116} />
+          <VideoTile trackRef={otherTrack} name={otherName} width={188} height={112} />
 
           <div style={{ display: 'flex', alignItems: 'center', gap: 7 }}>
             {isTherapist && (
@@ -310,7 +317,7 @@ export default function ModuleStage({
           // scrolls past it instead.
           overflowY: 'auto',
           overflowX: 'hidden',
-          padding: '18px 22px 22px',
+          padding: '10px 16px 12px',
           display: 'flex',
           flexDirection: 'column',
         }}

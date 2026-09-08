@@ -150,7 +150,7 @@ export default function FactsVsFeelings({ sessionId, role, isLocked }: FactsVsFe
         }}>
           <Brain size={21} color={GREEN} strokeWidth={1.9} />
         </div>
-        <div style={{ fontSize: 13.5, fontWeight: 500, color: INK_MUTED, textAlign: 'center' }}>
+        <div style={{ fontSize: 15.5, fontWeight: 500, color: INK_MUTED, textAlign: 'center' }}>
           Sort each thought into the right category
         </div>
       </div>
@@ -172,7 +172,7 @@ export default function FactsVsFeelings({ sessionId, role, isLocked }: FactsVsFe
         }}
       >
         {pool.length === 0 && (
-          <span style={{ fontSize: 12, color: INK_FAINT, padding: '14px 0' }}>
+          <span style={{ fontSize: 14.5, color: INK_FAINT, padding: '14px 0' }}>
             {cards.length === 0
               ? (isT ? 'No cards yet — write one in “Create a Card”.' : 'Waiting for your therapist to add a thought…')
               : 'Every thought has been sorted.'}
@@ -232,7 +232,7 @@ export default function FactsVsFeelings({ sessionId, role, isLocked }: FactsVsFe
                       position: 'absolute', top: -2, right: 0,
                       minWidth: 20, padding: '2px 7px', borderRadius: 999,
                       background: bin.tint, border: `1px solid ${bin.accent}`,
-                      fontSize: 10.5, fontWeight: 700, color: bin.accent, lineHeight: 1.4,
+                      fontSize: 12.5, fontWeight: 700, color: bin.accent, lineHeight: 1.4,
                     }}>{binCards.length}</span>
                   )}
                   <div aria-hidden style={{
@@ -241,10 +241,10 @@ export default function FactsVsFeelings({ sessionId, role, isLocked }: FactsVsFe
                   }}>
                     <Icon size={19} color={bin.accent} strokeWidth={2} />
                   </div>
-                  <div style={{ fontSize: 17, fontWeight: 800, letterSpacing: -0.2, color: bin.accent, lineHeight: 1.1 }}>
+                  <div style={{ fontSize: 19.5, fontWeight: 800, letterSpacing: -0.2, color: bin.accent, lineHeight: 1.1 }}>
                     {bin.label}
                   </div>
-                  <div style={{ fontSize: 11.5, lineHeight: 1.35, color: INK_MUTED, textAlign: 'center', maxWidth: 190 }}>
+                  <div style={{ fontSize: 14, lineHeight: 1.35, color: INK_MUTED, textAlign: 'center', maxWidth: 190 }}>
                     {bin.desc}
                   </div>
                 </div>
@@ -267,7 +267,7 @@ export default function FactsVsFeelings({ sessionId, role, isLocked }: FactsVsFe
                       />
                       {isT && bin.id === 'facts' && !overrideId.has(c.id) && (
                         <button onClick={() => overrideCard(c.id)} style={{
-                          alignSelf: 'flex-start', fontSize: 10, fontWeight: 600, padding: '3px 8px',
+                          alignSelf: 'flex-start', fontSize: 12, fontWeight: 600, padding: '3px 8px',
                           borderRadius: 999, border: `1px solid ${LINE}`, background: '#ffffff',
                           color: INK_FAINT, cursor: 'pointer', fontFamily: '"DM Sans", sans-serif',
                         }}>Keep here</button>
@@ -291,7 +291,7 @@ export default function FactsVsFeelings({ sessionId, role, isLocked }: FactsVsFe
           }}>
             <div style={{ flexShrink: 0, display: 'flex', alignItems: 'center', gap: 8 }}>
               <SquarePen size={19} color={GREEN} strokeWidth={2} />
-              <span style={{ fontSize: 15, fontWeight: 800, letterSpacing: -0.2, color: INK }}>Create a Card</span>
+              <span style={{ fontSize: 17, fontWeight: 800, letterSpacing: -0.2, color: INK }}>Create a Card</span>
             </div>
 
             <div style={{ position: 'relative', flex: 1, minHeight: 74, display: 'flex' }}>
@@ -306,14 +306,14 @@ export default function FactsVsFeelings({ sessionId, role, isLocked }: FactsVsFe
                   flex: 1, width: '100%', boxSizing: 'border-box', resize: 'none', outline: 'none',
                   padding: '11px 12px 24px', borderRadius: 14,
                   border: `1px solid ${LINE}`, background: '#ffffff',
-                  fontSize: 13, lineHeight: 1.4, color: INK_BODY,
+                  fontSize: 15, lineHeight: 1.4, color: INK_BODY,
                   fontFamily: '"DM Sans", sans-serif',
                   transition: 'border-color .15s, box-shadow .15s',
                 }}
               />
               <span style={{
                 position: 'absolute', right: 11, bottom: 8, pointerEvents: 'none',
-                fontSize: 11, fontWeight: 600, color: INK_FAINT,
+                fontSize: 13, fontWeight: 600, color: INK_FAINT,
               }}>{cardInput.length}/{MAX_CHARS}</span>
             </div>
 
@@ -322,7 +322,7 @@ export default function FactsVsFeelings({ sessionId, role, isLocked }: FactsVsFe
               disabled={!cardInput.trim()}
               style={{
                 flexShrink: 0, width: '100%', padding: '11px 14px', borderRadius: 12, border: 'none',
-                background: GREEN, color: '#ffffff', fontSize: 13.5, fontWeight: 700,
+                background: GREEN, color: '#ffffff', fontSize: 15.5, fontWeight: 700,
                 fontFamily: '"DM Sans", sans-serif',
                 cursor: cardInput.trim() ? 'pointer' : 'default',
                 opacity: cardInput.trim() ? 1 : 0.5,
@@ -340,7 +340,7 @@ export default function FactsVsFeelings({ sessionId, role, isLocked }: FactsVsFe
         <div role="status" style={{
           position: 'absolute', left: '50%', bottom: 10, transform: 'translateX(-50%)',
           background: '#FFF7ED', border: '1.5px solid #EA580C', borderRadius: 12,
-          padding: '9px 16px', fontSize: 12.5, fontWeight: 600, color: '#9A3412',
+          padding: '9px 16px', fontSize: 15, fontWeight: 600, color: '#9A3412',
           boxShadow: '0 6px 18px rgba(20,30,45,0.12)', animation: 'ff-rise .25s ease',
           maxWidth: '80%', textAlign: 'center', zIndex: 5,
         }}>
@@ -367,7 +367,7 @@ function ThoughtCard({ card, canInteract, dragging, onDragStart, onDragEnd }: {
         background: '#ffffff',
         border: `1.5px solid ${dragging ? GREEN : LINE}`,
         boxShadow: dragging ? '0 6px 18px rgba(31,122,68,0.18)' : '0 2px 8px rgba(20,30,45,0.06)',
-        fontSize: 13, lineHeight: 1.35, fontWeight: 500, color: INK_BODY,
+        fontSize: 15, lineHeight: 1.35, fontWeight: 500, color: INK_BODY,
         cursor: canInteract ? 'grab' : 'default',
         transition: 'border-color .12s, box-shadow .12s',
         userSelect: 'none',
@@ -391,7 +391,7 @@ function SortedCard({ card, accent, tint, canInteract, dragging, onDragStart, on
         padding: '7px 10px', borderRadius: 11,
         background: tint,
         border: `1px solid ${dragging ? GREEN : accent}`,
-        fontSize: 11.5, lineHeight: 1.35, fontWeight: 500, color: INK_BODY,
+        fontSize: 14, lineHeight: 1.35, fontWeight: 500, color: INK_BODY,
         cursor: canInteract ? 'grab' : 'default',
         userSelect: 'none',
       }}

@@ -92,7 +92,7 @@ const card: React.CSSProperties = {
 }
 
 const microLabel: React.CSSProperties = {
-  fontSize: 9.5,
+  fontSize: 12.5,
   fontWeight: 800,
   letterSpacing: 0.7,
   color: INDIGO,
@@ -150,17 +150,25 @@ function generateSequence(n: number, stimulusType: StimulusType, length: number)
     }
   }
 
-  // Enforce constraints: no more than 3 consecutive matches, 4 non-matches
+  /* Cap consecutive matches at two.
+
+     A run of matches is the same stimulus repeating — literally so at n=1 —
+     which reads as "the item I just answered is still on screen". Long runs
+     blur into one another, so the next genuine target gets missed.
+
+     The previous version stepped its look-back by 1 rather than n, so it only
+     measured a run correctly at n=1, and it broke a run with an unconstrained
+     random pick that could re-create the very match it was removing. */
+  let run = 0
   for (let i = n; i < length; i++) {
-    if (seq[i] === seq[i - n]) {
-      let matchRun = 1
-      for (let j = i - n; j >= n; j--) {
-        if (seq[j] === seq[j - n]) matchRun++
-        else break
-      }
-      if (matchRun > 3) {
-        seq[i] = pool[Math.floor(Math.random() * pool.length)]
-      }
+    if (seq[i] !== seq[i - n]) { run = 0; continue }
+    run++
+    if (run <= 2) continue
+    const banned = new Set([seq[i - n], seq[i - 1]])
+    const safe = pool.filter((p) => !banned.has(p))
+    if (safe.length > 0) {
+      seq[i] = safe[Math.floor(Math.random() * safe.length)]
+      run = 0
     }
   }
 
@@ -277,7 +285,7 @@ function PillGroup({
               borderRadius: 999,
               border: 'none',
               cursor: disabled ? 'default' : 'pointer',
-              fontSize: 11,
+              fontSize: 13,
               fontWeight: 700,
               lineHeight: 1.2,
               whiteSpace: 'nowrap',
@@ -339,6 +347,13 @@ export default function NBackChallenge({ sessionId, role, isLocked }: NBackChall
   const [animKey, setAnimKey] = useState(0)
   // Local-only flash counter so the Lottie remounts on every caught match.
   const [flashKey, setFlashKey] = useState(0)
+  /* Indices the responder has already answered, shared through Firestore.
+     Without it the therapist's timer counted a miss for EVERY match as it
+     scrolled past — including ones the client had just caught — so a correct
+     answer scored a hit and a miss at once and a perfect round read as 50%
+     accuracy. It also drives the "Missed!" flash, which used to fire on top of
+     "Correct!" for the same stimulus. */
+  const [responded, setResponded] = useState<number[]>([])
 
   /* Practice-round state. practiceActive/practiceIdx mirror the two non-clinical
      Firestore fields; the score and feedback stay local and are never persisted. */
@@ -351,8 +366,8 @@ export default function NBackChallenge({ sessionId, role, isLocked }: NBackChall
   const practiceFbTimer = useRef<ReturnType<typeof setTimeout>>()
 
   const timerRef = useRef<ReturnType<typeof setInterval>>()
-  const gameRef = useRef({ isPlaying, sequence, currentIndex, n, hits, misses })
-  gameRef.current = { isPlaying, sequence, currentIndex, n, hits, misses }
+  const gameRef = useRef({ isPlaying, sequence, currentIndex, n, hits, misses, responded })
+  gameRef.current = { isPlaying, sequence, currentIndex, n, hits, misses, responded }
 
   /* Match chime — a side effect of the existing hit path only. */
   const pingRef = useRef<HTMLAudioElement | null>(null)
@@ -369,6 +384,38 @@ export default function NBackChallenge({ sessionId, role, isLocked }: NBackChall
     } catch { /* audio is decorative */ }
   }, [])
   useEffect(() => () => { try { pingRef.current?.pause() } catch { /* noop */ } }, [])
+
+  /* Miss cue. The delivered asset folder has match-ping.wav but no miss sound,
+     so this is synthesised rather than shipped: a short low tone falling from
+     approximately 320Hz to 160Hz. Deliberately quieter and softer-edged than
+     the hit ping — the child is meant to notice a miss, not be startled by it. */
+  const missCtxRef = useRef<AudioContext | null>(null)
+  const playMiss = useCallback(() => {
+    try {
+      if (typeof window === 'undefined') return
+      const Ctor = window.AudioContext ||
+        (window as unknown as { webkitAudioContext?: typeof AudioContext }).webkitAudioContext
+      if (!Ctor) return
+      if (!missCtxRef.current) missCtxRef.current = new Ctor()
+      const ctx = missCtxRef.current
+      // Browsers start the context suspended until a gesture; a miss can land
+      // without one, so resume defensively and give up quietly if refused.
+      if (ctx.state === 'suspended') ctx.resume().catch(() => {})
+      const t = ctx.currentTime
+      const osc = ctx.createOscillator()
+      const gain = ctx.createGain()
+      osc.type = 'sine'
+      osc.frequency.setValueAtTime(320, t)
+      osc.frequency.exponentialRampToValueAtTime(160, t + 0.28)
+      gain.gain.setValueAtTime(0.0001, t)
+      gain.gain.exponentialRampToValueAtTime(0.22, t + 0.02)
+      gain.gain.exponentialRampToValueAtTime(0.0001, t + 0.3)
+      osc.connect(gain).connect(ctx.destination)
+      osc.start(t)
+      osc.stop(t + 0.32)
+    } catch { /* audio is decorative */ }
+  }, [])
+  useEffect(() => () => { try { missCtxRef.current?.close() } catch { /* noop */ } }, [])
 
   const writeToFirestore = useCallback(async (data: Record<string, unknown>) => {
     try {
@@ -398,6 +445,7 @@ export default function NBackChallenge({ sessionId, role, isLocked }: NBackChall
       }
       if (typeof s.nbHits === 'number') setHits(s.nbHits)
       if (typeof s.nbMisses === 'number') setMisses(s.nbMisses)
+      if (Array.isArray(s.nbResponded)) setResponded(s.nbResponded as number[])
       // Non-clinical warm-up coordination only.
       if (typeof s.nbPracticeActive === 'boolean') setPracticeActive(s.nbPracticeActive)
       if (typeof s.nbPracticeIndex === 'number') setPracticeIdx(s.nbPracticeIndex)
@@ -429,9 +477,12 @@ export default function NBackChallenge({ sessionId, role, isLocked }: NBackChall
         return
       }
 
-      // Check if previous item was a match that should have been caught
-      if (currentIndex >= n && sequence[currentIndex] === sequence[currentIndex - n]) {
-        const { hits, misses: m } = gameRef.current
+      // Charge a miss only for a match that scrolled past UNANSWERED. Answered
+      // indices were already scored by handleMatchPress, so counting them here
+      // too is what made every correct answer also a miss.
+      const { misses: m, responded } = gameRef.current
+      const wasMatch = currentIndex >= n && sequence[currentIndex] === sequence[currentIndex - n]
+      if (wasMatch && !responded.includes(currentIndex)) {
         writeToFirestore({
           'moduleState.nbCurrentIndex': nextIdx,
           'moduleState.nbMisses': m + 1,
@@ -455,15 +506,19 @@ export default function NBackChallenge({ sessionId, role, isLocked }: NBackChall
     }
   }, [currentIndex, sequence.length])
 
-  // Client missed-match detection
+  // Client missed-match detection. Skips indices the client answered — this
+  // used to flash "Missed!" over the top of "✓ Correct!" for the same
+  // stimulus, which is what made a caught match look like a failed one.
   useEffect(() => {
     if (isTherapist || currentIndex < n || currentIndex > sequence.length) return
     const prevIdx = currentIndex - 1
-    if (prevIdx >= n && sequence[prevIdx] === sequence[prevIdx - n]) {
+    if (prevIdx < n || responded.includes(prevIdx)) return
+    if (sequence[prevIdx] === sequence[prevIdx - n]) {
       setFeedback({ type: 'missed', text: 'Missed!' })
+      playMiss()
       setTimeout(() => setFeedback(null), 800)
     }
-  }, [currentIndex, n, sequence, isTherapist])
+  }, [currentIndex, n, sequence, isTherapist, responded, playMiss])
 
   // Cleanup on unmount
   useEffect(() => {
@@ -540,19 +595,34 @@ export default function NBackChallenge({ sessionId, role, isLocked }: NBackChall
   const handleMatchPress = () => {
     if (!canInteract || !isPlaying || currentIndex < n || complete) return
 
-    const { sequence, currentIndex: ci, hits, misses } = gameRef.current
+    const { sequence, currentIndex: ci, hits, misses, responded } = gameRef.current
+    // One response per stimulus. Without this a second tap on the same item
+    // scored twice, and the optimistic local update below would drift.
+    if (responded.includes(ci)) return
     const isMatch = sequence[ci] === sequence[ci - n]
+    const nextResponded = [...responded, ci]
+    // Applied locally as well as written, so the timer's miss check sees the
+    // response even if it ticks before the Firestore round trip lands.
+    setResponded(nextResponded)
 
     if (isMatch) {
       setFeedback({ type: 'correct', text: '✓ Correct!' })
       setTimeout(() => setFeedback(null), 800)
       playPing()
       setFlashKey((k) => k + 1)
-      writeToFirestore({ 'moduleState.nbHits': hits + 1 })
+      writeToFirestore({
+        'moduleState.nbHits': hits + 1,
+        'moduleState.nbResponded': nextResponded,
+      })
     } else {
+      // A false alarm still costs a miss, so it gets the miss cue too.
       setFeedback({ type: 'wrong', text: '✗ Not a match' })
+      playMiss()
       setTimeout(() => setFeedback(null), 800)
-      writeToFirestore({ 'moduleState.nbMisses': misses + 1 })
+      writeToFirestore({
+        'moduleState.nbMisses': misses + 1,
+        'moduleState.nbResponded': nextResponded,
+      })
     }
   }
 
@@ -576,6 +646,7 @@ export default function NBackChallenge({ sessionId, role, isLocked }: NBackChall
     setCurrentIndex(0)
     setHits(0)
     setMisses(0)
+    setResponded([])
     setComplete(false)
     setFeedback(null)
     setAnimKey((k) => k + 1)
@@ -586,6 +657,7 @@ export default function NBackChallenge({ sessionId, role, isLocked }: NBackChall
       'moduleState.nbCurrentIndex': 0,
       'moduleState.nbHits': 0,
       'moduleState.nbMisses': 0,
+      'moduleState.nbResponded': [],
       // The warm-up never overlaps the real exercise.
       'moduleState.nbPracticeActive': false,
       'moduleState.nbPracticeIndex': -1,
@@ -605,6 +677,7 @@ export default function NBackChallenge({ sessionId, role, isLocked }: NBackChall
     setCurrentIndex(-1)
     setHits(0)
     setMisses(0)
+    setResponded([])
     setComplete(false)
     setFeedback(null)
     writeToFirestore({
@@ -613,6 +686,7 @@ export default function NBackChallenge({ sessionId, role, isLocked }: NBackChall
       'moduleState.nbCurrentIndex': -1,
       'moduleState.nbHits': 0,
       'moduleState.nbMisses': 0,
+      'moduleState.nbResponded': [],
     })
   }
 
@@ -743,7 +817,7 @@ export default function NBackChallenge({ sessionId, role, isLocked }: NBackChall
                   color: '#ffffff',
                   borderRadius: 999,
                   padding: '6px 18px',
-                  fontSize: 11.5,
+                  fontSize: 14,
                   fontWeight: 800,
                   letterSpacing: 0.9,
                   boxShadow: '0 4px 12px rgba(40,32,150,0.28)',
@@ -777,7 +851,7 @@ export default function NBackChallenge({ sessionId, role, isLocked }: NBackChall
                     display: 'flex',
                     alignItems: 'center',
                     justifyContent: 'center',
-                    fontSize: 17,
+                    fontSize: 19.5,
                   }}
                 >
                   {s.icon}
@@ -792,7 +866,7 @@ export default function NBackChallenge({ sessionId, role, isLocked }: NBackChall
                         borderRadius: '50%',
                         background: INDIGO,
                         color: '#ffffff',
-                        fontSize: 10,
+                        fontSize: 12,
                         fontWeight: 800,
                         display: 'flex',
                         alignItems: 'center',
@@ -802,9 +876,9 @@ export default function NBackChallenge({ sessionId, role, isLocked }: NBackChall
                     >
                       {i + 1}
                     </span>
-                    <span style={{ fontSize: 13, fontWeight: 800, color: INDIGO }}>{s.title}</span>
+                    <span style={{ fontSize: 15, fontWeight: 800, color: INDIGO }}>{s.title}</span>
                   </div>
-                  <div style={{ fontSize: 11, lineHeight: 1.45, color: INK_BODY }}>{s.body}</div>
+                  <div style={{ fontSize: 13, lineHeight: 1.45, color: INK_BODY }}>{s.body}</div>
                 </div>
               </div>
             ))}
@@ -816,7 +890,7 @@ export default function NBackChallenge({ sessionId, role, isLocked }: NBackChall
                 const isMatchTile = i === exampleTiles.length - 1
                 return (
                   <div key={i} style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
-                    {i > 0 && <span aria-hidden style={{ fontSize: 11, color: INK_MUTED }}>→</span>}
+                    {i > 0 && <span aria-hidden style={{ fontSize: 13, color: INK_MUTED }}>→</span>}
                     <div
                       style={{
                         width: exampleTileSize,
@@ -848,7 +922,7 @@ export default function NBackChallenge({ sessionId, role, isLocked }: NBackChall
                 borderRadius: 12,
                 background: GREEN_SOFT,
                 border: `1px solid #BBF0CD`,
-                fontSize: 12.5,
+                fontSize: 15,
                 fontWeight: 800,
                 color: '#0F7A38',
               }}
@@ -869,7 +943,7 @@ export default function NBackChallenge({ sessionId, role, isLocked }: NBackChall
                   border: `1px solid ${BORDER}`,
                   background: SURFACE,
                   color: VIOLET,
-                  fontSize: 11.5,
+                  fontSize: 14,
                   fontWeight: 700,
                   cursor: canInteract ? 'pointer' : 'default',
                   opacity: canInteract ? 1 : 0.5,
@@ -888,7 +962,7 @@ export default function NBackChallenge({ sessionId, role, isLocked }: NBackChall
               {/* Cards keep a content-sized floor so a narrow stage wraps the row
                   instead of clipping the pill labels. */}
               <div style={{ ...card, flex: '1 1 250px', minWidth: 250, padding: '7px 10px 9px' }}>
-                <div style={{ textAlign: 'center', fontSize: 11, fontWeight: 800, color: INDIGO, marginBottom: 5 }}>Category</div>
+                <div style={{ textAlign: 'center', fontSize: 13, fontWeight: 800, color: INDIGO, marginBottom: 5 }}>Category</div>
                 <PillGroup
                   value={stimulusType}
                   disabled={settingsDisabled}
@@ -903,7 +977,7 @@ export default function NBackChallenge({ sessionId, role, isLocked }: NBackChall
               </div>
 
               <div style={{ ...card, flex: '1 1 165px', minWidth: 165, padding: '7px 10px 9px' }}>
-                <div style={{ textAlign: 'center', fontSize: 11, fontWeight: 800, color: INDIGO, marginBottom: 5 }}>Speed</div>
+                <div style={{ textAlign: 'center', fontSize: 13, fontWeight: 800, color: INDIGO, marginBottom: 5 }}>Speed</div>
                 <PillGroup
                   value={String(speed)}
                   disabled={settingsDisabled}
@@ -917,7 +991,7 @@ export default function NBackChallenge({ sessionId, role, isLocked }: NBackChall
               </div>
 
               <div style={{ ...card, flex: '1 1 235px', minWidth: 235, padding: '7px 10px 9px' }}>
-                <div style={{ textAlign: 'center', fontSize: 11, fontWeight: 800, color: INDIGO, marginBottom: 5 }}>Sequence Length</div>
+                <div style={{ textAlign: 'center', fontSize: 13, fontWeight: 800, color: INDIGO, marginBottom: 5 }}>Sequence Length</div>
                 <PillGroup
                   value={String(seqLength)}
                   disabled={settingsDisabled}
@@ -959,7 +1033,7 @@ export default function NBackChallenge({ sessionId, role, isLocked }: NBackChall
                   borderRadius: 999,
                   background: '#ffffff',
                   border: `1px solid ${BORDER}`,
-                  fontSize: 10.5,
+                  fontSize: 12.5,
                   fontWeight: 800,
                   color: VIOLET,
                   letterSpacing: 0.3,
@@ -974,7 +1048,7 @@ export default function NBackChallenge({ sessionId, role, isLocked }: NBackChall
                     position: 'absolute',
                     top: 10,
                     right: 12,
-                    fontSize: 10,
+                    fontSize: 12,
                     fontWeight: 700,
                     color: INK_MUTED,
                   }}
@@ -994,25 +1068,25 @@ export default function NBackChallenge({ sessionId, role, isLocked }: NBackChall
                     maxWidth: 340,
                   }}
                 >
-                  <div style={{ fontSize: 18, fontWeight: 800, color: INDIGO, marginBottom: 4 }}>Session Complete!</div>
-                  <div style={{ fontSize: 12, fontWeight: 600, color: INK_MUTED, marginBottom: 14 }}>
+                  <div style={{ fontSize: 20, fontWeight: 800, color: INDIGO, marginBottom: 4 }}>Session Complete!</div>
+                  <div style={{ fontSize: 14.5, fontWeight: 600, color: INK_MUTED, marginBottom: 14 }}>
                     {n}-Back · {stimTypeLabel} · {seqLength} items
                   </div>
                   <div style={{ display: 'flex', justifyContent: 'center', gap: 22, marginBottom: 14 }}>
                     <div>
-                      <div style={{ fontSize: 22, fontWeight: 800, color: GREEN }}>{hits}</div>
-                      <div style={{ fontSize: 10.5, fontWeight: 700, color: INK_MUTED }}>Hits</div>
+                      <div style={{ fontSize: 24, fontWeight: 800, color: GREEN }}>{hits}</div>
+                      <div style={{ fontSize: 12.5, fontWeight: 700, color: INK_MUTED }}>Hits</div>
                     </div>
                     <div>
-                      <div style={{ fontSize: 22, fontWeight: 800, color: RED }}>{misses}</div>
-                      <div style={{ fontSize: 10.5, fontWeight: 700, color: INK_MUTED }}>Misses</div>
+                      <div style={{ fontSize: 24, fontWeight: 800, color: RED }}>{misses}</div>
+                      <div style={{ fontSize: 12.5, fontWeight: 700, color: INK_MUTED }}>Misses</div>
                     </div>
                     <div>
-                      <div style={{ fontSize: 22, fontWeight: 800, color: INDIGO }}>{accuracy}%</div>
-                      <div style={{ fontSize: 10.5, fontWeight: 700, color: INK_MUTED }}>Accuracy</div>
+                      <div style={{ fontSize: 24, fontWeight: 800, color: INDIGO }}>{accuracy}%</div>
+                      <div style={{ fontSize: 12.5, fontWeight: 700, color: INK_MUTED }}>Accuracy</div>
                     </div>
                   </div>
-                  <div style={{ fontSize: 13, fontWeight: 700, color: INK_BODY, marginBottom: isTherapist ? 14 : 0 }}>
+                  <div style={{ fontSize: 15, fontWeight: 700, color: INK_BODY, marginBottom: isTherapist ? 14 : 0 }}>
                     {accuracy >= 70 ? 'Well done! 🎉' : 'Keep practising 💪'}
                   </div>
                   {isTherapist && (
@@ -1027,7 +1101,7 @@ export default function NBackChallenge({ sessionId, role, isLocked }: NBackChall
                           cursor: 'pointer',
                           background: INDIGO,
                           color: '#ffffff',
-                          fontSize: 12,
+                          fontSize: 14.5,
                           fontWeight: 800,
                           boxShadow: '0 4px 12px rgba(40,32,150,0.26)',
                         }}
@@ -1045,7 +1119,7 @@ export default function NBackChallenge({ sessionId, role, isLocked }: NBackChall
                             cursor: 'pointer',
                             background: '#ffffff',
                             color: VIOLET,
-                            fontSize: 12,
+                            fontSize: 14.5,
                             fontWeight: 800,
                           }}
                         >
@@ -1070,7 +1144,7 @@ export default function NBackChallenge({ sessionId, role, isLocked }: NBackChall
                         background: '#FFF6E3',
                         border: '1px solid #F3D79A',
                         color: '#8A5A06',
-                        fontSize: 10.5,
+                        fontSize: 12.5,
                         fontWeight: 800,
                         letterSpacing: 0.3,
                         whiteSpace: 'nowrap',
@@ -1126,10 +1200,10 @@ export default function NBackChallenge({ sessionId, role, isLocked }: NBackChall
                       {practiceActive ? (
                         practiceFinished ? (
                           <div style={{ textAlign: 'center', padding: 12 }}>
-                            <div style={{ fontSize: 14, fontWeight: 800, color: '#8A5A06', marginBottom: 4 }}>
+                            <div style={{ fontSize: 16, fontWeight: 800, color: '#8A5A06', marginBottom: 4 }}>
                               Practice done
                             </div>
-                            <div style={{ fontSize: 12, fontWeight: 700, color: INK_BODY }}>
+                            <div style={{ fontSize: 14.5, fontWeight: 700, color: INK_BODY }}>
                               You spotted {practiceHits} of 2
                             </div>
                           </div>
@@ -1138,7 +1212,7 @@ export default function NBackChallenge({ sessionId, role, isLocked }: NBackChall
                             <Stimulus item={practiceItem} type={stimulusType} size="clamp(78px, 14vh, 130px)" />
                           </div>
                         ) : (
-                          <span style={{ fontSize: 12, fontWeight: 700, color: INK_MUTED }}>Get ready…</span>
+                          <span style={{ fontSize: 14.5, fontWeight: 700, color: INK_MUTED }}>Get ready…</span>
                         )
                       ) : currentStimulus ? (
                         <div key={animKey} style={{ animation: 'nbStimulusIn 0.3s ease' }}>
@@ -1146,10 +1220,10 @@ export default function NBackChallenge({ sessionId, role, isLocked }: NBackChall
                         </div>
                       ) : (
                         <div style={{ textAlign: 'center', padding: 14 }}>
-                          <div style={{ fontSize: 13, fontWeight: 800, color: VIOLET, marginBottom: 3 }}>
+                          <div style={{ fontSize: 15, fontWeight: 800, color: VIOLET, marginBottom: 3 }}>
                             {isPlaying ? 'Get ready…' : `${n}-Back`}
                           </div>
-                          <div style={{ fontSize: 11, fontWeight: 600, color: INK_MUTED, lineHeight: 1.4 }}>
+                          <div style={{ fontSize: 13, fontWeight: 600, color: INK_MUTED, lineHeight: 1.4 }}>
                             {isTherapist ? 'Configure and press Start' : 'Waiting for your therapist…'}
                           </div>
                         </div>
@@ -1194,10 +1268,10 @@ export default function NBackChallenge({ sessionId, role, isLocked }: NBackChall
                         transition: 'border-color 0.15s, opacity 0.15s',
                       }}
                     >
-                      <span aria-hidden style={{ fontSize: 22, lineHeight: 1 }}>✋</span>
+                      <span aria-hidden style={{ fontSize: 24, lineHeight: 1 }}>✋</span>
                       <span
                         style={{
-                          fontSize: 20,
+                          fontSize: 22,
                           fontWeight: 800,
                           color:
                             feedback?.type === 'correct'
@@ -1219,7 +1293,7 @@ export default function NBackChallenge({ sessionId, role, isLocked }: NBackChall
                           borderRadius: 999,
                           background: INDIGO_SOFT,
                           color: VIOLET,
-                          fontSize: 12,
+                          fontSize: 14.5,
                           fontWeight: 800,
                           whiteSpace: 'nowrap',
                         }}
@@ -1235,7 +1309,7 @@ export default function NBackChallenge({ sessionId, role, isLocked }: NBackChall
                           style={{
                             flex: 1,
                             minWidth: 0,
-                            fontSize: 11,
+                            fontSize: 13,
                             fontWeight: 600,
                             lineHeight: 1.4,
                             color: practiceFeedback ? (practiceFeedback.ok ? '#0F7A38' : '#A8123A') : INK_MUTED,
@@ -1259,7 +1333,7 @@ export default function NBackChallenge({ sessionId, role, isLocked }: NBackChall
                               style={{
                                 flexShrink: 0, padding: '6px 13px', borderRadius: 999,
                                 border: `1px solid ${BORDER}`, background: '#ffffff',
-                                color: INK_BODY, fontSize: 11, fontWeight: 700, cursor: 'pointer',
+                                color: INK_BODY, fontSize: 13, fontWeight: 700, cursor: 'pointer',
                               }}
                             >
                               Practice again
@@ -1269,7 +1343,7 @@ export default function NBackChallenge({ sessionId, role, isLocked }: NBackChall
                               onClick={endPractice}
                               style={{
                                 flexShrink: 0, padding: '6px 13px', borderRadius: 999, border: 'none',
-                                background: INDIGO, color: '#ffffff', fontSize: 11, fontWeight: 800, cursor: 'pointer',
+                                background: INDIGO, color: '#ffffff', fontSize: 13, fontWeight: 800, cursor: 'pointer',
                               }}
                             >
                               I&apos;m ready
@@ -1282,7 +1356,7 @@ export default function NBackChallenge({ sessionId, role, isLocked }: NBackChall
                             style={{
                               flexShrink: 0, padding: '6px 13px', borderRadius: 999,
                               border: `1px solid ${BORDER}`, background: '#ffffff',
-                              color: INK_MUTED, fontSize: 11, fontWeight: 700, cursor: 'pointer',
+                              color: INK_MUTED, fontSize: 13, fontWeight: 700, cursor: 'pointer',
                             }}
                           >
                             Skip practice
@@ -1302,7 +1376,7 @@ export default function NBackChallenge({ sessionId, role, isLocked }: NBackChall
             {isTherapist && (
               <>
                 <div style={{ ...card, flexShrink: 0, padding: '7px 10px 9px' }}>
-                  <div style={{ textAlign: 'center', fontSize: 11, fontWeight: 800, color: INDIGO, marginBottom: 5 }}>N-Level</div>
+                  <div style={{ textAlign: 'center', fontSize: 13, fontWeight: 800, color: INDIGO, marginBottom: 5 }}>N-Level</div>
                   <PillGroup
                     value={String(n)}
                     disabled={false}
@@ -1327,7 +1401,7 @@ export default function NBackChallenge({ sessionId, role, isLocked }: NBackChall
                         border: `1px solid ${BORDER}`,
                         background: '#ffffff',
                         color: '#8A5A06',
-                        fontSize: 14,
+                        fontSize: 16,
                         fontWeight: 800,
                         cursor: 'pointer',
                         boxShadow: CARD_SHADOW,
@@ -1347,7 +1421,7 @@ export default function NBackChallenge({ sessionId, role, isLocked }: NBackChall
                         border: 'none',
                         background: `linear-gradient(180deg, ${INDIGO}, ${INDIGO_DEEP})`,
                         color: '#ffffff',
-                        fontSize: 15,
+                        fontSize: 17,
                         fontWeight: 800,
                         cursor: complete ? 'default' : 'pointer',
                         opacity: complete ? 0.45 : 1,
@@ -1367,7 +1441,7 @@ export default function NBackChallenge({ sessionId, role, isLocked }: NBackChall
                       border: `1px solid ${BORDER}`,
                       background: '#ffffff',
                       color: INK_BODY,
-                      fontSize: 13.5,
+                      fontSize: 15.5,
                       fontWeight: 800,
                       cursor: 'pointer',
                       boxShadow: CARD_SHADOW,
@@ -1392,7 +1466,7 @@ export default function NBackChallenge({ sessionId, role, isLocked }: NBackChall
                 gap: 11,
               }}
             >
-              <div style={{ textAlign: 'center', fontSize: 11.5, fontWeight: 800, letterSpacing: 0.8, color: INDIGO, textTransform: 'uppercase' }}>
+              <div style={{ textAlign: 'center', fontSize: 14, fontWeight: 800, letterSpacing: 0.8, color: INDIGO, textTransform: 'uppercase' }}>
                 Your Performance
               </div>
 
@@ -1418,8 +1492,8 @@ export default function NBackChallenge({ sessionId, role, isLocked }: NBackChall
                     }}
                   >
                     <img src={t.icon} alt="" aria-hidden width={26} height={26} style={{ display: 'block' }} />
-                    <div style={{ fontSize: 20, fontWeight: 800, color: t.ink, lineHeight: 1.1 }}>{t.value}</div>
-                    <div style={{ fontSize: 10.5, fontWeight: 700, color: t.ink }}>{t.label}</div>
+                    <div style={{ fontSize: 22, fontWeight: 800, color: t.ink, lineHeight: 1.1 }}>{t.value}</div>
+                    <div style={{ fontSize: 12.5, fontWeight: 700, color: t.ink }}>{t.label}</div>
                   </div>
                 ))}
               </div>
@@ -1446,7 +1520,7 @@ export default function NBackChallenge({ sessionId, role, isLocked }: NBackChall
                       }}
                     />
                   </div>
-                  <span style={{ fontSize: 14, fontWeight: 800, color: INDIGO, flexShrink: 0 }}>{progressPct}%</span>
+                  <span style={{ fontSize: 16, fontWeight: 800, color: INDIGO, flexShrink: 0 }}>{progressPct}%</span>
                 </div>
               </div>
             </div>

@@ -1,10 +1,11 @@
 'use client'
 import { useState, useEffect, useRef, useCallback } from 'react'
 import { doc, onSnapshot, updateDoc } from 'firebase/firestore'
-import { Star, BarChart3, SlidersHorizontal, Volume2, RotateCcw, Check, ChevronRight } from 'lucide-react'
+import { Star, BarChart3, SlidersHorizontal, Volume2, RotateCcw, Check, ChevronRight, Play, RefreshCw } from 'lucide-react'
 import { db } from '@/lib/firebase'
 import { logModuleEvent } from '@/lib/sessionEvents'
 import { staadSpeak, randomPraise } from '@/lib/voice/staadVoice'
+import type { VoiceLanguage } from '@/lib/voice/staadVoice'
 import { useVoiceLanguage } from '@/lib/voice/useVoiceLanguage'
 import VoiceLanguageToggle from '@/components/modules/VoiceLanguageToggle'
 
@@ -26,24 +27,11 @@ const WB_CHIME = A('Success_Chime_Correct_Word (1).wav')
    matte out and can never darken the canvas under the dark body copy. */
 const WB_SCENE = `/assets/modules/Background/${encodeURIComponent('word building.png')}`
 
-/* Per-letter phonics clips extracted from word_audio_A-Z.zip (A_Apple.mp3 …
-   Z_Zebra.mp3), copied into the asset folder flat as letter_a.mp3 … letter_z.mp3
-   so a letter maps straight to a file. Lazily constructed and cached. */
-const letterAudio: Record<string, HTMLAudioElement> = {}
-function playLetter(letter: string) {
-  try {
-    if (typeof window === 'undefined') return
-    const k = letter.toLowerCase()
-    if (!/^[a-z]$/.test(k)) return
-    let a = letterAudio[k]
-    if (!a) {
-      a = new Audio(A(`letter_${k}.mp3`))
-      letterAudio[k] = a
-    }
-    a.currentTime = 0
-    void a.play()
-  } catch {}
-}
+/* The per-letter phonics clips (letter_a.mp3 … letter_z.mp3, extracted from
+   word_audio_A-Z.zip) deliberately have no automatic caller. Each clip names a
+   word for its letter ("A … Apple"), so firing one every time a tile was picked
+   up meant a word was spoken on every selection. The word is now spoken only on
+   request (Say It) and on a correct, checked answer. */
 
 /* One-shot success chime, lazily created so nothing touches window during SSR. */
 let wbChime: HTMLAudioElement | null = null
@@ -99,6 +87,56 @@ const DIFFICULTIES: { key: Difficulty; label: string; Icon: typeof Star; tint: s
   { key: 'custom', label: 'Custom', Icon: SlidersHorizontal, tint: '#D97706' },
 ]
 
+/* Spoken vocabulary for the non-English voice languages. The tiles always spell
+   the English word — that is the phonics task — so a Hindi/Telugu session hears
+   the word in that language with the English spelling read out alongside it.
+   Custom words have no entry and fall back to the English word alone. */
+const WORD_TRANSLATIONS: Record<Exclude<VoiceLanguage, 'en-IN'>, Record<string, string>> = {
+  'hi-IN': {
+    cat: 'बिल्ली', dog: 'कुत्ता', hat: 'टोपी', sun: 'सूरज', run: 'दौड़ना', big: 'बड़ा',
+    red: 'लाल', cup: 'कप', sit: 'बैठना', hot: 'गरम', man: 'आदमी', bus: 'बस',
+    fog: 'कोहरा', pen: 'कलम', web: 'जाला', zip: 'ज़िप', jam: 'जैम', mud: 'कीचड़',
+    leg: 'टाँग', fin: 'मछली का पंख',
+    apple: 'सेब', chair: 'कुर्सी', bread: 'रोटी', cloud: 'बादल', flame: 'लौ',
+    grass: 'घास', plant: 'पौधा', tiger: 'बाघ', stone: 'पत्थर', crown: 'मुकुट',
+    shelf: 'अलमारी', train: 'रेलगाड़ी', globe: 'गोला', stamp: 'टिकट',
+    captain: 'कप्तान', explore: 'खोजना', blanket: 'कंबल', freedom: 'आज़ादी',
+    justice: 'न्याय', dolphin: 'डॉल्फ़िन', journey: 'यात्रा', primary: 'प्राथमिक',
+    thunder: 'गरज', support: 'सहारा',
+  },
+  'te-IN': {
+    cat: 'పిల్లి', dog: 'కుక్క', hat: 'టోపీ', sun: 'సూర్యుడు', run: 'పరుగు', big: 'పెద్ద',
+    red: 'ఎరుపు', cup: 'కప్పు', sit: 'కూర్చో', hot: 'వేడి', man: 'మనిషి', bus: 'బస్సు',
+    fog: 'పొగమంచు', pen: 'కలం', web: 'వల', zip: 'జిప్', jam: 'జామ్', mud: 'బురద',
+    leg: 'కాలు', fin: 'రెక్క',
+    apple: 'ఆపిల్', chair: 'కుర్చీ', bread: 'రొట్టె', cloud: 'మేఘం', flame: 'మంట',
+    grass: 'గడ్డి', plant: 'మొక్క', tiger: 'పులి', stone: 'రాయి', crown: 'కిరీటం',
+    shelf: 'అర', train: 'రైలు', globe: 'భూగోళం', stamp: 'స్టాంపు',
+    captain: 'కెప్టెన్', explore: 'అన్వేషించు', blanket: 'దుప్పటి', freedom: 'స్వేచ్ఛ',
+    justice: 'న్యాయం', dolphin: 'డాల్ఫిన్', journey: 'ప్రయాణం', primary: 'ప్రాథమిక',
+    thunder: 'ఉరుము', support: 'మద్దతు',
+  },
+}
+
+/* Everything else this module says, in each supported language. */
+const LINES: Record<VoiceLanguage, { start: string; tryAgain: string; finished: string }> = {
+  'en-IN': {
+    start: "Let's build some words!",
+    tryAgain: 'Not quite. Try again!',
+    finished: 'Great work! You finished all the words!',
+  },
+  'hi-IN': {
+    start: 'चलो शब्द बनाते हैं!',
+    tryAgain: 'बिलकुल नहीं। फिर से कोशिश करो!',
+    finished: 'शाबाश! तुमने सारे शब्द पूरे कर लिए!',
+  },
+  'te-IN': {
+    start: 'పదాలు తయారు చేద్దాం!',
+    tryAgain: 'కాదు. మళ్ళీ ప్రయత్నించు!',
+    finished: 'అద్భుతం! నువ్వు అన్ని పదాలు పూర్తి చేశావు!',
+  },
+}
+
 function shuffleArray(arr: string[]): string[] {
   const a = [...arr]
   for (let i = a.length - 1; i > 0; i--) {
@@ -111,7 +149,6 @@ function shuffleArray(arr: string[]): string[] {
 export default function WordBuilding({ sessionId, role, isLocked }: WordBuildingProps) {
   const isT = role === 'therapist'
   const isTherapist = isT
-  const canInteract = isTherapist || !isLocked
 
   const [targetWord, setTargetWord] = useState('')
   const [difficulty, setDifficulty] = useState<Difficulty>('easy')
@@ -127,11 +164,19 @@ export default function WordBuilding({ sessionId, role, isLocked }: WordBuilding
   const [dragging, setDragging] = useState<{ tileIndex: number; offsetX: number; offsetY: number } | null>(null)
   const [dragPos, setDragPos] = useState<{ x: number; y: number } | null>(null)
   const [selectedTile, setSelectedTile] = useState<number | null>(null)
+  /* Run lifecycle. The activity now opens on a Start screen and ends when the
+     level's word list is exhausted, so the progress bar has a real finish line
+     instead of growing with the score. Both are synced. */
+  const [started, setStarted] = useState(false)
+  const [finished, setFinished] = useState(false)
   /* Pure presentation: flipped by the Check pill so the mistake shake replays
      even when the wrong indices are unchanged (swapping the animation-name is
      what restarts a CSS animation). Never persisted. */
   const [shakeKey, setShakeKey] = useState(0)
   const voiceLanguage = useVoiceLanguage(sessionId)
+
+  // Tiles are live only during a started, unfinished run.
+  const canInteract = (isTherapist || !isLocked) && started && !finished
 
   const slotRefs = useRef<(HTMLDivElement | null)[]>([])
   const poolRef = useRef<HTMLDivElement>(null)
@@ -145,6 +190,15 @@ export default function WordBuilding({ sessionId, role, isLocked }: WordBuilding
   // game logic) are untouched by a language change.
   const voiceLangRef = useRef(voiceLanguage)
   voiceLangRef.current = voiceLanguage
+
+  // One evaluation per Check press: both browsers run the effect off the synced
+  // flag and React may re-run it, so each attempt is fingerprinted.
+  const evaluatedRef = useRef<string | null>(null)
+  // Start/finish lines are spoken on a real transition, never when a reloaded
+  // browser hydrates into a run that was already under way.
+  const hydratedRef = useRef(false)
+  const spokeStartRef = useRef(false)
+  const spokeFinishRef = useRef(false)
 
   const writeToFirestore = useCallback(async (data: Record<string, unknown>) => {
     try {
@@ -175,11 +229,30 @@ export default function WordBuilding({ sessionId, role, isLocked }: WordBuilding
       if (typeof state.wbScore === 'number') {
         setScore(state.wbScore)
       }
+      if (typeof state.wbWordIndex === 'number') {
+        setWordIndex(state.wbWordIndex)
+      }
+      if (typeof state.wbStarted === 'boolean') {
+        setStarted(state.wbStarted)
+      }
+      if (typeof state.wbFinished === 'boolean') {
+        setFinished(state.wbFinished)
+      }
+      if (typeof state.wbChecked === 'boolean') {
+        setChecked(state.wbChecked)
+      }
+      // First snapshot: a run already under way was not started here, so mark
+      // its lines as spoken and stay silent on hydration.
+      if (!hydratedRef.current) {
+        hydratedRef.current = true
+        if (state.wbStarted === true) spokeStartRef.current = true
+        if (state.wbFinished === true) spokeFinishRef.current = true
+      }
     })
     return () => unsub()
   }, [sessionId])
 
-  const setWord = useCallback((word: string, diff: Difficulty) => {
+  const setWord = useCallback((word: string, diff: Difficulty, extra: Record<string, unknown> = {}) => {
     if (!word || word.length > 10) return
     const letters = word.toLowerCase().split('')
     const shuffled = shuffleArray(letters)
@@ -195,24 +268,62 @@ export default function WordBuilding({ sessionId, role, isLocked }: WordBuilding
       'moduleState.wbTiles': shuffled,
       'moduleState.wbSlots': new Array(word.length).fill(null),
       'moduleState.wbScore': ref.current.score,
+      'moduleState.wbChecked': false,
+      ...extra,
     })
   }, [writeToFirestore])
 
+  /** Begin (or restart) a run of the current level from its first word. */
+  const startGame = useCallback((diff: Difficulty) => {
+    if (diff === 'custom') return
+    setScore(0)
+    setWordIndex(0)
+    setStarted(true)
+    setFinished(false)
+    setCelebrating(false)
+    evaluatedRef.current = null
+    setWord(WORDS[diff][0], diff, {
+      'moduleState.wbScore': 0,
+      'moduleState.wbWordIndex': 0,
+      'moduleState.wbStarted': true,
+      'moduleState.wbFinished': false,
+    })
+  }, [setWord])
+
+  /* The word list IS the activity: one pass through it completes the module, so
+     the run ends on the last word rather than wrapping round and letting the
+     progress bar chase the score forever. */
   const advanceToNextWord = useCallback(() => {
     const { difficulty, wordIndex } = ref.current
     if (difficulty === 'custom') return
     const list = WORDS[difficulty]
-    const nextIdx = (wordIndex + 1) % list.length
+    const nextIdx = wordIndex + 1
+    if (nextIdx >= list.length) {
+      setFinished(true)
+      writeToFirestore({ 'moduleState.wbFinished': true })
+      if (isTherapist) {
+        logModuleEvent(sessionId, {
+          module: 'word-building',
+          type: 'module_completed',
+          detail: `Completed all ${list.length} ${difficulty} words`,
+        })
+      }
+      return
+    }
     setWordIndex(nextIdx)
-    setWord(list[nextIdx], difficulty)
-  }, [setWord])
+    setWord(list[nextIdx], difficulty, { 'moduleState.wbWordIndex': nextIdx })
+  }, [setWord, writeToFirestore, isTherapist, sessionId])
 
   const handleDifficultySelect = (diff: Difficulty) => {
     setDifficulty(diff)
-    if (diff !== 'custom') {
-      setCustomInput('')
-      setWordIndex(0)
-      setWord(WORDS[diff][0], diff)
+    if (diff === 'custom') return
+    setCustomInput('')
+    // Mid-run this restarts at the new level; before Start it only arms the
+    // choice, so the therapist opens the activity deliberately.
+    if (started) {
+      startGame(diff)
+    } else {
+      writeToFirestore({ 'moduleState.wbDifficulty': diff })
     }
   }
 
@@ -220,7 +331,14 @@ export default function WordBuilding({ sessionId, role, isLocked }: WordBuilding
     const word = customInput.trim().toLowerCase()
     if (word.length < 2 || word.length > 10) return
     setWordIndex(-1)
-    setWord(word, 'custom')
+    setStarted(true)
+    setFinished(false)
+    evaluatedRef.current = null
+    setWord(word, 'custom', {
+      'moduleState.wbWordIndex': -1,
+      'moduleState.wbStarted': true,
+      'moduleState.wbFinished': false,
+    })
   }
 
   const startDrag = (tileIndex: number, clientX: number, clientY: number) => {
@@ -251,7 +369,7 @@ export default function WordBuilding({ sessionId, role, isLocked }: WordBuilding
       setSlots(newSlots)
       setChecked(false)
       setWrongIndices(new Set())
-      writeToFirestore({ 'moduleState.wbSlots': newSlots })
+      writeToFirestore({ 'moduleState.wbSlots': newSlots, 'moduleState.wbChecked': false })
     }
     setDragging(null)
     setDragPos(null)
@@ -273,31 +391,51 @@ export default function WordBuilding({ sessionId, role, isLocked }: WordBuilding
       setChecked(false)
       setWrongIndices(new Set())
       setSelectedTile(null)
-      writeToFirestore({ 'moduleState.wbSlots': newSlots })
+      writeToFirestore({ 'moduleState.wbSlots': newSlots, 'moduleState.wbChecked': false })
     } else if (slots[slotIndex] !== null && selectedTile === null) {
       const newSlots = [...slots]
       newSlots[slotIndex] = null
       setSlots(newSlots)
       setChecked(false)
       setWrongIndices(new Set())
-      writeToFirestore({ 'moduleState.wbSlots': newSlots })
+      writeToFirestore({ 'moduleState.wbSlots': newSlots, 'moduleState.wbChecked': false })
     }
   }
 
-  // The target word is always spoken in English — it IS the English word being
-  // built — so this one call stays on 'en-IN' regardless of the praise language.
+  /* Spoken only on request (Say It / the instruction pill) and after a correct,
+     checked answer — never while letters are being placed. It follows the
+     session's voice language: a Hindi/Telugu session hears the translation and
+     the English spelling in that voice. */
   const speakWord = useCallback((word: string) => {
     if (!word) return
-    staadSpeak({ text: word, language: 'en-IN', type: 'instruction' })
+    const lang = voiceLangRef.current
+    if (lang === 'en-IN') {
+      staadSpeak({ text: word, language: 'en-IN', type: 'instruction' })
+      return
+    }
+    const translated = WORD_TRANSLATIONS[lang]?.[word.toLowerCase()]
+    staadSpeak({
+      text: translated ? `${translated}, ${word}` : word,
+      language: lang,
+      type: 'instruction',
+    })
   }, [])
 
+  /* Nothing is scored, chimed or spoken until Check is pressed — the flag is
+     synced, so both browsers evaluate the same attempt. */
   useEffect(() => {
-    if (!targetWord || slots.includes(null) || checked) return
+    if (!checked) {
+      evaluatedRef.current = null
+      return
+    }
+    if (!targetWord || slots.includes(null)) return
     const slotLetters = slots.map((idx) => (idx !== null ? tiles[idx] : ''))
-    const allFilled = slotLetters.every((l) => l !== '')
-    if (!allFilled) return
+    if (slotLetters.some((l) => l === '')) return
 
-    setChecked(true)
+    const token = `${targetWord}|${slotLetters.join('')}`
+    if (evaluatedRef.current === token) return
+    evaluatedRef.current = token
+
     const wrong = new Set<number>()
     let allCorrect = true
     for (let i = 0; i < targetWord.length; i++) {
@@ -308,8 +446,10 @@ export default function WordBuilding({ sessionId, role, isLocked }: WordBuilding
     }
     if (!allCorrect) {
       setWrongIndices(wrong)
+      staadSpeak({ text: LINES[voiceLangRef.current].tryAgain, language: voiceLangRef.current, type: 'feedback' })
       return
     }
+    setWrongIndices(new Set())
 
     const newScore = ref.current.score + 1
     setScore(newScore)
@@ -352,7 +492,24 @@ export default function WordBuilding({ sessionId, role, isLocked }: WordBuilding
     return () => {
       if (timerRef.current) clearTimeout(timerRef.current)
     }
-  }, [targetWord, slots, tiles, checked, speakWord, writeToFirestore, advanceToNextWord, isTherapist, sessionId])
+  }, [checked, targetWord, slots, tiles, speakWord, writeToFirestore, advanceToNextWord, isTherapist, sessionId])
+
+  /* Spoken on both browsers — the child hears these too, not just the therapist. */
+  useEffect(() => {
+    if (started && !spokeStartRef.current) {
+      spokeStartRef.current = true
+      staadSpeak({ text: LINES[voiceLangRef.current].start, language: voiceLangRef.current, type: 'instruction' })
+    }
+    if (!started) spokeStartRef.current = false
+  }, [started])
+
+  useEffect(() => {
+    if (finished && !spokeFinishRef.current) {
+      spokeFinishRef.current = true
+      staadSpeak({ text: LINES[voiceLangRef.current].finished, language: voiceLangRef.current, type: 'praise' })
+    }
+    if (!finished) spokeFinishRef.current = false
+  }, [finished])
 
   const poolTileIndices = slots.reduce((used, idx) => {
     if (idx !== null) used.add(idx)
@@ -376,37 +533,35 @@ export default function WordBuilding({ sessionId, role, isLocked }: WordBuilding
     setChecked(false)
     setWrongIndices(new Set())
     setSelectedTile(null)
-    writeToFirestore({ 'moduleState.wbSlots': cleared })
+    writeToFirestore({ 'moduleState.wbSlots': cleared, 'moduleState.wbChecked': false })
   }
 
-  // Re-marks the mistakes. Validation still happens automatically the moment the
-  // last slot is filled — this only replays that feedback on demand, and never
-  // touches the score, the checked flag or Firestore.
+  /* The answer is graded here and nowhere else: this raises the synced flag the
+     scoring effect watches, so the word is never marked right (or spoken) until
+     the child asks for it to be checked. */
   const handleCheck = () => {
-    if (!allFilled) return
-    const wrong = new Set<number>()
-    for (let i = 0; i < targetWord.length; i++) {
-      const idx = slots[i]
-      if (idx === null || tiles[idx] !== targetWord[i]) wrong.add(i)
-    }
-    setWrongIndices(wrong)
+    if (!canInteract || !allFilled || checked) return
+    setChecked(true)
     setShakeKey((k) => k + 1)
+    writeToFirestore({ 'moduleState.wbChecked': true })
   }
 
-  const canNextWord = isTherapist && difficulty !== 'custom' && !!targetWord
+  const canNextWord = isTherapist && difficulty !== 'custom' && !!targetWord && started && !finished
   const handleNextWord = () => {
     if (!canNextWord) return
-    const nextIdx = (wordIndex + 1) % WORDS[difficulty as Exclude<Difficulty, 'custom'>].length
-    setWordIndex(nextIdx)
-    setWord(WORDS[difficulty as Exclude<Difficulty, 'custom'>][nextIdx], difficulty)
+    if (timerRef.current) clearTimeout(timerRef.current)
+    setCelebrating(false)
+    advanceToNextWord()
   }
 
-  /* Progress denominator is derived, never stored: the length of the active
-     word list (and a plain 8-word run for custom words, which have no list).
-     Widened by the score so the fraction can never read "12 / 8". */
-  const goalBase = difficulty === 'custom' ? 8 : WORDS[difficulty as Exclude<Difficulty, 'custom'>].length
-  const goal = Math.max(goalBase, score)
-  const pct = goal > 0 ? Math.min(100, (score / goal) * 100) : 0
+  /* Progress denominator is derived, never stored: the length of the active word
+     list. It is a fixed finish line — completing it ends the activity — so the
+     fill can reach 100% and stop instead of the goal chasing the score. Custom
+     words have no list, so they show a plain count instead of a bar. */
+  const isCustom = difficulty === 'custom'
+  const goal = isCustom ? 0 : WORDS[difficulty as Exclude<Difficulty, 'custom'>].length
+  const wordsDone = isCustom ? score : Math.min(score, goal)
+  const pct = goal > 0 ? Math.min(100, (wordsDone / goal) * 100) : 0
 
   return (
     <>
@@ -553,7 +708,7 @@ export default function WordBuilding({ sessionId, role, isLocked }: WordBuilding
                           border: active ? `1.5px solid ${GREEN}` : '1.5px solid transparent',
                           background: active ? '#F3FBF5' : 'transparent',
                           color: active ? GREEN_DEEP : INK_BODY,
-                          fontSize: 15,
+                          fontSize: 17,
                           fontWeight: 600,
                           fontFamily: "'DM Sans', sans-serif",
                           cursor: isT ? 'pointer' : 'default',
@@ -600,6 +755,36 @@ export default function WordBuilding({ sessionId, role, isLocked }: WordBuilding
                   <VoiceLanguageToggle sessionId={sessionId} language={voiceLanguage} />
                 </div>
               )}
+
+              {/* Start opens the activity; mid-run it restarts the level. Custom
+                  words start from their own "Set word" button instead. */}
+              {isT && difficulty !== 'custom' && (
+                <button
+                  className="wb-act"
+                  onClick={() => startGame(difficulty)}
+                  style={{
+                    flexShrink: 0,
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: 9,
+                    padding: '13px 26px',
+                    borderRadius: 999,
+                    border: 'none',
+                    background: GREEN,
+                    color: '#ffffff',
+                    fontSize: 17,
+                    fontWeight: 600,
+                    fontFamily: "'DM Sans', sans-serif",
+                    cursor: 'pointer',
+                    boxShadow: '0 6px 16px rgba(22,163,74,0.26)',
+                  }}
+                >
+                  {started
+                    ? <RefreshCw size={18} strokeWidth={2.4} />
+                    : <Play size={18} strokeWidth={2.4} fill="#ffffff" />}
+                  {started ? 'Restart' : 'Start'}
+                </button>
+              )}
             </div>
 
             {/* ---------- Custom word entry (therapist) ---------- */}
@@ -618,7 +803,7 @@ export default function WordBuilding({ sessionId, role, isLocked }: WordBuilding
                   boxShadow: CARD_SHADOW,
                 }}
               >
-                <span style={{ fontSize: 14, fontWeight: 600, color: MUTED, flexShrink: 0 }}>Custom word</span>
+                <span style={{ fontSize: 16, fontWeight: 600, color: MUTED, flexShrink: 0 }}>Custom word</span>
                 <input
                   className="wb-input"
                   value={customInput}
@@ -633,7 +818,7 @@ export default function WordBuilding({ sessionId, role, isLocked }: WordBuilding
                     borderRadius: 14,
                     padding: '13px 16px',
                     color: INK,
-                    fontSize: 15,
+                    fontSize: 17,
                     fontFamily: "'DM Sans', sans-serif",
                     outline: 'none',
                     transition: 'border-color .15s, box-shadow .15s',
@@ -649,7 +834,7 @@ export default function WordBuilding({ sessionId, role, isLocked }: WordBuilding
                     border: 'none',
                     background: GREEN,
                     color: '#ffffff',
-                    fontSize: 15,
+                    fontSize: 17,
                     fontWeight: 600,
                     fontFamily: "'DM Sans', sans-serif",
                     cursor: 'pointer',
@@ -661,8 +846,8 @@ export default function WordBuilding({ sessionId, role, isLocked }: WordBuilding
               </div>
             )}
 
-            {/* ---------- Waiting state ---------- */}
-            {!targetWord && (
+            {/* ---------- Start screen ---------- */}
+            {!started && (
               <div
                 style={{
                   flex: 1,
@@ -679,15 +864,70 @@ export default function WordBuilding({ sessionId, role, isLocked }: WordBuilding
                   boxShadow: CARD_SHADOW,
                 }}
               >
-                <span style={{ fontSize: 34 }}>🔤</span>
-                <span style={{ fontSize: 15, fontWeight: 500, color: INK_BODY, textAlign: 'center' }}>
-                  {isT ? 'Pick a level above to set the first word' : 'Waiting for your therapist to set a word…'}
+                <span style={{ fontSize: 36 }}>🔤</span>
+                <span style={{ fontSize: 17, fontWeight: 500, color: INK_BODY, textAlign: 'center' }}>
+                  {isT
+                    ? difficulty === 'custom'
+                      ? 'Type a word above and press Set word'
+                      : 'Pick a level above, then press Start'
+                    : 'Waiting for your therapist to start…'}
                 </span>
               </div>
             )}
 
+            {/* ---------- Completed state — the run ends here, it never loops ---------- */}
+            {started && finished && (
+              <div
+                style={{
+                  flex: 1,
+                  minHeight: 220,
+                  display: 'flex',
+                  flexDirection: 'column',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  gap: 12,
+                  background: CARD,
+                  border: `1px solid ${BORDER}`,
+                  borderRadius: 22,
+                  padding: 24,
+                  boxShadow: CARD_SHADOW,
+                }}
+              >
+                <span style={{ fontSize: 42.5 }}>🎉</span>
+                <span style={{ fontSize: 22, fontWeight: 700, color: GREEN_DEEP }}>Activity complete!</span>
+                <span style={{ fontSize: 17, fontWeight: 500, color: INK_BODY }}>
+                  {wordsDone} of {goal} words built
+                </span>
+                {isT && (
+                  <button
+                    className="wb-act"
+                    onClick={() => startGame(difficulty === 'custom' ? 'easy' : difficulty)}
+                    style={{
+                      marginTop: 6,
+                      display: 'flex',
+                      alignItems: 'center',
+                      gap: 9,
+                      padding: '13px 26px',
+                      borderRadius: 999,
+                      border: 'none',
+                      background: GREEN,
+                      color: '#ffffff',
+                      fontSize: 17,
+                      fontWeight: 600,
+                      fontFamily: "'DM Sans', sans-serif",
+                      cursor: 'pointer',
+                      boxShadow: '0 6px 16px rgba(22,163,74,0.26)',
+                    }}
+                  >
+                    <RefreshCw size={18} strokeWidth={2.4} />
+                    Play again
+                  </button>
+                )}
+              </div>
+            )}
+
             {/* ---------- Activity + action rail ---------- */}
-            {targetWord && (
+            {started && !finished && targetWord && (
               <div style={{ flex: 1, minHeight: 0, display: 'flex', alignItems: 'stretch', gap: 16, flexWrap: 'wrap' }}>
                 {/* Activity card */}
                 <div
@@ -722,7 +962,7 @@ export default function WordBuilding({ sessionId, role, isLocked }: WordBuilding
                       border: 'none',
                       background: 'transparent',
                       color: GREEN_DEEP,
-                      fontSize: 15,
+                      fontSize: 17,
                       fontWeight: 600,
                       fontFamily: "'DM Sans', sans-serif",
                       cursor: 'pointer',
@@ -754,7 +994,7 @@ export default function WordBuilding({ sessionId, role, isLocked }: WordBuilding
                             display: 'flex',
                             alignItems: 'center',
                             justifyContent: 'center',
-                            fontSize: 32,
+                            fontSize: 34,
                             fontWeight: 700,
                             lineHeight: 1,
                             color: isWrong ? '#B3441C' : INK,
@@ -801,7 +1041,6 @@ export default function WordBuilding({ sessionId, role, isLocked }: WordBuilding
                           onPointerDown={(e) => {
                             if (!canInteract) return
                             e.preventDefault()
-                            playLetter(letter)
                             startDrag(idx, e.clientX, e.clientY)
                           }}
                           onClick={(e) => {
@@ -815,7 +1054,7 @@ export default function WordBuilding({ sessionId, role, isLocked }: WordBuilding
                             display: 'flex',
                             alignItems: 'center',
                             justifyContent: 'center',
-                            fontSize: 34,
+                            fontSize: 36,
                             fontWeight: 700,
                             lineHeight: 1,
                             color: INK,
@@ -874,7 +1113,7 @@ export default function WordBuilding({ sessionId, role, isLocked }: WordBuilding
                     bg="#E9F9EF"
                     edge="#C3EBD2"
                     ink={GREEN_DEEP}
-                    disabled={!allFilled}
+                    disabled={!canInteract || !allFilled || checked}
                     onClick={handleCheck}
                   />
                   <ActionPill
@@ -892,7 +1131,7 @@ export default function WordBuilding({ sessionId, role, isLocked }: WordBuilding
             )}
 
             {/* ---------- Progress ---------- */}
-            {targetWord && (
+            {started && (
               <div
                 style={{
                   flexShrink: 0,
@@ -907,7 +1146,8 @@ export default function WordBuilding({ sessionId, role, isLocked }: WordBuilding
                   boxShadow: CARD_SHADOW,
                 }}
               >
-                <span style={{ fontSize: 15, fontWeight: 600, color: INK_BODY, flexShrink: 0 }}>Progress</span>
+                <span style={{ fontSize: 17, fontWeight: 600, color: INK_BODY, flexShrink: 0 }}>Progress</span>
+                {!isCustom && (
                 <div style={{ flex: '1 1 220px', minWidth: 160, position: 'relative', height: 14, display: 'flex', alignItems: 'center' }}>
                   <div style={{ width: '100%', height: 12, borderRadius: 999, background: '#E9EEF4', overflow: 'hidden' }}>
                     <div
@@ -943,17 +1183,19 @@ export default function WordBuilding({ sessionId, role, isLocked }: WordBuilding
                     <Star size={13} color="#ffffff" fill="#ffffff" strokeWidth={1.6} />
                   </span>
                 </div>
+                )}
                 <span
                   style={{
                     flexShrink: 0,
+                    marginLeft: isCustom ? 'auto' : 0,
                     paddingLeft: 20,
                     borderLeft: `1px solid ${BORDER}`,
-                    fontSize: 15,
+                    fontSize: 17,
                     fontWeight: 600,
                     color: INK_BODY,
                   }}
                 >
-                  {score} / {goal} words
+                  {isCustom ? `${score} words` : `${wordsDone} / ${goal} words`}
                 </span>
               </div>
             )}
@@ -968,7 +1210,7 @@ export default function WordBuilding({ sessionId, role, isLocked }: WordBuilding
               position: 'absolute',
               left: `${ce.x}%`,
               top: '45%',
-              fontSize: 26,
+              fontSize: 28.5,
               zIndex: 20,
               pointerEvents: 'none',
               animation: 'wbFloatUp 1.6s ease forwards',
@@ -992,7 +1234,7 @@ export default function WordBuilding({ sessionId, role, isLocked }: WordBuilding
             display: 'flex',
             alignItems: 'center',
             justifyContent: 'center',
-            fontSize: 34,
+            fontSize: 36,
             fontWeight: 700,
             lineHeight: 1,
             fontFamily: "'DM Sans', sans-serif",
@@ -1050,7 +1292,7 @@ function ActionPill({
         border: `1px solid ${edge}`,
         background: bg,
         color: ink,
-        fontSize: 15,
+        fontSize: 17,
         fontWeight: 600,
         fontFamily: "'DM Sans', sans-serif",
         cursor: disabled ? 'default' : 'pointer',

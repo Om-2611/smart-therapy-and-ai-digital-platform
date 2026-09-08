@@ -223,7 +223,7 @@ function InfoCard({ icon, tint, title, children }: { icon: ReactNode; tint: stri
         {icon}
       </span>
       <div style={{ flex: 1, minWidth: 0 }}>
-        {title && <div style={{ fontSize: 12, fontWeight: 800, color: INK, lineHeight: 1.2, marginBottom: 2 }}>{title}</div>}
+        {title && <div style={{ fontSize: 14.5, fontWeight: 800, color: INK, lineHeight: 1.2, marginBottom: 2 }}>{title}</div>}
         {children}
       </div>
     </div>
@@ -474,7 +474,7 @@ export default function BoxPopping({ sessionId, role, isLocked }: BoxPoppingProp
     border: `1px solid ${on ? GREEN : BORDER}`,
     background: on ? GREEN : '#ffffff',
     color: on ? '#ffffff' : GREEN,
-    fontSize: 13,
+    fontSize: 15,
     fontWeight: 700,
     cursor: isT ? 'pointer' : 'default',
     boxShadow: on ? '0 4px 12px rgba(31,122,68,0.26)' : CARD_SHADOW,
@@ -487,7 +487,7 @@ export default function BoxPopping({ sessionId, role, isLocked }: BoxPoppingProp
     border: `1px solid ${on ? GREEN : BORDER}`,
     background: on ? 'rgba(31,122,68,0.10)' : '#ffffff',
     color: on ? GREEN : MUTED,
-    fontSize: 10.5,
+    fontSize: 12.5,
     fontWeight: 700,
     textTransform: 'capitalize',
     cursor: 'pointer',
@@ -499,7 +499,7 @@ export default function BoxPopping({ sessionId, role, isLocked }: BoxPoppingProp
     border: `1px solid ${BORDER}`,
     background: '#ffffff',
     color: INK_BODY,
-    fontSize: 10.5,
+    fontSize: 12.5,
     fontWeight: 700,
     cursor: 'pointer',
     display: 'inline-flex',
@@ -513,7 +513,7 @@ export default function BoxPopping({ sessionId, role, isLocked }: BoxPoppingProp
     const art = m === 'wrap' ? <BubbleClusterArt size={44} /> : <BalloonArt size={44} />
     const label = m === 'wrap' ? <>Bubble<br />Popping</> : <>Balloon<br />Popping</>
     const text = (
-      <span style={{ fontSize: 14, fontWeight: 800, lineHeight: 1.13, letterSpacing: -0.2, color: accent, textAlign: m === 'wrap' ? 'left' : 'right' }}>
+      <span style={{ fontSize: 16, fontWeight: 800, lineHeight: 1.13, letterSpacing: -0.2, color: accent, textAlign: m === 'wrap' ? 'left' : 'right' }}>
         {label}
       </span>
     )
@@ -562,27 +562,27 @@ export default function BoxPopping({ sessionId, role, isLocked }: BoxPoppingProp
       }}
     >
       <InfoCard icon={<Clock size={15} strokeWidth={2.3} color={INK_BODY} />} tint="#eef1f6">
-        <div style={{ fontSize: 17, fontWeight: 800, color: INK, lineHeight: 1.1, fontVariantNumeric: 'tabular-nums' }}>
+        <div style={{ fontSize: 19.5, fontWeight: 800, color: INK, lineHeight: 1.1, fontVariantNumeric: 'tabular-nums' }}>
           <ElapsedClock />
         </div>
-        <div style={{ fontSize: 10.5, fontWeight: 600, color: MUTED, marginTop: 1 }}>Time Elapsed</div>
+        <div style={{ fontSize: 12.5, fontWeight: 600, color: MUTED, marginTop: 1 }}>Time Elapsed</div>
       </InfoCard>
 
       <InfoCard icon={<Target size={15} strokeWidth={2.3} color="#EA580C" />} tint="#FFF1E6" title="Goal">
-        <div style={{ fontSize: 11, fontWeight: 600, lineHeight: 1.4, color: INK_BODY }}>{meta.goal}</div>
+        <div style={{ fontSize: 13, fontWeight: 600, lineHeight: 1.4, color: INK_BODY }}>{meta.goal}</div>
       </InfoCard>
 
       <InfoCard icon={<Sparkles size={15} strokeWidth={2.3} color={VIOLET} />} tint="#F2ECFE" title="Focus">
         {FOCUS_LINES.map(line => (
-          <div key={line} style={{ fontSize: 11, fontWeight: 600, lineHeight: 1.45, color: INK_BODY }}>{line}</div>
+          <div key={line} style={{ fontSize: 13, fontWeight: 600, lineHeight: 1.45, color: INK_BODY }}>{line}</div>
         ))}
       </InfoCard>
 
       <InfoCard icon={<Volume2 size={15} strokeWidth={2.3} color={GREEN} />} tint="#E8F5EE" title="Instructions">
-        <div style={{ fontSize: 11, fontWeight: 600, lineHeight: 1.4, color: INK_BODY }}>
+        <div style={{ fontSize: 13, fontWeight: 600, lineHeight: 1.4, color: INK_BODY }}>
           {mode === 'wrap' ? 'Press and drag to pop a whole row.' : 'Tap a balloon to let that worry go.'}
         </div>
-        <div style={{ fontSize: 11, fontWeight: 600, lineHeight: 1.4, color: MUTED, marginTop: 2 }}>
+        <div style={{ fontSize: 13, fontWeight: 600, lineHeight: 1.4, color: MUTED, marginTop: 2 }}>
           Keep the volume at max
         </div>
       </InfoCard>
@@ -599,10 +599,10 @@ export default function BoxPopping({ sessionId, role, isLocked }: BoxPoppingProp
         }}
       >
         <div style={{ display: 'flex', alignItems: 'baseline', justifyContent: 'space-between', gap: 6 }}>
-          <span style={{ fontSize: 12, fontWeight: 800, color: INK }}>{cnt} / {total}</span>
-          <span style={{ fontSize: 11, fontWeight: 800, color: GREEN }}>{pct}%</span>
+          <span style={{ fontSize: 14.5, fontWeight: 800, color: INK }}>{cnt} / {total}</span>
+          <span style={{ fontSize: 13, fontWeight: 800, color: GREEN }}>{pct}%</span>
         </div>
-        <div style={{ fontSize: 10.5, fontWeight: 600, color: MUTED, margin: '1px 0 6px' }}>
+        <div style={{ fontSize: 12.5, fontWeight: 600, color: MUTED, margin: '1px 0 6px' }}>
           {mode === 'wrap' ? 'bubbles popped' : 'worries released'}
         </div>
         <div style={{ width: '100%', height: 6, borderRadius: 999, background: '#eef1f4', overflow: 'hidden' }}>
@@ -627,12 +627,12 @@ export default function BoxPopping({ sessionId, role, isLocked }: BoxPoppingProp
         >
           <div style={{ display: 'flex', alignItems: 'center', gap: 7 }}>
             <BalloonArt size={22} />
-            <span style={{ fontSize: 12.5, fontWeight: 800, color: VIOLET }}>Worry Balloons</span>
+            <span style={{ fontSize: 15, fontWeight: 800, color: VIOLET }}>Worry Balloons</span>
           </div>
 
           {!launched && (
             <>
-              <div style={{ fontSize: 10.5, fontWeight: 600, lineHeight: 1.4, color: MUTED }}>
+              <div style={{ fontSize: 12.5, fontWeight: 600, lineHeight: 1.4, color: MUTED }}>
                 Type a worry that&apos;s on your mind and pop it to feel lighter.
               </div>
               <input
@@ -649,7 +649,7 @@ export default function BoxPopping({ sessionId, role, isLocked }: BoxPoppingProp
                 style={{
                   width: '100%', boxSizing: 'border-box',
                   background: '#ffffff', border: `1px solid ${BORDER}`, borderRadius: 10,
-                  padding: '7px 9px', color: INK, fontSize: 11, fontWeight: 600, outline: 'none',
+                  padding: '7px 9px', color: INK, fontSize: 13, fontWeight: 600, outline: 'none',
                 }}
               />
               <button
@@ -663,7 +663,7 @@ export default function BoxPopping({ sessionId, role, isLocked }: BoxPoppingProp
                 style={{
                   display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6,
                   padding: '8px 10px', borderRadius: 10, border: 'none',
-                  background: VIOLET, color: '#ffffff', fontSize: 11.5, fontWeight: 700,
+                  background: VIOLET, color: '#ffffff', fontSize: 14, fontWeight: 700,
                   cursor: (!inputVal.trim() || worries.length >= 12) ? 'default' : 'pointer',
                   opacity: (!inputVal.trim() || worries.length >= 12) ? 0.45 : 1,
                   boxShadow: '0 4px 12px rgba(124,58,237,0.26)',
@@ -680,7 +680,7 @@ export default function BoxPopping({ sessionId, role, isLocked }: BoxPoppingProp
                       style={{
                         display: 'inline-flex', alignItems: 'center', gap: 4,
                         background: '#F5F6FA', border: `1px solid ${BORDER}`, borderRadius: 999,
-                        padding: '2px 4px 2px 8px', fontSize: 10, fontWeight: 600, color: INK_BODY, maxWidth: '100%',
+                        padding: '2px 4px 2px 8px', fontSize: 12, fontWeight: 600, color: INK_BODY, maxWidth: '100%',
                       }}
                     >
                       <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', maxWidth: 96 }}>{w}</span>
@@ -688,7 +688,7 @@ export default function BoxPopping({ sessionId, role, isLocked }: BoxPoppingProp
                         type="button"
                         onClick={() => { const n = worries.filter((_, j) => j !== i); setWorries(n); write({ 'moduleState.bpWorries': n, 'moduleState.bpPopped': [], 'moduleState.bpEndMood': '' }) }}
                         aria-label={`Remove ${w}`}
-                        style={{ background: 'none', border: 'none', color: MUTED, cursor: 'pointer', padding: '0 2px', fontSize: 11, lineHeight: 1 }}
+                        style={{ background: 'none', border: 'none', color: MUTED, cursor: 'pointer', padding: '0 2px', fontSize: 13, lineHeight: 1 }}
                       >✕</button>
                     </span>
                   ))}
@@ -702,7 +702,7 @@ export default function BoxPopping({ sessionId, role, isLocked }: BoxPoppingProp
                   style={{
                     display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6,
                     padding: '8px 10px', borderRadius: 10, border: 'none',
-                    background: GREEN, color: '#ffffff', fontSize: 11.5, fontWeight: 700, cursor: 'pointer',
+                    background: GREEN, color: '#ffffff', fontSize: 14, fontWeight: 700, cursor: 'pointer',
                     boxShadow: '0 4px 12px rgba(31,122,68,0.26)',
                   }}
                 >
@@ -714,7 +714,7 @@ export default function BoxPopping({ sessionId, role, isLocked }: BoxPoppingProp
 
           {launched && (
             <>
-              <div style={{ fontSize: 10.5, fontWeight: 600, color: MUTED }}>
+              <div style={{ fontSize: 12.5, fontWeight: 600, color: MUTED }}>
                 {worries.length} balloon{worries.length === 1 ? '' : 's'} · {cnt} popped
               </div>
               <button type="button" onClick={() => write({ 'moduleState.bpLaunched': false })} style={{ ...ghostBtn, justifyContent: 'center' }}>
@@ -727,7 +727,7 @@ export default function BoxPopping({ sessionId, role, isLocked }: BoxPoppingProp
 
       {mode === 'balloon' && (
         <InfoCard icon={<Lightbulb size={15} strokeWidth={2.3} color="#B45309" />} tint="#FEF6E0" title="Tip">
-          <div style={{ fontSize: 11, fontWeight: 600, lineHeight: 1.4, color: INK_BODY }}>
+          <div style={{ fontSize: 13, fontWeight: 600, lineHeight: 1.4, color: INK_BODY }}>
             You can pop as many worries as you want.
           </div>
         </InfoCard>
@@ -999,7 +999,7 @@ export default function BoxPopping({ sessionId, role, isLocked }: BoxPoppingProp
                       }}>
                         {/* Dark text on a pastel balloon — never white-on-light. */}
                         <span style={{
-                          fontSize: 9.5, fontWeight: 700, color: '#1f2937', textAlign: 'center', lineHeight: 1.22,
+                          fontSize: 12.5, fontWeight: 700, color: '#1f2937', textAlign: 'center', lineHeight: 1.22,
                           overflow: 'hidden', display: '-webkit-box', WebkitLineClamp: 3, WebkitBoxOrient: 'vertical', wordBreak: 'break-word',
                         }}>{b.worry}</span>
                       </div>
@@ -1016,7 +1016,7 @@ export default function BoxPopping({ sessionId, role, isLocked }: BoxPoppingProp
 
                 {floaters.map(f => (
                   <div key={f.id} style={{
-                    position: 'absolute', left: f.x, top: f.y, fontSize: 11, fontWeight: 700, color: INK_BODY,
+                    position: 'absolute', left: f.x, top: f.y, fontSize: 13, fontWeight: 700, color: INK_BODY,
                     background: 'rgba(255,255,255,0.88)', border: `1px solid ${BORDER}`, borderRadius: 999, padding: '3px 9px',
                     pointerEvents: 'none', zIndex: 20, whiteSpace: 'nowrap', animation: 'fu 1.5s ease forwards',
                   }}>{f.text}</div>
@@ -1029,7 +1029,7 @@ export default function BoxPopping({ sessionId, role, isLocked }: BoxPoppingProp
                 <div style={{
                   padding: '10px 18px', borderRadius: 999,
                   background: 'rgba(255,255,255,0.9)', border: `1px solid ${BORDER}`, boxShadow: CARD_SHADOW,
-                  fontSize: 13, fontWeight: 700, color: INK_BODY, textAlign: 'center',
+                  fontSize: 15, fontWeight: 700, color: INK_BODY, textAlign: 'center',
                 }}>
                   {isT ? 'Add worries in the panel, then launch the balloons.' : 'Your therapist is setting up…'}
                 </div>
@@ -1049,7 +1049,7 @@ export default function BoxPopping({ sessionId, role, isLocked }: BoxPoppingProp
         <div style={{ flexShrink: 0, display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap', paddingTop: 7, borderTop: `1px solid ${BORDER}` }}>
           {mode === 'wrap' && (
             <>
-              <span style={{ fontSize: 10, fontWeight: 700, color: MUTED, letterSpacing: 0.3, textTransform: 'uppercase' }}>Pop feel</span>
+              <span style={{ fontSize: 12, fontWeight: 700, color: MUTED, letterSpacing: 0.3, textTransform: 'uppercase' }}>Pop feel</span>
               {['gentle', 'normal', 'satisfying'].map(v => (
                 <button key={v} type="button" onClick={() => write({ 'moduleState.bpIntensity': v })} style={smallPill(intensity === v)}>
                   {v}
@@ -1058,7 +1058,7 @@ export default function BoxPopping({ sessionId, role, isLocked }: BoxPoppingProp
             </>
           )}
           {mode === 'balloon' && (
-            <span style={{ fontSize: 10.5, fontWeight: 600, color: MUTED }}>
+            <span style={{ fontSize: 12.5, fontWeight: 600, color: MUTED }}>
               {worries.length} worr{worries.length === 1 ? 'y' : 'ies'} · {cnt} released
             </span>
           )}
@@ -1086,20 +1086,20 @@ export default function BoxPopping({ sessionId, role, isLocked }: BoxPoppingProp
             padding: '22px 30px', borderRadius: 22, maxWidth: 420,
             background: '#ffffff', border: `1px solid ${BORDER}`, boxShadow: '0 18px 44px rgba(20,30,45,0.16)',
           }}>
-            <div style={{ fontSize: 38, lineHeight: 1 }}>🎉</div>
-            <div style={{ fontSize: 19, fontWeight: 800, letterSpacing: -0.4, color: INK, textAlign: 'center' }}>
+            <div style={{ fontSize: 40.5, lineHeight: 1 }}>🎉</div>
+            <div style={{ fontSize: 21, fontWeight: 800, letterSpacing: -0.4, color: INK, textAlign: 'center' }}>
               {mode === 'wrap' ? 'All bubbles popped!' : 'You released all your worries!'}
             </div>
             {mode === 'balloon' && !endMood && (
               <>
-                <div style={{ fontSize: 12.5, fontWeight: 600, color: MUTED }}>How do you feel now?</div>
+                <div style={{ fontSize: 15, fontWeight: 600, color: MUTED }}>How do you feel now?</div>
                 <div style={{ display: 'flex', gap: 9 }}>
                   {MOOD_EMOJIS.map(e => (
                     <button key={e} type="button"
                       onClick={() => { setEndMood(e); write({ 'moduleState.bpEndMood': e }); logModuleEvent(sessionId, { module: 'virtual-box-popping', type: 'mood_check', detail: `Reported feeling "${e}" after releasing worries` }) }}
                       style={{
                         background: '#ffffff', border: `1px solid ${BORDER}`,
-                        borderRadius: 12, padding: '7px 9px', cursor: 'pointer', fontSize: 21,
+                        borderRadius: 12, padding: '7px 9px', cursor: 'pointer', fontSize: 23,
                         boxShadow: CARD_SHADOW, transition: 'all 0.15s',
                       }}
                     >{e}</button>
@@ -1108,13 +1108,13 @@ export default function BoxPopping({ sessionId, role, isLocked }: BoxPoppingProp
               </>
             )}
             {mode === 'balloon' && endMood && (
-              <div style={{ fontSize: 14, fontWeight: 700, color: INK_BODY }}>You chose {endMood}</div>
+              <div style={{ fontSize: 16, fontWeight: 700, color: INK_BODY }}>You chose {endMood}</div>
             )}
             {(mode === 'wrap' || endMood) && isT && (
               <button type="button" onClick={resetAll}
                 style={{
                   marginTop: 2, padding: '9px 22px', borderRadius: 11, border: 'none',
-                  background: GREEN, color: '#ffffff', fontSize: 12.5, fontWeight: 700, cursor: 'pointer',
+                  background: GREEN, color: '#ffffff', fontSize: 15, fontWeight: 700, cursor: 'pointer',
                   boxShadow: '0 5px 14px rgba(31,122,68,0.28)',
                 }}
               >Start again</button>
@@ -1128,7 +1128,7 @@ export default function BoxPopping({ sessionId, role, isLocked }: BoxPoppingProp
         <div style={{
           position: 'absolute', top: '50%', left: '50%', transform: 'translate(-50%,-50%)',
           background: 'rgba(17,24,39,0.9)', borderRadius: 12,
-          padding: '9px 18px', color: '#ffffff', fontSize: 13, fontWeight: 700, zIndex: 100, pointerEvents: 'none',
+          padding: '9px 18px', color: '#ffffff', fontSize: 15, fontWeight: 700, zIndex: 100, pointerEvents: 'none',
           boxShadow: '0 10px 26px rgba(20,30,45,0.28)',
         }}>
           {toast.msg}

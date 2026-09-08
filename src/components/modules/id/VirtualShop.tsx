@@ -318,13 +318,13 @@ export default function VirtualShop({ sessionId, role, isLocked }: VirtualShopPr
 
       {/* Therapist controls */}
       {isT && (
-        <div style={{ flexShrink: 0, padding: '6px 10px', borderBottom: '1px solid var(--glass-border)', display: 'flex', flexDirection: 'column', gap: 5, fontSize: 10 }}>
+        <div style={{ flexShrink: 0, padding: '6px 10px', borderBottom: '1px solid var(--glass-border)', display: 'flex', flexDirection: 'column', gap: 5, fontSize: 12 }}>
           <div style={{ display: 'flex', gap: 6, alignItems: 'center', flexWrap: 'wrap' }}>
             <span style={{ color: 'rgba(0,0,0,0.4)' }}>Difficulty:</span>
             {['easy', 'medium', 'hard'].map(d => (
               <button key={d} onClick={() => setDifficultyPreset(d)}
                 style={{
-                  padding: '2px 10px', borderRadius: 4, cursor: 'pointer', fontSize: 10, textTransform: 'capitalize',
+                  padding: '2px 10px', borderRadius: 4, cursor: 'pointer', fontSize: 12, textTransform: 'capitalize',
                   border: difficulty === d ? '1px solid rgba(74,124,111,0.6)' : '1px solid rgba(0,0,0,0.08)',
                   background: difficulty === d ? 'rgba(74,124,111,0.15)' : 'transparent',
                   color: difficulty === d ? 'rgba(0,0,0,0.8)' : 'rgba(0,0,0,0.35)',
@@ -335,7 +335,7 @@ export default function VirtualShop({ sessionId, role, isLocked }: VirtualShopPr
             {['rupee', 'dollar', 'pound'].map(c => (
               <button key={c} onClick={() => write({ 'moduleState.vsCurrency': c })}
                 style={{
-                  padding: '2px 8px', borderRadius: 4, cursor: 'pointer', fontSize: 10,
+                  padding: '2px 8px', borderRadius: 4, cursor: 'pointer', fontSize: 12,
                   border: currency === c ? '1px solid rgba(74,124,111,0.6)' : '1px solid rgba(0,0,0,0.08)',
                   background: currency === c ? 'rgba(74,124,111,0.15)' : 'transparent',
                   color: currency === c ? 'rgba(0,0,0,0.8)' : 'rgba(0,0,0,0.35)',
@@ -345,30 +345,30 @@ export default function VirtualShop({ sessionId, role, isLocked }: VirtualShopPr
           </div>
           <div style={{ display: 'flex', gap: 6, alignItems: 'center' }}>
             <button onClick={() => setEditList(!editList)}
-              style={{ padding: '2px 10px', borderRadius: 4, cursor: 'pointer', fontSize: 10, border: '1px solid rgba(0,0,0,0.12)', background: editList ? 'rgba(74,124,111,0.15)' : 'transparent', color: 'rgba(0,0,0,0.6)' }}
+              style={{ padding: '2px 10px', borderRadius: 4, cursor: 'pointer', fontSize: 12, border: '1px solid rgba(0,0,0,0.12)', background: editList ? 'rgba(74,124,111,0.15)' : 'transparent', color: 'rgba(0,0,0,0.6)' }}
             >{editList ? 'Done editing list' : '📋 Edit shopping list'}</button>
-            <span style={{ color: 'rgba(0,0,0,0.3)', fontSize: 9 }}>Wallet:</span>
+            <span style={{ color: 'rgba(0,0,0,0.3)', fontSize: 11.5 }}>Wallet:</span>
             <input type="number" value={walletAmount} onChange={e => {
               const v = Math.max(10, parseInt(e.target.value) || 10)
               write({ 'moduleState.vsWalletAmount': v, 'moduleState.vsWalletBalance': v })
             }}
-              style={{ width: 50, background: 'rgba(0,0,0,0.06)', border: '1px solid rgba(0,0,0,0.1)', borderRadius: 4, padding: '2px 6px', color: '#2b2f33', fontSize: 10, outline: 'none' }}
+              style={{ width: 50, background: 'rgba(0,0,0,0.06)', border: '1px solid rgba(0,0,0,0.1)', borderRadius: 4, padding: '2px 6px', color: '#2b2f33', fontSize: 12, outline: 'none' }}
             />
             {basket.length > 0 && (
-              <button onClick={resetShop} style={{ marginLeft: 'auto', padding: '2px 8px', borderRadius: 4, cursor: 'pointer', fontSize: 10, border: '1px solid rgba(200,60,60,0.3)', background: 'transparent', color: 'rgba(200,80,80,0.7)' }}>↺ Reset</button>
+              <button onClick={resetShop} style={{ marginLeft: 'auto', padding: '2px 8px', borderRadius: 4, cursor: 'pointer', fontSize: 12, border: '1px solid rgba(200,60,60,0.3)', background: 'transparent', color: 'rgba(200,80,80,0.7)' }}>↺ Reset</button>
             )}
           </div>
           {/* Shopping list editor */}
           {editList && (
             <div style={{ display: 'flex', flexDirection: 'column', gap: 4, maxHeight: 160, overflowY: 'auto', padding: 4, background: 'rgba(0,0,0,0.15)', borderRadius: 6 }}>
-              <div style={{ fontSize: 9, color: 'rgba(0,0,0,0.4)', marginBottom: 2 }}>Tap items to add to shopping list</div>
+              <div style={{ fontSize: 11.5, color: 'rgba(0,0,0,0.4)', marginBottom: 2 }}>Tap items to add to shopping list</div>
               <div style={{ display: 'flex', flexWrap: 'wrap', gap: 4 }}>
                 {SHOP_ITEMS.map(item => {
                   const qty = editQty[item.id] || 0
                   return (
                     <div key={item.id} onClick={() => toggleEditItem(item.id)}
                       style={{
-                        display: 'flex', alignItems: 'center', gap: 3, padding: '3px 6px', borderRadius: 6, cursor: 'pointer', fontSize: 10,
+                        display: 'flex', alignItems: 'center', gap: 3, padding: '3px 6px', borderRadius: 6, cursor: 'pointer', fontSize: 12,
                         background: qty > 0 ? 'rgba(74,124,111,0.2)' : 'rgba(0,0,0,0.05)',
                         border: qty > 0 ? '1px solid rgba(74,124,111,0.4)' : '1px solid rgba(0,0,0,0.08)',
                         color: qty > 0 ? '#2b2f33' : 'rgba(0,0,0,0.5)',
@@ -378,9 +378,9 @@ export default function VirtualShop({ sessionId, role, isLocked }: VirtualShopPr
                       <span>{item.name}</span>
                       {qty > 0 && (
                         <span style={{ display: 'flex', alignItems: 'center', gap: 2, marginLeft: 2 }}>
-                          <span onClick={e => { e.stopPropagation(); changeEditQty(item.id, -1) }} style={{ cursor: 'pointer', color: 'rgba(0,0,0,0.5)', fontSize: 12 }}>−</span>
+                          <span onClick={e => { e.stopPropagation(); changeEditQty(item.id, -1) }} style={{ cursor: 'pointer', color: 'rgba(0,0,0,0.5)', fontSize: 14.5 }}>−</span>
                           <span style={{ color: '#1F7A44', fontWeight: 600 }}>{qty}</span>
-                          <span onClick={e => { e.stopPropagation(); changeEditQty(item.id, 1) }} style={{ cursor: 'pointer', color: 'rgba(0,0,0,0.5)', fontSize: 12 }}>+</span>
+                          <span onClick={e => { e.stopPropagation(); changeEditQty(item.id, 1) }} style={{ cursor: 'pointer', color: 'rgba(0,0,0,0.5)', fontSize: 14.5 }}>+</span>
                         </span>
                       )}
                     </div>
@@ -388,7 +388,7 @@ export default function VirtualShop({ sessionId, role, isLocked }: VirtualShopPr
                 })}
               </div>
               <button onClick={saveShoppingList}
-                style={{ padding: '4px 0', borderRadius: 6, border: '1px solid rgba(74,124,111,0.4)', background: 'rgba(74,124,111,0.2)', color: '#1F7A44', cursor: 'pointer', fontSize: 10 }}
+                style={{ padding: '4px 0', borderRadius: 6, border: '1px solid rgba(74,124,111,0.4)', background: 'rgba(74,124,111,0.2)', color: '#1F7A44', cursor: 'pointer', fontSize: 12 }}
               >Set shopping list ({Object.keys(editQty).length} items)</button>
             </div>
           )}
@@ -421,19 +421,19 @@ export default function VirtualShop({ sessionId, role, isLocked }: VirtualShopPr
             border: '1.5px solid rgba(74,124,111,0.4)', borderRadius: 12, padding: '8px 12px',
           }}>
             <div style={{ display: 'flex', alignItems: 'center', gap: 4, marginBottom: 2 }}>
-              <span style={{ fontSize: 16 }}>👛</span>
-              <span style={{ fontSize: 9, color: 'rgba(0,0,0,0.4)' }}>My Wallet</span>
+              <span style={{ fontSize: 18.5 }}>👛</span>
+              <span style={{ fontSize: 11.5, color: 'rgba(0,0,0,0.4)' }}>My Wallet</span>
             </div>
-            <div style={{ fontSize: 20, fontFamily: '"DM Serif Display", serif', color: balanceColor, transition: 'color 0.3s' }}>
+            <div style={{ fontSize: 22, fontFamily: '"DM Serif Display", serif', color: balanceColor, transition: 'color 0.3s' }}>
               {fmtPrice(walletBalance, currency)}
             </div>
           </div>
 
           {/* Shopping list */}
           <div style={{ flex: 1, background: 'rgba(255,255,255,0.82)', border: '1px solid rgba(0,0,0,0.10)', borderRadius: 14, padding: '14px 16px', minWidth: 0, boxShadow: '0 4px 14px rgba(20,30,40,0.06)' }}>
-            <div style={{ fontSize: 9, color: 'rgba(0,0,0,0.4)', marginBottom: 4 }}>Shopping List 📋</div>
+            <div style={{ fontSize: 11.5, color: 'rgba(0,0,0,0.4)', marginBottom: 4 }}>Shopping List 📋</div>
             {shoppingList.length === 0 ? (
-              <div style={{ fontSize: 10, color: 'rgba(0,0,0,0.25)', fontStyle: 'italic' }}>
+              <div style={{ fontSize: 12, color: 'rgba(0,0,0,0.25)', fontStyle: 'italic' }}>
                 {isT ? 'Set shopping list above' : 'Waiting for shopping list...'}
               </div>
             ) : (
@@ -444,16 +444,16 @@ export default function VirtualShop({ sessionId, role, isLocked }: VirtualShopPr
                   const inBasket = basketMap.get(l.itemId)
                   const fulfilled = inBasket && inBasket.quantity >= l.quantity
                   return (
-                    <div key={l.itemId} style={{ display: 'flex', alignItems: 'center', gap: 4, fontSize: 10, color: fulfilled ? 'rgba(0,0,0,0.35)' : 'rgba(0,0,0,0.85)', textDecoration: fulfilled ? 'line-through' : 'none' }}>
+                    <div key={l.itemId} style={{ display: 'flex', alignItems: 'center', gap: 4, fontSize: 12, color: fulfilled ? 'rgba(0,0,0,0.35)' : 'rgba(0,0,0,0.85)', textDecoration: fulfilled ? 'line-through' : 'none' }}>
                       <span>{fulfilled ? '☑' : '☐'}</span>
                       <span>{item.emoji}</span>
                       <span style={{ flex: 1, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{item.name}</span>
-                      {l.quantity > 1 && <span style={{ fontSize: 9, color: 'rgba(0,0,0,0.4)' }}>×{l.quantity}</span>}
+                      {l.quantity > 1 && <span style={{ fontSize: 11.5, color: 'rgba(0,0,0,0.4)' }}>×{l.quantity}</span>}
                     </div>
                   )
                 })}
                 {allListItemsInBasket && shoppingList.length > 0 && (
-                  <div style={{ fontSize: 9, color: '#1F7A44', marginTop: 2 }}>Shopping list complete! 🎉</div>
+                  <div style={{ fontSize: 11.5, color: '#1F7A44', marginTop: 2 }}>Shopping list complete! 🎉</div>
                 )}
               </div>
             )}
@@ -463,7 +463,7 @@ export default function VirtualShop({ sessionId, role, isLocked }: VirtualShopPr
         {/* Maths helper (Easy/Medium) */}
         {difficulty !== 'hard' && mathTerms.length > 0 && (
           <div style={{
-            margin: '12px 16px 0', padding: '12px 14px', fontSize: 11, color: 'rgba(0,0,0,0.62)',
+            margin: '12px 16px 0', padding: '12px 14px', fontSize: 13, color: 'rgba(0,0,0,0.62)',
             background: 'rgba(255,255,255,0.82)', borderRadius: 12, boxShadow: '0 4px 14px rgba(20,30,40,0.06)',
             flexShrink: 0,
           }}>
@@ -482,7 +482,7 @@ export default function VirtualShop({ sessionId, role, isLocked }: VirtualShopPr
           {AISLES.map(a => (
             <button key={a.id} onClick={() => { if (isT) write({ 'moduleState.vsAisle': a.id }); else setAisle(a.id) }}
               style={{
-                whiteSpace: 'nowrap', padding: '3px 10px', borderRadius: 10, cursor: 'pointer', fontSize: 10,
+                whiteSpace: 'nowrap', padding: '3px 10px', borderRadius: 10, cursor: 'pointer', fontSize: 12,
                 border: aisle === a.id ? '1px solid rgba(74,124,111,0.5)' : '1px solid rgba(0,0,0,0.08)',
                 background: aisle === a.id ? 'rgba(74,124,111,0.15)' : 'transparent',
                 color: aisle === a.id ? 'rgba(0,0,0,0.8)' : 'rgba(0,0,0,0.4)',
@@ -513,18 +513,18 @@ export default function VirtualShop({ sessionId, role, isLocked }: VirtualShopPr
                     boxShadow: '0 3px 10px rgba(20,30,40,0.06)',
                   }}
                 >
-                  {onList && <span style={{ position: 'absolute', top: 2, right: 4, fontSize: 8 }}>📋</span>}
+                  {onList && <span style={{ position: 'absolute', top: 2, right: 4, fontSize: 10.5 }}>📋</span>}
                   {qty > 0 && (
                     <span style={{
-                      position: 'absolute', top: -4, right: -4, background: '#4a7c6f', color: '#fff', fontSize: 8,
+                      position: 'absolute', top: -4, right: -4, background: '#4a7c6f', color: '#fff', fontSize: 10.5,
                       borderRadius: 8, padding: '1px 5px', fontWeight: 600, zIndex: 2,
                     }}>
                       {qty}
                     </span>
                   )}
-                  <span style={{ fontSize: 22, lineHeight: 1 }}>{item.emoji}</span>
-                  <span style={{ fontSize: 7, color: 'rgba(0,0,0,0.75)', textAlign: 'center', lineHeight: 1.1 }}>{item.name}</span>
-                  <span style={{ fontSize: 9, fontWeight: 600, color: walletBalance >= item.price ? '#1F7A44' : '#c8602a' }}>
+                  <span style={{ fontSize: 24, lineHeight: 1 }}>{item.emoji}</span>
+                  <span style={{ fontSize: 9, color: 'rgba(0,0,0,0.75)', textAlign: 'center', lineHeight: 1.1 }}>{item.name}</span>
+                  <span style={{ fontSize: 11.5, fontWeight: 600, color: walletBalance >= item.price ? '#1F7A44' : '#c8602a' }}>
                     {fmtPrice(item.price, currency)}
                   </span>
                 </div>
@@ -539,7 +539,7 @@ export default function VirtualShop({ sessionId, role, isLocked }: VirtualShopPr
             style={{
               padding: '8px 12px', cursor: 'pointer',
               background: basketOpen ? 'rgba(0,0,0,0.06)' : 'rgba(0,0,0,0.04)',
-              display: 'flex', justifyContent: 'space-between', alignItems: 'center', fontSize: 11, color: 'rgba(0,0,0,0.6)',
+              display: 'flex', justifyContent: 'space-between', alignItems: 'center', fontSize: 13, color: 'rgba(0,0,0,0.6)',
             }}
           >
             <span>🛒 Basket ({itemCount} item{itemCount !== 1 ? 's' : ''})</span>
@@ -548,7 +548,7 @@ export default function VirtualShop({ sessionId, role, isLocked }: VirtualShopPr
           {basketOpen && (
             <div style={{ padding: '8px 12px', background: 'rgba(0,0,0,0.1)' }}>
               {basket.length === 0 ? (
-                <div style={{ fontSize: 10, color: 'rgba(0,0,0,0.25)', fontStyle: 'italic' }}>Basket is empty</div>
+                <div style={{ fontSize: 12, color: 'rgba(0,0,0,0.25)', fontStyle: 'italic' }}>Basket is empty</div>
               ) : (
                 <div style={{ display: 'flex', gap: 6, overflowX: 'auto', paddingBottom: 6, marginBottom: 6 }}>
                   {basket.map(b => {
@@ -559,10 +559,10 @@ export default function VirtualShop({ sessionId, role, isLocked }: VirtualShopPr
                         style={{
                           display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 2, cursor: canInteract ? 'pointer' : 'default',
                           padding: '6px 8px', background: 'rgba(0,0,0,0.05)', borderRadius: 8, border: '1px solid rgba(0,0,0,0.08)',
-                          fontSize: 10, whiteSpace: 'nowrap', flexShrink: 0,
+                          fontSize: 12, whiteSpace: 'nowrap', flexShrink: 0,
                         }}
                       >
-                        <span style={{ fontSize: 18 }}>{item.emoji}</span>
+                        <span style={{ fontSize: 20 }}>{item.emoji}</span>
                         <span style={{ color: 'rgba(0,0,0,0.5)' }}>×{b.quantity}</span>
                         <span style={{ color: '#1F7A44' }}>{fmtPrice(b.price * b.quantity, currency)}</span>
                       </div>
@@ -570,23 +570,23 @@ export default function VirtualShop({ sessionId, role, isLocked }: VirtualShopPr
                   })}
                 </div>
               )}
-              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', fontSize: 12, marginBottom: 6 }}>
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', fontSize: 14.5, marginBottom: 6 }}>
                 <span style={{ color: total > walletAmount ? '#c8602a' : '#1F7A44', fontWeight: 600 }}>
                   Total: {fmtPrice(total, currency)}
                 </span>
-                <span style={{ fontSize: 10, color: 'rgba(0,0,0,0.4)' }}>
+                <span style={{ fontSize: 12, color: 'rgba(0,0,0,0.4)' }}>
                   Left: {fmtPrice(walletBalance, currency)}
                 </span>
               </div>
               {difficulty === 'hard' && (
-                <div style={{ fontSize: 10, color: 'rgba(0,0,0,0.4)', marginBottom: 6 }}>
+                <div style={{ fontSize: 12, color: 'rgba(0,0,0,0.4)', marginBottom: 6 }}>
                   Change: {fmtPrice(walletBalance, currency)}
                 </div>
               )}
               {!completed && (
                 <button onClick={handlePay} disabled={!canPay || paying}
                   style={{
-                    width: '100%', height: 40, borderRadius: 10, fontSize: 13, fontWeight: 500, cursor: canPay && !paying ? 'pointer' : 'default',
+                    width: '100%', height: 40, borderRadius: 10, fontSize: 15, fontWeight: 500, cursor: canPay && !paying ? 'pointer' : 'default',
                     background: canPay && !paying ? 'rgba(74,124,111,0.3)' : 'rgba(0,0,0,0.04)',
                     border: canPay && !paying ? '1.5px solid rgba(74,124,111,0.5)' : '1px solid rgba(0,0,0,0.08)',
                     color: canPay && !paying ? '#1F7A44' : 'rgba(0,0,0,0.25)', opacity: canPay && !paying ? 1 : 0.4,
@@ -600,7 +600,7 @@ export default function VirtualShop({ sessionId, role, isLocked }: VirtualShopPr
         {/* Floaters */}
         {floaters.map(f => (
           <div key={f.id} style={{
-            position: 'absolute', left: f.x - 12, top: f.y - 16, fontSize: 14, pointerEvents: 'none', zIndex: 30,
+            position: 'absolute', left: f.x - 12, top: f.y - 16, fontSize: 16, pointerEvents: 'none', zIndex: 30,
             animation: 'flUp 0.5s ease forwards', color: '#1F7A44',
           }}>
             +1 🛒
@@ -610,7 +610,7 @@ export default function VirtualShop({ sessionId, role, isLocked }: VirtualShopPr
         {/* Pay animation */}
         {paying && (
           <div style={{
-            position: 'absolute', left: '40%', top: '40%', fontSize: 40, zIndex: 40, pointerEvents: 'none',
+            position: 'absolute', left: '40%', top: '40%', fontSize: 42.5, zIndex: 40, pointerEvents: 'none',
             animation: 'payF 0.6s ease forwards',
           }}>
             💳➡️🏪
@@ -627,33 +627,33 @@ export default function VirtualShop({ sessionId, role, isLocked }: VirtualShopPr
               background: 'rgba(255,255,240,0.1)', border: '1px solid rgba(255,255,200,0.2)', borderRadius: 8,
               padding: 16, width: '100%', maxWidth: 280, animation: 'receiptUp 0.4s ease',
             }}>
-              <div style={{ fontFamily: '"DM Serif Display", serif', fontSize: 14, color: '#fff', textAlign: 'center', marginBottom: 8 }}>🏪 Staad Store</div>
+              <div style={{ fontFamily: '"DM Serif Display", serif', fontSize: 16, color: '#fff', textAlign: 'center', marginBottom: 8 }}>🏪 Staad Store</div>
               <div style={{ borderTop: '1px dashed rgba(0,0,0,0.15)', marginBottom: 8 }} />
               {receipt.items.map(b => {
                 const item = ITEM_MAP.get(b.itemId)
                 return (
-                  <div key={b.itemId} style={{ display: 'flex', justifyContent: 'space-between', fontSize: 10, color: 'rgba(0,0,0,0.7)', marginBottom: 3 }}>
+                  <div key={b.itemId} style={{ display: 'flex', justifyContent: 'space-between', fontSize: 12, color: 'rgba(0,0,0,0.7)', marginBottom: 3 }}>
                     <span>{item?.emoji} {item?.name} ×{b.quantity}</span>
                     <span>{fmtPrice(b.price * b.quantity, currency)}</span>
                   </div>
                 )
               })}
               <div style={{ borderTop: '1px dashed rgba(0,0,0,0.15)', margin: '6px 0' }} />
-              <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 12, color: '#fff', fontWeight: 600 }}>
+              <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 14.5, color: '#fff', fontWeight: 600 }}>
                 <span>Total</span><span>{fmtPrice(receipt.total, currency)}</span>
               </div>
-              <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 10, color: 'rgba(0,0,0,0.5)' }}>
+              <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 12, color: 'rgba(0,0,0,0.5)' }}>
                 <span>Paid</span><span>{fmtPrice(receipt.paid, currency)}</span>
               </div>
               {difficulty === 'hard' && (
-                <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 10, color: 'rgba(0,0,0,0.5)' }}>
+                <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 12, color: 'rgba(0,0,0,0.5)' }}>
                   <span>Change</span><span>{fmtPrice(receipt.change, currency)}</span>
                 </div>
               )}
               <div style={{ borderTop: '1px dashed rgba(0,0,0,0.15)', margin: '6px 0' }} />
-              <div style={{ fontSize: 11, color: 'rgba(0,0,0,0.6)', textAlign: 'center' }}>Thank you! 😊</div>
+              <div style={{ fontSize: 13, color: 'rgba(0,0,0,0.6)', textAlign: 'center' }}>Thank you! 😊</div>
               <button onClick={resetShop}
-                style={{ marginTop: 8, width: '100%', padding: '6px 0', borderRadius: 6, border: '1px solid rgba(74,124,111,0.4)', background: 'rgba(74,124,111,0.2)', color: '#1F7A44', cursor: 'pointer', fontSize: 11 }}
+                style={{ marginTop: 8, width: '100%', padding: '6px 0', borderRadius: 6, border: '1px solid rgba(74,124,111,0.4)', background: 'rgba(74,124,111,0.2)', color: '#1F7A44', cursor: 'pointer', fontSize: 13 }}
               >Shop again</button>
             </div>
           </div>
@@ -665,11 +665,11 @@ export default function VirtualShop({ sessionId, role, isLocked }: VirtualShopPr
             position: 'absolute', inset: 0, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', gap: 8,
             background: 'rgba(74,124,111,0.15)', backdropFilter: 'blur(4px)', zIndex: 45, padding: 20,
           }}>
-            <div style={{ fontSize: 32 }}>🎉</div>
-            <div style={{ fontSize: 14, color: '#2b2f33', textAlign: 'center' }}>Shopping complete!</div>
-            <div style={{ fontSize: 11, color: 'rgba(0,0,0,0.5)' }}>Score: {score}</div>
+            <div style={{ fontSize: 34 }}>🎉</div>
+            <div style={{ fontSize: 16, color: '#2b2f33', textAlign: 'center' }}>Shopping complete!</div>
+            <div style={{ fontSize: 13, color: 'rgba(0,0,0,0.5)' }}>Score: {score}</div>
             <button onClick={resetShop}
-              style={{ padding: '6px 20px', borderRadius: 6, border: '1px solid rgba(74,124,111,0.4)', background: 'rgba(74,124,111,0.2)', color: '#1F7A44', cursor: 'pointer', fontSize: 11 }}
+              style={{ padding: '6px 20px', borderRadius: 6, border: '1px solid rgba(74,124,111,0.4)', background: 'rgba(74,124,111,0.2)', color: '#1F7A44', cursor: 'pointer', fontSize: 13 }}
             >Shop again</button>
           </div>
         )}
@@ -680,7 +680,7 @@ export default function VirtualShop({ sessionId, role, isLocked }: VirtualShopPr
         <div style={{
           position: 'absolute', top: '50%', left: '50%', transform: 'translate(-50%,-50%)',
           background: 'rgba(0,0,0,0.6)', backdropFilter: 'blur(8px)', borderRadius: 10,
-          padding: '8px 16px', color: '#fff', fontSize: 13, zIndex: 100, pointerEvents: 'none',
+          padding: '8px 16px', color: '#fff', fontSize: 15, zIndex: 100, pointerEvents: 'none',
         }}>
           {toast.msg}
         </div>

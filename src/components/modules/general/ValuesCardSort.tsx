@@ -248,12 +248,12 @@ export default function ValuesCardSort({ sessionId, role, isLocked }: ValuesCard
       <div style={{ flexShrink: 0, textAlign: 'center' }}>
         <div style={{
           display: 'inline-flex', alignItems: 'center', gap: 9,
-          fontSize: 19, fontWeight: 800, letterSpacing: -0.3, color: VIOLET,
+          fontSize: 21, fontWeight: 800, letterSpacing: -0.3, color: VIOLET,
         }}>
           <Target size={20} color={VIOLET_BRIGHT} strokeWidth={2.4} />
           {PROMPT[round]?.head ?? PROMPT[1].head}
         </div>
-        <div style={{ marginTop: 3, fontSize: 13, fontWeight: 500, color: INK_MUTED }}>
+        <div style={{ marginTop: 3, fontSize: 15, fontWeight: 500, color: INK_MUTED }}>
           {PROMPT[round]?.sub ?? PROMPT[1].sub}
         </div>
       </div>
@@ -271,7 +271,7 @@ export default function ValuesCardSort({ sessionId, role, isLocked }: ValuesCard
         }}>
           <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexShrink: 0 }}>
             <BookOpen size={17} color={VIOLET_BRIGHT} strokeWidth={2.2} />
-            <span style={{ fontSize: 14.5, fontWeight: 800, letterSpacing: -0.2, color: VIOLET }}>How it works</span>
+            <span style={{ fontSize: 16.5, fontWeight: 800, letterSpacing: -0.2, color: VIOLET }}>How it works</span>
           </div>
 
           <ol style={{ margin: 0, padding: 0, listStyle: 'none', display: 'flex', flexDirection: 'column', gap: 8, flexShrink: 0 }}>
@@ -280,9 +280,9 @@ export default function ValuesCardSort({ sessionId, role, isLocked }: ValuesCard
                 <span style={{
                   width: 19, height: 19, borderRadius: '50%', flexShrink: 0, marginTop: 1,
                   display: 'flex', alignItems: 'center', justifyContent: 'center',
-                  background: VIOLET, color: '#ffffff', fontSize: 10.5, fontWeight: 700, lineHeight: 1,
+                  background: VIOLET, color: '#ffffff', fontSize: 12.5, fontWeight: 700, lineHeight: 1,
                 }}>{i + 1}</span>
-                <span style={{ fontSize: 12.5, lineHeight: 1.4, fontWeight: 500, color: INK_BODY }}>{s}</span>
+                <span style={{ fontSize: 15, lineHeight: 1.4, fontWeight: 500, color: INK_BODY }}>{s}</span>
               </li>
             ))}
           </ol>
@@ -291,7 +291,7 @@ export default function ValuesCardSort({ sessionId, role, isLocked }: ValuesCard
 
           <div style={{ display: 'flex', alignItems: 'flex-start', gap: 9, flexShrink: 0 }}>
             <Lightbulb size={16} color="#D97706" fill="#FCD34D" strokeWidth={2} style={{ flexShrink: 0, marginTop: 1 }} />
-            <span style={{ fontSize: 12, lineHeight: 1.4, fontWeight: 500, color: INK_MUTED }}>
+            <span style={{ fontSize: 14.5, lineHeight: 1.4, fontWeight: 500, color: INK_MUTED }}>
               Take your time. There are no right or wrong answers.
             </span>
           </div>
@@ -437,10 +437,10 @@ export default function ValuesCardSort({ sessionId, role, isLocked }: ValuesCard
             }}>
               <Trophy size={19} color={allSorted ? '#D97706' : INK_FAINT} strokeWidth={2.1} />
               <div style={{ minWidth: 0 }}>
-                <div style={{ fontSize: 13, fontWeight: 800, letterSpacing: -0.2, color: allSorted ? GREEN_DEEP : VIOLET }}>
+                <div style={{ fontSize: 15, fontWeight: 800, letterSpacing: -0.2, color: allSorted ? GREEN_DEEP : VIOLET }}>
                   {allSorted ? 'All sorted!' : 'Keep going!'}
                 </div>
-                <div style={{ fontSize: 11, fontWeight: 500, color: INK_FAINT }}>
+                <div style={{ fontSize: 13, fontWeight: 500, color: INK_FAINT }}>
                   {allSorted
                     ? `${sortedCount} of ${cards.length} values placed.`
                     : `Sort all values to continue.`}
@@ -464,12 +464,12 @@ export default function ValuesCardSort({ sessionId, role, isLocked }: ValuesCard
                   opacity: allSorted || !isT ? 1 : 0.72,
                 }}
               >
-                <span style={{ display: 'flex', alignItems: 'center', gap: 8, fontSize: 13.5, fontWeight: 800, letterSpacing: -0.2, color: VIOLET }}>
+                <span style={{ display: 'flex', alignItems: 'center', gap: 8, fontSize: 15.5, fontWeight: 800, letterSpacing: -0.2, color: VIOLET }}>
                   Continue to Round {round + 1}
                   <ArrowRight size={15} strokeWidth={2.6} color={VIOLET} />
                   {!allSorted && <Lock size={13} strokeWidth={2.4} color={VIOLET_BRIGHT} />}
                 </span>
-                <span style={{ fontSize: 11, fontWeight: 500, color: '#6B6394' }}>
+                <span style={{ fontSize: 13, fontWeight: 500, color: '#6B6394' }}>
                   {round === 1 ? 'Find your most important values right now.' : 'Lock in your core values.'}
                 </span>
               </button>
@@ -523,7 +523,7 @@ function ValueCard({ card, index, total, dx, side, canInteract, onPointerDown, o
         position: 'absolute', top: 13, left: 15,
         padding: '4px 11px', borderRadius: 999,
         background: GREEN_TINT, border: `1px solid ${GREEN_LINE}`,
-        fontSize: 13, fontWeight: 700, color: GREEN_DEEP, fontVariantNumeric: 'tabular-nums',
+        fontSize: 15, fontWeight: 700, color: GREEN_DEEP, fontVariantNumeric: 'tabular-nums',
       }}>
         {index} / {total}
       </span>
@@ -538,7 +538,7 @@ function ValueCard({ card, index, total, dx, side, canInteract, onPointerDown, o
       </span>
 
       <div style={{
-        fontSize: 46, fontWeight: 800, letterSpacing: 0.5, lineHeight: 1.05,
+        fontSize: 49, fontWeight: 800, letterSpacing: 0.5, lineHeight: 1.05,
         textTransform: 'uppercase', color: INK, textAlign: 'center', wordBreak: 'break-word',
       }}>
         {card.text}
@@ -552,7 +552,7 @@ function ValueCard({ card, index, total, dx, side, canInteract, onPointerDown, o
       </div>
 
       <div style={{
-        fontSize: 16, fontWeight: 500, lineHeight: 1.35, color: INK_BODY,
+        fontSize: 18.5, fontWeight: 500, lineHeight: 1.35, color: INK_BODY,
         textAlign: 'center', maxWidth: 330,
       }}>
         {describe(card.text)}
@@ -571,8 +571,8 @@ function DoneCard({ sorted }: { sorted: number }) {
       padding: 20, textAlign: 'center',
     }}>
       <Trophy size={34} color="#D97706" strokeWidth={2} />
-      <div style={{ fontSize: 22, fontWeight: 800, letterSpacing: -0.3, color: VIOLET }}>Every value is sorted</div>
-      <div style={{ fontSize: 13.5, fontWeight: 500, color: INK_MUTED, maxWidth: 320 }}>
+      <div style={{ fontSize: 24, fontWeight: 800, letterSpacing: -0.3, color: VIOLET }}>Every value is sorted</div>
+      <div style={{ fontSize: 15.5, fontWeight: 500, color: INK_MUTED, maxWidth: 320 }}>
         All {sorted} cards are in a pile. Your therapist can move you to the next round.
       </div>
     </div>
@@ -584,7 +584,7 @@ function DragHint({ dim }: { dim: boolean }) {
   return (
     <div aria-hidden style={{
       flexShrink: 0, display: 'flex', alignItems: 'center', gap: 10,
-      fontSize: 13, fontWeight: 600, color: VIOLET, opacity: dim ? 0.3 : 1,
+      fontSize: 15, fontWeight: 600, color: VIOLET, opacity: dim ? 0.3 : 1,
       transition: 'opacity .15s',
     }}>
       <DashArrow dir="left" />
@@ -647,13 +647,13 @@ function Pile({ tone, label, count, cards, active }: {
 
       <div style={{
         flexShrink: 0, textAlign: 'center',
-        fontSize: 15.5, fontWeight: 800, letterSpacing: -0.2, color: accent, lineHeight: 1.15,
+        fontSize: 18, fontWeight: 800, letterSpacing: -0.2, color: accent, lineHeight: 1.15,
       }}>
         {label}
       </div>
       <div style={{
         flexShrink: 0, textAlign: 'center', marginTop: 2, marginBottom: 8,
-        fontSize: 13, fontWeight: 600, color: deep, fontVariantNumeric: 'tabular-nums',
+        fontSize: 15, fontWeight: 600, color: deep, fontVariantNumeric: 'tabular-nums',
       }}>
         {count} {count === 1 ? 'value' : 'values'}
       </div>
@@ -665,7 +665,7 @@ function Pile({ tone, label, count, cards, active }: {
         paddingTop: 2,
       }}>
         {stack.length === 0 ? (
-          <span style={{ fontSize: 11.5, fontWeight: 500, color: INK_FAINT, textAlign: 'center', paddingTop: 10 }}>
+          <span style={{ fontSize: 14, fontWeight: 500, color: INK_FAINT, textAlign: 'center', paddingTop: 10 }}>
             Nothing here yet.
           </span>
         ) : (
@@ -674,7 +674,7 @@ function Pile({ tone, label, count, cards, active }: {
               <div key={c.id} style={{
                 padding: '7px 10px', borderRadius: 11,
                 background: tint, border: `1px solid ${line}`,
-                fontSize: 12.5, fontWeight: 700, textTransform: 'capitalize',
+                fontSize: 15, fontWeight: 700, textTransform: 'capitalize',
                 color: red ? '#991B1B' : '#14532D',
                 textAlign: 'center',
                 animation: 'vs-pop .18s ease',
@@ -683,7 +683,7 @@ function Pile({ tone, label, count, cards, active }: {
               </div>
             ))}
             {cards.length > stack.length && (
-              <div style={{ fontSize: 11, fontWeight: 600, color: deep, textAlign: 'center', paddingTop: 2 }}>
+              <div style={{ fontSize: 13, fontWeight: 600, color: deep, textAlign: 'center', paddingTop: 2 }}>
                 +{cards.length - stack.length} more
               </div>
             )}
@@ -709,10 +709,10 @@ function EmptyStage({ isT, onStart }: { isT: boolean; onStart: () => void }) {
       }}>
         <Users size={28} color={VIOLET_BRIGHT} fill={VIOLET_BRIGHT} strokeWidth={1.6} />
       </span>
-      <div style={{ fontSize: 20, fontWeight: 800, letterSpacing: -0.3, color: VIOLET }}>
+      <div style={{ fontSize: 22, fontWeight: 800, letterSpacing: -0.3, color: VIOLET }}>
         {isT ? 'Ready when you are' : 'Waiting for your therapist…'}
       </div>
-      <div style={{ fontSize: 13.5, fontWeight: 500, color: INK_MUTED, maxWidth: 320 }}>
+      <div style={{ fontSize: 15.5, fontWeight: 500, color: INK_MUTED, maxWidth: 320 }}>
         {isT
           ? 'Deal the deck of 20 values and sort them one card at a time.'
           : 'Your therapist will deal the deck of values in a moment.'}
@@ -764,12 +764,12 @@ function CompareStage({ cards, comparePair, remaining, canInteract, onPick }: {
                   <Heart size={24} color={VIOLET_BRIGHT} fill={VIOLET_BRIGHT} />
                 </span>
                 <span style={{
-                  fontSize: 34, fontWeight: 800, letterSpacing: 0.4, lineHeight: 1.05,
+                  fontSize: 36, fontWeight: 800, letterSpacing: 0.4, lineHeight: 1.05,
                   textTransform: 'uppercase', color: INK, textAlign: 'center', wordBreak: 'break-word',
                 }}>
                   {card.text}
                 </span>
-                <span style={{ fontSize: 13.5, fontWeight: 500, lineHeight: 1.35, color: INK_BODY, textAlign: 'center', maxWidth: 260 }}>
+                <span style={{ fontSize: 15.5, fontWeight: 500, lineHeight: 1.35, color: INK_BODY, textAlign: 'center', maxWidth: 260 }}>
                   {describe(card.text)}
                 </span>
               </button>
@@ -783,15 +783,15 @@ function CompareStage({ cards, comparePair, remaining, canInteract, onPick }: {
           borderRadius: 22, border: `2px dashed ${VIOLET_LINE}`, background: '#ffffff', textAlign: 'center', padding: 20,
         }}>
           <Trophy size={32} color="#D97706" strokeWidth={2} />
-          <div style={{ fontSize: 20, fontWeight: 800, letterSpacing: -0.3, color: VIOLET }}>
+          <div style={{ fontSize: 22, fontWeight: 800, letterSpacing: -0.3, color: VIOLET }}>
             {remaining} value{remaining === 1 ? '' : 's'} remaining
           </div>
-          <div style={{ fontSize: 13.5, fontWeight: 500, color: INK_MUTED }}>
+          <div style={{ fontSize: 15.5, fontWeight: 500, color: INK_MUTED }}>
             There is nothing left to compare.
           </div>
         </div>
       )}
-      <div style={{ flexShrink: 0, textAlign: 'center', fontSize: 12.5, fontWeight: 600, color: INK_FAINT }}>
+      <div style={{ flexShrink: 0, textAlign: 'center', fontSize: 15, fontWeight: 600, color: INK_FAINT }}>
         {remaining} remaining — keep going until 3–5 remain
       </div>
     </div>
@@ -812,7 +812,7 @@ function FinalStage({ final, highlighted, canInteract, onPick }: {
       alignContent: 'center', padding: 4,
     }}>
       {final.length === 0 && (
-        <span style={{ fontSize: 13, fontWeight: 500, color: INK_FAINT }}>No core values were carried through.</span>
+        <span style={{ fontSize: 15, fontWeight: 500, color: INK_FAINT }}>No core values were carried through.</span>
       )}
       {final.slice(0, 5).map(c => {
         const on = highlighted === c.id
@@ -834,12 +834,12 @@ function FinalStage({ final, highlighted, canInteract, onPick }: {
           >
             <Heart size={19} color={VIOLET_BRIGHT} fill={on ? VIOLET_BRIGHT : 'none'} />
             <span style={{
-              fontSize: 26, fontWeight: 800, letterSpacing: 0.4, lineHeight: 1.1,
+              fontSize: 28.5, fontWeight: 800, letterSpacing: 0.4, lineHeight: 1.1,
               textTransform: 'uppercase', color: INK,
             }}>
               {c.text}
             </span>
-            <span style={{ fontSize: 12, fontWeight: 600, color: on ? VIOLET : INK_FAINT }}>
+            <span style={{ fontSize: 14.5, fontWeight: 600, color: on ? VIOLET : INK_FAINT }}>
               {on ? 'Living this least lately' : 'Tap to mark'}
             </span>
           </button>
@@ -856,7 +856,7 @@ function FinalStage({ final, highlighted, canInteract, onPick }: {
 const bigBtn = (bg: string, glow: string, disabled: boolean): CSSProperties => ({
   display: 'inline-flex', alignItems: 'center', justifyContent: 'center', gap: 10,
   padding: '13px 26px', borderRadius: 14, border: 'none',
-  background: bg, color: '#ffffff', fontSize: 17, fontWeight: 700,
+  background: bg, color: '#ffffff', fontSize: 19.5, fontWeight: 700,
   fontFamily: '"DM Sans", sans-serif', whiteSpace: 'nowrap',
   boxShadow: disabled ? 'none' : `0 6px 16px ${glow}`,
   cursor: disabled ? 'default' : 'pointer',
@@ -867,19 +867,19 @@ const ghostBtn: CSSProperties = {
   display: 'inline-flex', alignItems: 'center', gap: 6,
   padding: '9px 12px', borderRadius: 12,
   border: `1px solid ${VIOLET_LINE}`, background: '#ffffff',
-  color: VIOLET, fontSize: 12, fontWeight: 700,
+  color: VIOLET, fontSize: 14.5, fontWeight: 700,
   fontFamily: '"DM Sans", sans-serif', cursor: 'pointer', whiteSpace: 'nowrap',
 }
 
 const chipBtn: CSSProperties = {
   padding: '8px 14px', borderRadius: 10, border: 'none',
-  background: VIOLET, color: '#ffffff', fontSize: 12, fontWeight: 700,
+  background: VIOLET, color: '#ffffff', fontSize: 14.5, fontWeight: 700,
   fontFamily: '"DM Sans", sans-serif', cursor: 'pointer', flexShrink: 0,
 }
 
 const inputStyle: CSSProperties = {
   flex: 1, minWidth: 0, background: '#ffffff', border: `1px solid ${HAIRLINE}`,
-  borderRadius: 10, padding: '8px 11px', fontSize: 12.5, color: '#1E293B',
+  borderRadius: 10, padding: '8px 11px', fontSize: 15, color: '#1E293B',
   outline: 'none', fontFamily: '"DM Sans", sans-serif',
   transition: 'border-color .15s, box-shadow .15s',
 }

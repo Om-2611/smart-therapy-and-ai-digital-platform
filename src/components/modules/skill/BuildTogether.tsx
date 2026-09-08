@@ -1101,7 +1101,7 @@ export default function BuildTogether({ sessionId, role, isLocked }: BuildTogeth
             style={{
               display: 'flex', alignItems: 'center', gap: 8, padding: '5px 14px', borderRadius: 20,
               background: 'rgba(255,251,240,0.95)', boxShadow: '0 4px 14px rgba(0,0,0,0.18)',
-              fontSize: 12, fontWeight: 800, color: '#5a3a1a', whiteSpace: 'nowrap',
+              fontSize: 14.5, fontWeight: 800, color: '#5a3a1a', whiteSpace: 'nowrap',
             }}
           >
             <span>{THEME_EMOJI[scenario.theme]}</span>
@@ -1118,7 +1118,7 @@ export default function BuildTogether({ sessionId, role, isLocked }: BuildTogeth
                   key={key}
                   onClick={() => write({ 'moduleState.btLanguage': key })}
                   style={{
-                    border: 'none', cursor: 'pointer', borderRadius: 999, padding: '3px 8px', fontSize: 9, fontWeight: 800,
+                    border: 'none', cursor: 'pointer', borderRadius: 999, padding: '3px 8px', fontSize: 11.5, fontWeight: 800,
                     fontFamily: key === 'hi' ? DEVANAGARI : NUNITO,
                     background: language === key ? 'rgba(74,124,111,0.3)' : 'transparent',
                     color: language === key ? '#2f5c50' : '#9a8570',
@@ -1139,7 +1139,7 @@ export default function BuildTogether({ sessionId, role, isLocked }: BuildTogeth
                 key={l}
                 onClick={() => loadScenario(scenariosFor(l)[0].id, l)}
                 style={{
-                  padding: '2px 10px', borderRadius: 999, cursor: 'pointer', fontSize: 9, fontWeight: 800, textTransform: 'capitalize',
+                  padding: '2px 10px', borderRadius: 999, cursor: 'pointer', fontSize: 11.5, fontWeight: 800, textTransform: 'capitalize',
                   fontFamily: NUNITO, border: 'none',
                   background: level === l ? 'rgba(74,124,111,0.85)' : 'rgba(255,251,240,0.85)',
                   color: level === l ? '#fff' : '#8a6a4a',
@@ -1157,26 +1157,26 @@ export default function BuildTogether({ sessionId, role, isLocked }: BuildTogeth
           <div style={cardBase}>
             {/* folded corner */}
             <div style={{ position: 'absolute', top: 0, right: 0, width: 0, height: 0, borderStyle: 'solid', borderWidth: '0 14px 14px 0', borderColor: `transparent rgba(139,90,43,0.18) transparent transparent`, borderTopRightRadius: 12 }} />
-            <div style={{ fontSize: 10, fontWeight: 800, textTransform: 'uppercase', color: '#8a5a2a', marginBottom: 6, letterSpacing: 0.3 }}>
+            <div style={{ fontSize: 12, fontWeight: 800, textTransform: 'uppercase', color: '#8a5a2a', marginBottom: 6, letterSpacing: 0.3 }}>
               {myClueIsTherapist ? '🧑‍⚕️ Your card (hidden from the child)' : '🧒 Your card (hidden from the therapist)'}
             </div>
 
             {myClueIsTherapist ? (
               <>
-                {showEn && <div style={{ fontSize: 11, fontWeight: 700, color: '#2c1f0e', lineHeight: 1.4 }}>{scenario.therapistClue.en}</div>}
+                {showEn && <div style={{ fontSize: 13, fontWeight: 700, color: '#2c1f0e', lineHeight: 1.4 }}>{scenario.therapistClue.en}</div>}
                 {language === 'both' && <div style={{ height: 1, background: 'rgba(139,90,43,0.18)', margin: '6px 0' }} />}
-                {showHi && <div style={{ fontSize: 11, fontWeight: 600, fontFamily: DEVANAGARI, color: '#6b5540', lineHeight: 1.5 }}>{scenario.therapistClue.hi}</div>}
+                {showHi && <div style={{ fontSize: 13, fontWeight: 600, fontFamily: DEVANAGARI, color: '#6b5540', lineHeight: 1.5 }}>{scenario.therapistClue.hi}</div>}
               </>
             ) : (
               <>
-                {showEn && <div style={{ fontSize: 11, fontWeight: 700, color: '#2c1f0e', lineHeight: 1.4 }}>{scenario.childClue.en}</div>}
+                {showEn && <div style={{ fontSize: 13, fontWeight: 700, color: '#2c1f0e', lineHeight: 1.4 }}>{scenario.childClue.en}</div>}
                 {language === 'both' && <div style={{ height: 1, background: 'rgba(139,90,43,0.18)', margin: '6px 0' }} />}
-                {showHi && <div style={{ fontSize: 11, fontWeight: 600, fontFamily: DEVANAGARI, color: '#6b5540', lineHeight: 1.5 }}>{scenario.childClue.hi}</div>}
+                {showHi && <div style={{ fontSize: 13, fontWeight: 600, fontFamily: DEVANAGARI, color: '#6b5540', lineHeight: 1.5 }}>{scenario.childClue.hi}</div>}
                 <div style={{ marginTop: 8, display: 'flex', flexDirection: 'column', gap: 4 }}>
                   {scenario.childClue.materialKey.map((k) => (
                     <div key={k.material} style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
                       <span style={{ flexShrink: 0, width: 10, height: 10, borderRadius: 3, background: SWATCH[k.material], border: '1px solid rgba(0,0,0,0.2)' }} />
-                      <span style={{ flex: 1, minWidth: 0, fontSize: 9, lineHeight: 1.3 }}>
+                      <span style={{ flex: 1, minWidth: 0, fontSize: 11.5, lineHeight: 1.3 }}>
                         {showEn && <span style={{ display: 'block', fontWeight: 700, color: '#2c1f0e' }}>{MATERIAL_LABEL[k.material].en}: {k.label_en}</span>}
                         {showHi && <span style={{ display: 'block', fontFamily: DEVANAGARI, fontWeight: 600, color: '#6b5540' }}>{MATERIAL_LABEL[k.material].hi}: {k.label_hi}</span>}
                       </span>
@@ -1282,7 +1282,7 @@ export default function BuildTogether({ sessionId, role, isLocked }: BuildTogeth
               <button
                 onClick={handleNext}
                 style={{
-                  padding: '7px 18px', borderRadius: 999, cursor: 'pointer', fontSize: 12, fontWeight: 800, fontFamily: NUNITO,
+                  padding: '7px 18px', borderRadius: 999, cursor: 'pointer', fontSize: 14.5, fontWeight: 800, fontFamily: NUNITO,
                   background: 'rgba(74,124,111,0.95)', border: 'none', color: '#fff', boxShadow: '0 4px 14px rgba(0,0,0,0.25)',
                 }}
               >
@@ -1292,7 +1292,7 @@ export default function BuildTogether({ sessionId, role, isLocked }: BuildTogeth
               <button
                 onClick={handleCheck}
                 style={{
-                  padding: '7px 18px', borderRadius: 999, cursor: 'pointer', fontSize: 12, fontWeight: 800, fontFamily: NUNITO,
+                  padding: '7px 18px', borderRadius: 999, cursor: 'pointer', fontSize: 14.5, fontWeight: 800, fontFamily: NUNITO,
                   background: 'rgba(255,251,240,0.95)', border: '1px solid rgba(139,90,43,0.25)', color: '#5a3a1a',
                   boxShadow: '0 4px 14px rgba(0,0,0,0.2)',
                 }}
@@ -1305,7 +1305,7 @@ export default function BuildTogether({ sessionId, role, isLocked }: BuildTogeth
 
         {/* Locked hint */}
         {!canDrag && (
-          <div style={{ position: 'absolute', bottom: 88, left: 16, zIndex: 30, fontSize: 9, fontWeight: 700, color: '#fff', textShadow: '0 1px 3px rgba(0,0,0,0.7)' }}>
+          <div style={{ position: 'absolute', bottom: 88, left: 16, zIndex: 30, fontSize: 11.5, fontWeight: 700, color: '#fff', textShadow: '0 1px 3px rgba(0,0,0,0.7)' }}>
             Therapist is controlling
           </div>
         )}
@@ -1339,13 +1339,13 @@ export default function BuildTogether({ sessionId, role, isLocked }: BuildTogeth
                 <span
                   style={{
                     position: 'absolute', top: -5, right: -5, minWidth: 17, height: 17, borderRadius: '50%',
-                    background: '#c8602a', color: '#fff', fontSize: 9, fontWeight: 900,
+                    background: '#c8602a', color: '#fff', fontSize: 11.5, fontWeight: 900,
                     display: 'flex', alignItems: 'center', justifyContent: 'center', border: '2px solid #fffbf0',
                   }}
                 >
                   {left}
                 </span>
-                <span style={{ fontSize: 8, fontWeight: 800, color: '#5a3a1a', fontFamily: showHi && !showEn ? DEVANAGARI : NUNITO }}>
+                <span style={{ fontSize: 10.5, fontWeight: 800, color: '#5a3a1a', fontFamily: showHi && !showEn ? DEVANAGARI : NUNITO }}>
                   {showEn ? MATERIAL_LABEL[m.type].en : MATERIAL_LABEL[m.type].hi}
                 </span>
               </div>
@@ -1368,7 +1368,7 @@ export default function BuildTogether({ sessionId, role, isLocked }: BuildTogeth
             >
               <button
                 onClick={() => setFqOpen((o) => !o)}
-                style={{ width: '100%', display: 'flex', justifyContent: 'space-between', alignItems: 'center', background: 'transparent', border: 'none', cursor: 'pointer', padding: 0, color: '#fff', fontFamily: NUNITO, fontSize: 11, fontWeight: 800 }}
+                style={{ width: '100%', display: 'flex', justifyContent: 'space-between', alignItems: 'center', background: 'transparent', border: 'none', cursor: 'pointer', padding: 0, color: '#fff', fontFamily: NUNITO, fontSize: 13, fontWeight: 800 }}
               >
                 <span>💬 Ask the child</span>
                 <span>{fqOpen ? '▾' : '▸'}</span>
@@ -1376,7 +1376,7 @@ export default function BuildTogether({ sessionId, role, isLocked }: BuildTogeth
               {fqOpen && (
                 <ol style={{ margin: '6px 0 0', paddingLeft: 16, display: 'flex', flexDirection: 'column', gap: 5 }}>
                   {scenario.facilitatorQuestions.map((q, i) => (
-                    <li key={i} style={{ fontSize: 10, fontWeight: 600, color: 'rgba(255,255,255,0.92)', lineHeight: 1.35 }}>
+                    <li key={i} style={{ fontSize: 12, fontWeight: 600, color: 'rgba(255,255,255,0.92)', lineHeight: 1.35 }}>
                       <span style={{ display: 'block' }}>{q.en}</span>
                       <span style={{ display: 'block', fontFamily: DEVANAGARI, color: 'rgba(255,255,255,0.7)' }}>{q.hi}</span>
                     </li>
