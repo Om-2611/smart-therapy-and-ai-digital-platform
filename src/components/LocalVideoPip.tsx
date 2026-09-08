@@ -14,8 +14,8 @@ export default function LocalVideoPip({ docked = false }: { docked?: boolean }) 
   // `docked` renders the self-view as a tile in the top strip (replacing the
   // static "You" thumbnail). Default is the floating overlay over the video.
   const positionStyle: CSSProperties = docked
-    ? { position: 'relative', width: 140, height: 84, flexShrink: 0 }
-    : { position: 'absolute', bottom: 92, left: 18, width: 132, height: 96, zIndex: 18 }
+    ? { position: 'relative', width: 168, height: 100, flexShrink: 0 }
+    : { position: 'absolute', bottom: 92, left: 18, width: 190, height: 138, zIndex: 18 }
 
   return (
     <div
@@ -39,7 +39,7 @@ export default function LocalVideoPip({ docked = false }: { docked?: boolean }) 
         />
       ) : (
         <div className="flex items-center justify-center h-full">
-          <span style={{ fontSize: 22, color: 'rgba(255,255,255,0.6)' }}>
+          <span style={{ fontSize: 30, color: 'rgba(255,255,255,0.6)' }}>
             {userName?.charAt(0)?.toUpperCase() || 'Y'}
           </span>
         </div>
@@ -47,9 +47,9 @@ export default function LocalVideoPip({ docked = false }: { docked?: boolean }) 
       <div
         style={{
           position: 'absolute',
-          top: 4,
-          left: 6,
-          fontSize: 8,
+          top: 5,
+          left: 7,
+          fontSize: 10.5,
           color: 'rgba(255,255,255,0.5)',
           background: 'rgba(0,0,0,0.5)',
           padding: '1px 6px',
@@ -61,9 +61,9 @@ export default function LocalVideoPip({ docked = false }: { docked?: boolean }) 
       <div
         style={{
           position: 'absolute',
-          bottom: 4,
-          left: 6,
-          fontSize: 9,
+          bottom: 5,
+          left: 7,
+          fontSize: 12,
           color: 'rgba(255,255,255,0.6)',
         }}
       >

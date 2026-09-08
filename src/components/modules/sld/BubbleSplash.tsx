@@ -20,7 +20,10 @@ type WordSet = 'sight-words' | 'phonics' | 'rhymes' | 'vocabulary' | 'custom'
 interface BubbleData {
   id: string
   word: string
+  /** Lane centre as a percentage of the sky's width. */
   x: number
+  /** How many lanes the round was laid out in; sizes the bubble to fit one. */
+  lanes?: number
   size: number
   color: string
   spawnedAt: number
@@ -34,16 +37,27 @@ interface Particle {
   y: number
 }
 
-const SPEED_CONFIG: Record<Speed, { floatDuration: number; spawnInterval: number }> = {
-  slow: { floatDuration: 5000, spawnInterval: 2000 },
-  normal: { floatDuration: 3500, spawnInterval: 1200 },
-  fast: { floatDuration: 2000, spawnInterval: 700 },
+/* How long a bubble takes to cross the sky. The old values gave a child under
+   four seconds to read six words on Normal and two on Fast, so the speed pills
+   read as "hard / harder" rather than a pace the therapist can match to the
+   child. Widened so each step is clearly different and every step is readable. */
+const SPEED_CONFIG: Record<Speed, { floatDuration: number }> = {
+  slow: { floatDuration: 9000 },
+  normal: { floatDuration: 6500 },
+  fast: { floatDuration: 4000 },
 }
 
-const DIFFICULTY_CONFIG: Record<Difficulty, { maxBubbles: number }> = {
-  easy: { maxBubbles: 4 },
-  medium: { maxBubbles: 5 },
-  hard: { maxBubbles: 6 },
+/* How many bubbles rise together. A round now draws a random count inside the
+   level's range instead of always the same number, so each set feels different. */
+const DIFFICULTY_CONFIG: Record<Difficulty, { minBubbles: number; maxBubbles: number }> = {
+  easy: { minBubbles: 4, maxBubbles: 5 },
+  medium: { minBubbles: 5, maxBubbles: 6 },
+  hard: { minBubbles: 6, maxBubbles: 7 },
+}
+
+function roundSize(difficulty: Difficulty): number {
+  const { minBubbles, maxBubbles } = DIFFICULTY_CONFIG[difficulty]
+  return minBubbles + Math.floor(Math.random() * (maxBubbles - minBubbles + 1))
 }
 
 /* ---------------------------------------------------------------------------
@@ -63,6 +77,20 @@ const BG = (f: string) => `/assets/modules/Background/${encodeURIComponent(f)}`
 /* Pastel lavender-to-blue sky, already carrying the mockup's clouds, drifting
    bubbles and gold stars. */
 const SCENE = BG('bubble splash.png')
+
+/* The delivered pop sound (bubble_pop.mp3, shipped inside the assets zip and
+   previously unused). Lazily created so nothing touches window during SSR. */
+const POP_SFX = A('bubble_pop.mp3')
+let bsPop: HTMLAudioElement | null = null
+function playPop(volume = 0.55) {
+  try {
+    if (typeof window === 'undefined') return
+    if (!bsPop) bsPop = new Audio(POP_SFX)
+    bsPop.volume = volume
+    bsPop.currentTime = 0
+    void bsPop.play()
+  } catch {}
+}
 const IDLE_SPRITES = [A('bubble_see.png'), A('bubble_the.png'), A('bubble_go.png')]
 
 /* Palette — this renders on a WHITE stage canvas, so every label is dark ink on
@@ -162,22 +190,76 @@ const SIGHT_WORDS: Record<string, string[]> = {
   hard: ['because', 'through', 'where', 'before', 'right', 'too', 'does', 'another', 'large', 'often', 'together', 'always'],
 }
 
-const PHONICS_FAMILIES: Record<string, string[]> = {
-  '-at': ['cat', 'bat', 'hat', 'mat', 'rat', 'sat', 'fat', 'pat'],
-  '-an': ['can', 'ban', 'fan', 'man', 'pan', 'ran', 'tan', 'van'],
-  '-ig': ['big', 'dig', 'fig', 'jig', 'pig', 'rig', 'wig'],
-  '-op': ['cop', 'hop', 'mop', 'pop', 'top', 'bop', 'drop', 'stop'],
+/* Every pool below is now graded by difficulty. Only sight words were before —
+   phonics, rhymes and vocabulary all drew from one fixed pool, so Easy, Medium
+   and Hard asked exactly the same questions and only changed how many bubbles
+   rose. */
+const PHONICS_FAMILIES: Record<Difficulty, Record<string, string[]>> = {
+  easy: {
+    '-at': ['cat', 'bat', 'hat', 'mat', 'rat', 'sat'],
+    '-an': ['can', 'fan', 'man', 'pan', 'ran', 'van'],
+    '-ig': ['big', 'dig', 'pig', 'wig', 'fig'],
+    '-op': ['hop', 'mop', 'pop', 'top', 'cop'],
+  },
+  medium: {
+    '-ell': ['bell', 'fell', 'sell', 'tell', 'well', 'shell'],
+    '-ick': ['kick', 'lick', 'pick', 'sick', 'tick', 'brick'],
+    '-ump': ['bump', 'jump', 'lump', 'pump', 'dump', 'stump'],
+    '-and': ['band', 'hand', 'land', 'sand', 'stand', 'grand'],
+  },
+  hard: {
+    '-ight': ['light', 'night', 'right', 'sight', 'bright', 'fight'],
+    '-ing': ['bring', 'sting', 'swing', 'thing', 'spring', 'string'],
+    '-tch': ['catch', 'match', 'patch', 'watch', 'pitch', 'switch'],
+    '-ound': ['round', 'sound', 'found', 'ground', 'pound'],
+  },
 }
 
-const RHYME_GROUPS: string[][] = [
-  ['cat', 'bat', 'hat'], ['dog', 'log', 'fog'], ['sun', 'fun', 'run'],
-  ['day', 'say', 'play'], ['book', 'look', 'cook'], ['cake', 'lake', 'make'],
-]
+/* Each group needs at least two words: one becomes the CUE named in the prompt
+   and a different one becomes the answer in the bubbles. */
+const RHYME_GROUPS: Record<Difficulty, string[][]> = {
+  easy: [
+    ['cat', 'bat', 'hat', 'mat'],
+    ['dog', 'log', 'fog', 'jog'],
+    ['sun', 'fun', 'run', 'bun'],
+    ['pig', 'big', 'dig', 'wig'],
+  ],
+  medium: [
+    ['cake', 'lake', 'make', 'bake'],
+    ['book', 'look', 'cook', 'hook'],
+    ['play', 'day', 'say', 'way'],
+    ['ring', 'king', 'sing', 'wing'],
+  ],
+  hard: [
+    ['flower', 'power', 'tower', 'shower'],
+    ['bright', 'night', 'flight', 'light'],
+    ['station', 'nation', 'creation'],
+    ['dinner', 'winner', 'thinner'],
+  ],
+}
 
-const VOCABULARY = {
-  animals: ['lion', 'tiger', 'eagle', 'shark', 'panda', 'koala'],
-  colors: ['scarlet', 'violet', 'crimson', 'amber', 'ivory'],
-  food: ['bread', 'fruit', 'cream', 'grain', 'salad', 'pasta'],
+const VOCABULARY: Record<Difficulty, Record<string, string[]>> = {
+  easy: {
+    animals: ['cat', 'dog', 'cow', 'pig', 'hen', 'duck'],
+    colours: ['red', 'blue', 'green', 'pink', 'black'],
+    foods: ['milk', 'rice', 'cake', 'egg', 'apple'],
+  },
+  medium: {
+    animals: ['tiger', 'horse', 'rabbit', 'monkey', 'parrot'],
+    colours: ['purple', 'orange', 'yellow', 'silver', 'brown'],
+    foods: ['bread', 'cheese', 'butter', 'tomato', 'banana'],
+  },
+  hard: {
+    animals: ['elephant', 'crocodile', 'butterfly', 'kangaroo', 'dolphin'],
+    colours: ['scarlet', 'crimson', 'turquoise', 'lavender', 'emerald'],
+    foods: ['spaghetti', 'pineapple', 'chocolate', 'cucumber', 'strawberry'],
+  },
+}
+
+/** "animals" -> "an animal", "colours" -> "a colour". */
+function categoryPhrase(cat: string): string {
+  const singular = cat.replace(/s$/, '')
+  return `${/^[aeiou]/.test(singular) ? 'an' : 'a'} ${singular}`
 }
 
 let bubbleIdCounter = 0
@@ -195,77 +277,115 @@ function pick<T>(arr: T[]): T {
   return arr[Math.floor(Math.random() * arr.length)]
 }
 
-function generateRound(wordSet: WordSet, difficulty: Difficulty, customWords: string[], customPrompt: string): { prompt: string; correctWord: string; allWords: string[] } {
-  const maxBubbles = DIFFICULTY_CONFIG[difficulty].maxBubbles
-  let allWords: string[] = []
+/**
+ * Build one round: the prompt, the single correct word, and the words to float.
+ *
+ * Every mode now has exactly ONE defensible answer. Before this, three of the
+ * four modes were ambiguous or gave the answer away:
+ *   - sight words drew the distractors from the same list and prompted only
+ *     "Pop a sight word!", so every bubble on screen satisfied the prompt;
+ *   - vocabulary drew its distractors from the SAME category, so every bubble
+ *     was an animal when the prompt asked for an animal;
+ *   - rhymes named the correct word in the prompt itself ("rhymes with CAT"
+ *     while CAT was the bubble to pop).
+ * That is why the target appeared to be rising almost every time — in practice
+ * most of the bubbles were valid targets. Distractors now always come from
+ * outside the answer's own set, and the rhyme cue is never the answer.
+ */
+function generateRound(
+  wordSet: WordSet,
+  difficulty: Difficulty,
+  customWords: string[],
+  customPrompt: string
+): { prompt: string; correctWord: string; allWords: string[] } {
+  const count = roundSize(difficulty)
+  const take = (pool: string[], n: number) => shuffle(pool).slice(0, Math.max(0, n))
+
   let correctWord = ''
   let prompt = ''
+  let distractors: string[] = []
 
   if (wordSet === 'sight-words') {
     const pool = SIGHT_WORDS[difficulty] || SIGHT_WORDS.easy
     correctWord = pick(pool)
-    const distractors = shuffle(pool.filter((w) => w !== correctWord)).slice(0, maxBubbles - 1)
-    allWords = shuffle([correctWord, ...distractors])
-    prompt = 'Pop a sight word!'
+    distractors = take(pool.filter((w) => w !== correctWord), count - 1)
+    // Naming the word is the point of sight-word practice: recognise it on
+    // sight among others. Without it, every bubble was an equally valid answer.
+    prompt = `Pop the word "${correctWord.toUpperCase()}"`
   } else if (wordSet === 'phonics') {
-    const families = Object.keys(PHONICS_FAMILIES)
-    const familyKey = pick(families)
-    const pool = PHONICS_FAMILIES[familyKey]
-    const familyWords = shuffle(pool)
-    correctWord = familyWords[0]
-    const distractors: string[] = []
-    const otherWords = Object.entries(PHONICS_FAMILIES)
+    const families = PHONICS_FAMILIES[difficulty]
+    const familyKey = pick(Object.keys(families))
+    correctWord = pick(families[familyKey])
+    const others = Object.entries(families)
       .filter(([k]) => k !== familyKey)
       .flatMap(([, v]) => v)
-    const shuffledOthers = shuffle(otherWords)
-    for (let i = 0; i < maxBubbles - 1 && i < shuffledOthers.length; i++) {
-      distractors.push(shuffledOthers[i])
-    }
-    allWords = shuffle([correctWord, ...distractors.slice(0, maxBubbles - 1)])
+    distractors = take(others, count - 1)
     prompt = `Pop a word from the ${familyKey} family`
   } else if (wordSet === 'rhymes') {
-    const group = pick(RHYME_GROUPS)
-    correctWord = pick(group)
-    const sameGroup = group.filter((w) => w !== correctWord)
-    const distractors: string[] = []
-    const otherWords = RHYME_GROUPS.filter((g) => g !== group).flat()
-    const shuffledOthers = shuffle(otherWords)
-    for (let i = 0; i < maxBubbles - 1 && i < shuffledOthers.length; i++) {
-      distractors.push(shuffledOthers[i])
-    }
-    allWords = shuffle([correctWord, ...distractors.slice(0, maxBubbles - 1)])
-    prompt = `Pop a word that rhymes with ${correctWord.toUpperCase()}`
+    const groups = RHYME_GROUPS[difficulty]
+    const group = pick(groups)
+    // Cue and answer are two DIFFERENT words from the same group, so the prompt
+    // asks the child to hear the rhyme rather than copy the word.
+    const [cue, answer] = shuffle(group)
+    correctWord = answer
+    const others = groups.filter((g) => g !== group).flat()
+    distractors = take(others, count - 1)
+    prompt = `Pop a word that rhymes with ${cue.toUpperCase()}`
   } else if (wordSet === 'vocabulary') {
-    const categories = Object.keys(VOCABULARY)
-    const cat = pick(categories)
-    const pool = VOCABULARY[cat as keyof typeof VOCABULARY]
-    correctWord = pick(pool)
-    const distractors = shuffle(pool.filter((w) => w !== correctWord)).slice(0, maxBubbles - 1)
-    allWords = shuffle([correctWord, ...distractors])
-    prompt = `Pop a${cat === 'animals' ? 'n' : ''} ${cat.slice(0, -1)} word`
-  } else if (wordSet === 'custom') {
+    const cats = VOCABULARY[difficulty]
+    const catKey = pick(Object.keys(cats))
+    correctWord = pick(cats[catKey])
+    const others = Object.entries(cats)
+      .filter(([k]) => k !== catKey)
+      .flatMap(([, v]) => v)
+    distractors = take(others, count - 1)
+    prompt = `Pop ${categoryPhrase(catKey)} word`
+  } else {
     const words = customWords.length > 0 ? customWords : ['hello', 'world']
     correctWord = pick(words)
-    const distractors = shuffle(words.filter((w) => w !== correctWord)).slice(0, maxBubbles - 1)
-    allWords = shuffle([correctWord, ...distractors])
+    distractors = take(words.filter((w) => w !== correctWord), count - 1)
     prompt = customPrompt || 'Pop the word!'
   }
 
-  return { prompt, correctWord, allWords }
+  // Never float the same word twice: a duplicate of the answer would be a
+  // second correct-looking bubble that scores as wrong.
+  const seen = new Set([correctWord])
+  const unique = distractors.filter((w) => !seen.has(w) && seen.add(w))
+
+  return { prompt, correctWord, allWords: shuffle([correctWord, ...unique]) }
 }
 
+/**
+ * Lay a round out across the sky.
+ *
+ * Each bubble gets its OWN vertical lane, so two bubbles can never overlap
+ * however many are rising — previously every x was an independent random value
+ * between 8% and 82%, which routinely stacked two bubbles on top of each other
+ * and made a word unreadable. `x` is the lane centre; the renderer subtracts
+ * half the drawn diameter and clamps that diameter to the lane, so the guarantee
+ * holds at any board width.
+ *
+ * Bubbles are also staggered by a few hundred milliseconds so a set drifts up
+ * as a loose group rather than a rigid row.
+ */
 function spawnBubbles(allWords: string[], correctWord: string, difficulty: Difficulty, now: number): BubbleData[] {
-  const maxBubbles = DIFFICULTY_CONFIG[difficulty].maxBubbles
-  return allWords.slice(0, maxBubbles).map((word) => {
+  const words = allWords.slice(0, DIFFICULTY_CONFIG[difficulty].maxBubbles)
+  const lanes = words.length
+  // Lane order is shuffled so the answer is not biased toward any position.
+  const laneOrder = shuffle(Array.from({ length: lanes }, (_, i) => i))
+  return words.map((word, i) => {
     bubbleIdCounter++
-    const size = 52 + Math.floor(Math.random() * 20)
+    const lane = laneOrder[i]
     return {
       id: `b${bubbleIdCounter}`,
       word,
-      x: 8 + Math.random() * 74,
-      size,
+      // Lane centre, as a percentage of the sky's width.
+      x: ((lane + 0.5) / lanes) * 100,
+      lanes,
+      size: 56 + Math.floor(Math.random() * 14),
       color: pick(BUBBLE_COLORS),
-      spawnedAt: now,
+      // A short, varied head start per lane.
+      spawnedAt: now + Math.round(Math.random() * 420),
       isCorrect: word === correctWord,
       state: 'floating' as const,
     }
@@ -303,6 +423,37 @@ export default function BubbleSplash({ sessionId, role, isLocked }: BubbleSplash
   const respawnPendingRef = useRef(false)
   const starIdRef = useRef(0)
   const particleIdRef = useRef(0)
+
+  /* The negative animation-delay that resumes a bubble mid-flight, FROZEN per
+     bubble on first sight.
+
+     This was recomputed from Date.now() on every render. The module re-renders
+     several times a second (expiry sweep, round timer, Firestore snapshots), and
+     each render handed the element a slightly different animationDelay, so the
+     browser restarted the rise from a new offset every time — the stutter that
+     made the bubbles look like they were lagging. Frozen, the value never
+     changes after mount, React writes nothing to the style, and the CSS
+     animation runs uninterrupted on the compositor. */
+  const delayRef = useRef<Record<string, number>>({})
+
+  /* Sky size, so a bubble can rise the full height of whatever board it is on
+     and be sized to fit its lane. */
+  const skyRef = useRef<HTMLDivElement>(null)
+  const [sky, setSky] = useState({ w: 0, h: 0 })
+  useEffect(() => {
+    const el = skyRef.current
+    if (!el) return
+    const ro = new ResizeObserver((entries) => {
+      const { width, height } = entries[0].contentRect
+      setSky((prev) =>
+        Math.abs(prev.w - width) < 2 && Math.abs(prev.h - height) < 2
+          ? prev
+          : { w: width, h: height }
+      )
+    })
+    ro.observe(el)
+    return () => ro.disconnect()
+  }, [])
 
   // Shared helper: same liveSessions write as before, but a failure is reported
   // instead of vanishing into an empty catch.
@@ -438,26 +589,39 @@ export default function BubbleSplash({ sessionId, role, isLocked }: BubbleSplash
     }
   }, [isPlaying, isTherapist, maintainRound])
 
+  /* Sweeps bubbles that have floated off the top.
+
+     Deliberately local: both browsers hold the same spawnedAt values and the
+     same speed, so both expire the same bubbles at the same moment with no
+     traffic. It used to publish the whole array to Firestore twice a second,
+     and every echo back re-set React state and re-rendered every bubble.
+
+     Returning `prev` unchanged when nothing expired matters just as much —
+     `filter` always allocates a new array, so this fired a state update (and a
+     full re-render) every 500ms even when the board was untouched. */
   const removeExpiredBubbles = useCallback(() => {
     setBubbles((prev) => {
-      const next = prev.filter((b) => {
-        if (b.state !== 'floating') return true
-        const elapsed = Date.now() - b.spawnedAt
-        const duration = SPEED_CONFIG[gameRef.current.speed].floatDuration
-        return elapsed < duration
-      })
-      if (next.length !== prev.length) {
-        writeToFirestore({ 'moduleState.bsBubbles': next })
-      }
-      return next
+      const duration = SPEED_CONFIG[gameRef.current.speed].floatDuration
+      const now = Date.now()
+      const next = prev.filter((b) => b.state !== 'floating' || now - b.spawnedAt < duration)
+      return next.length === prev.length ? prev : next
     })
-  }, [writeToFirestore])
+  }, [])
 
   useEffect(() => {
     if (!isPlaying) return
     const interval = setInterval(removeExpiredBubbles, 500)
     return () => clearInterval(interval)
   }, [isPlaying, removeExpiredBubbles])
+
+  // Frozen animation offsets belong to bubbles that are gone once a round is
+  // swept or replaced; drop them so the map tracks the board.
+  useEffect(() => {
+    const live = new Set(bubbles.map((b) => b.id))
+    for (const id of Object.keys(delayRef.current)) {
+      if (!live.has(id)) delete delayRef.current[id]
+    }
+  }, [bubbles])
 
   useEffect(() => {
     return () => {
@@ -501,8 +665,9 @@ export default function BubbleSplash({ sessionId, role, isLocked }: BubbleSplash
         return next
       })
 
-      triggerParticles(50, 50)
-      triggerStar(50, 50)
+      playPop()
+      triggerParticles(bubble.x, 50)
+      triggerStar(bubble.x, 50)
 
       if (newStreak === 3) {
         setStreakBadgeText('🔥 On a roll!')
@@ -516,6 +681,8 @@ export default function BubbleSplash({ sessionId, role, isLocked }: BubbleSplash
 
       setTimeout(() => startNewRound(), 600)
     } else {
+      // Same pop, quieter — the tap is acknowledged, the bounce says "not that one".
+      playPop(0.28)
       setStreak(0)
       setStreakBadgeText('')
       setShowStreakBadge(false)
@@ -631,7 +798,7 @@ export default function BubbleSplash({ sessionId, role, isLocked }: BubbleSplash
     border: `2px solid ${on ? accent : `${accent}33`}`,
     background: on ? accent : '#ffffff',
     color: on ? '#ffffff' : accent,
-    fontSize: 14,
+    fontSize: 16,
     fontWeight: 700,
     lineHeight: 1.15,
     whiteSpace: 'nowrap',
@@ -647,7 +814,7 @@ export default function BubbleSplash({ sessionId, role, isLocked }: BubbleSplash
     border: `2px solid ${on ? '#BBE7CC' : 'transparent'}`,
     background: on ? '#E7F7EE' : '#F3F5F8',
     color: on ? GREEN_DEEP : MUTED,
-    fontSize: 14,
+    fontSize: 16,
     fontWeight: 700,
     lineHeight: 1.15,
     whiteSpace: 'nowrap',
@@ -666,7 +833,7 @@ export default function BubbleSplash({ sessionId, role, isLocked }: BubbleSplash
     border: `2px solid ${on ? accent : BORDER}`,
     background: on ? `${accent}12` : '#ffffff',
     color: on ? accent : INK_BODY,
-    fontSize: 14,
+    fontSize: 16,
     fontWeight: 700,
     lineHeight: 1.15,
     whiteSpace: 'nowrap',
@@ -695,7 +862,7 @@ export default function BubbleSplash({ sessionId, role, isLocked }: BubbleSplash
     border: `1px solid ${BORDER}`,
     background: '#ffffff',
     color: INK,
-    fontSize: 12.5,
+    fontSize: 15,
     fontWeight: 600,
     outline: 'none',
   }
@@ -718,11 +885,15 @@ export default function BubbleSplash({ sessionId, role, isLocked }: BubbleSplash
         .bs-scroll { scrollbar-width: thin; scrollbar-color:#d7dde3 transparent; }
         .bs-scroll::-webkit-scrollbar { width:6px; }
         .bs-scroll::-webkit-scrollbar-thumb { background:#d7dde3; border-radius:999px; }
+        /* Rises by --rise, set per bubble from the measured sky height, so a
+           bubble always clears the top instead of stalling at a fixed 400px and
+           fading in mid-air on a taller board. Linear: a bubble rising through
+           water does not ease in and out. */
         @keyframes bsFloatUp {
           0%   { transform: translateY(0) scale(1); opacity: 0; }
-          5%   { opacity: 1; }
-          85%  { opacity: 1; }
-          100% { transform: translateY(-400px) scale(0.97); opacity: 0; }
+          6%   { opacity: 1; }
+          88%  { opacity: 1; }
+          100% { transform: translateY(var(--rise, -420px)) scale(0.97); opacity: 0; }
         }
         @keyframes bsPop {
           0%   { transform: scale(1); opacity: 1; }
@@ -851,7 +1022,7 @@ export default function BubbleSplash({ sessionId, role, isLocked }: BubbleSplash
               border: `2px solid ${isPlaying ? '#F6D6AE' : '#BBE7CC'}`,
               background: isPlaying ? '#FFF6EC' : '#E7F7EE',
               color: isPlaying ? AMBER : GREEN_DEEP,
-              fontSize: 14,
+              fontSize: 16,
               fontWeight: 700,
               lineHeight: 1.15,
               whiteSpace: 'nowrap',
@@ -896,7 +1067,7 @@ export default function BubbleSplash({ sessionId, role, isLocked }: BubbleSplash
                 }}
               >
                 <BookOpen size={18} strokeWidth={2.4} color={VIOLET} />
-                <span style={{ fontSize: 15, fontWeight: 800, color: VIOLET, letterSpacing: -0.2 }}>
+                <span style={{ fontSize: 17, fontWeight: 800, color: VIOLET, letterSpacing: -0.2 }}>
                   How it works
                 </span>
               </div>
@@ -906,7 +1077,7 @@ export default function BubbleSplash({ sessionId, role, isLocked }: BubbleSplash
                     <span aria-hidden style={{ flexShrink: 0, marginTop: 2, lineHeight: 0 }}>
                       <h.Icon size={17} strokeWidth={2.3} color={h.accent} />
                     </span>
-                    <p style={{ margin: 0, fontSize: 12.5, fontWeight: 600, lineHeight: 1.6, color: INK_BODY }}>
+                    <p style={{ margin: 0, fontSize: 15, fontWeight: 600, lineHeight: 1.6, color: INK_BODY }}>
                       <span style={{ fontWeight: 800, color: h.accent }}>{h.term}:</span> {h.body}
                     </p>
                   </div>
@@ -920,7 +1091,7 @@ export default function BubbleSplash({ sessionId, role, isLocked }: BubbleSplash
               <div style={{ ...card, padding: 18, flexShrink: 0, display: 'flex', flexDirection: 'column', gap: 12 }}>
                 <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
                   <Sparkles size={17} strokeWidth={2.4} color="#0891B2" />
-                  <span style={{ fontSize: 14, fontWeight: 800, color: '#0E7490' }}>Custom words</span>
+                  <span style={{ fontSize: 16, fontWeight: 800, color: '#0E7490' }}>Custom words</span>
                 </div>
                 <input
                   className="bs-input"
@@ -941,17 +1112,17 @@ export default function BubbleSplash({ sessionId, role, isLocked }: BubbleSplash
 
             <div style={{ ...card, padding: 18, flexShrink: 0, display: 'flex', flexDirection: 'column', gap: 12 }}>
               <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 12 }}>
-                <span style={{ fontSize: 12.5, fontWeight: 600, color: MUTED }}>💧 Bubbles popped</span>
-                <span style={{ fontSize: 17, fontWeight: 800, color: INK, fontVariantNumeric: 'tabular-nums' }}>{score}</span>
+                <span style={{ fontSize: 15, fontWeight: 600, color: MUTED }}>💧 Bubbles popped</span>
+                <span style={{ fontSize: 19.5, fontWeight: 800, color: INK, fontVariantNumeric: 'tabular-nums' }}>{score}</span>
               </div>
               <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 12 }}>
-                <span style={{ fontSize: 12.5, fontWeight: 600, color: MUTED }}>⚡ In a row</span>
-                <span style={{ fontSize: 17, fontWeight: 800, color: GREEN_DEEP, fontVariantNumeric: 'tabular-nums' }}>{streak}</span>
+                <span style={{ fontSize: 15, fontWeight: 600, color: MUTED }}>⚡ In a row</span>
+                <span style={{ fontSize: 19.5, fontWeight: 800, color: GREEN_DEEP, fontVariantNumeric: 'tabular-nums' }}>{streak}</span>
               </div>
             </div>
 
             {!canInteract && (
-              <div style={{ flexShrink: 0, fontSize: 12, fontWeight: 600, color: MUTED, textAlign: 'center', padding: '2px 6px 6px' }}>
+              <div style={{ flexShrink: 0, fontSize: 14.5, fontWeight: 600, color: MUTED, textAlign: 'center', padding: '2px 6px 6px' }}>
                 Your therapist is controlling this activity
               </div>
             )}
@@ -961,6 +1132,7 @@ export default function BubbleSplash({ sessionId, role, isLocked }: BubbleSplash
               gold stars and drifting bubbles, so it is painted as a covering
               background with a gradient underneath it as the fallback. ---- */}
           <div
+            ref={skyRef}
             style={{
               flex: 1,
               minWidth: 0,
@@ -1016,7 +1188,7 @@ export default function BubbleSplash({ sessionId, role, isLocked }: BubbleSplash
                   background: 'rgba(255,255,255,0.94)',
                   border: `1px solid ${BORDER}`,
                   boxShadow: '0 6px 18px rgba(20,30,45,0.12)',
-                  fontSize: 14,
+                  fontSize: 16,
                   fontWeight: 700,
                   color: INK,
                   textAlign: 'center',
@@ -1033,8 +1205,12 @@ export default function BubbleSplash({ sessionId, role, isLocked }: BubbleSplash
             )}
 
             {isPlaying && bubbles.map((bubble) => {
-              const elapsed = Date.now() - bubble.spawnedAt
-              const animDelay = -Math.min(elapsed, floatDur) / 1000
+              // Frozen on first sight; see delayRef above.
+              let animDelay = delayRef.current[bubble.id]
+              if (animDelay === undefined) {
+                animDelay = -Math.min(Date.now() - bubble.spawnedAt, floatDur) / 1000
+                delayRef.current[bubble.id] = animDelay
+              }
 
               let animName = 'bsFloatUp'
               let animDuration = `${floatDur}ms`
@@ -1059,9 +1235,15 @@ export default function BubbleSplash({ sessionId, role, isLocked }: BubbleSplash
                 pointerStyle = { pointerEvents: 'none' as const }
               }
 
-              // Rendered diameter only — the stored `size` (and everything that
-              // reads it) is untouched.
-              const px = Math.round(bubble.size * 1.42)
+              /* Rendered diameter, clamped to this browser's lane width so two
+                 bubbles can never touch even if the sky is narrower here than on
+                 the screen that dealt the round. */
+              const lanes = bubble.lanes ?? Math.max(1, bubbles.length)
+              const laneW = sky.w > 0 ? sky.w / lanes : 0
+              const px = Math.max(
+                44,
+                Math.round(laneW > 0 ? Math.min(bubble.size * 1.42, laneW * 0.86) : bubble.size * 1.42)
+              )
               // Big, bold ink, stepped down only far enough that a long word
               // still fits inside its bubble.
               const wordSize = Math.max(
@@ -1075,15 +1257,18 @@ export default function BubbleSplash({ sessionId, role, isLocked }: BubbleSplash
                   onClick={() => handleBubbleTap(bubble)}
                   style={{
                     position: 'absolute',
-                    left: `${bubble.x}%`,
-                    bottom: -80,
+                    // `x` is the lane CENTRE, so half the diameter comes back off.
+                    left: `calc(${bubble.x}% - ${px / 2}px)`,
+                    bottom: -px,
                     width: px,
                     height: px,
                     display: 'flex',
                     alignItems: 'center',
                     justifyContent: 'center',
-                    animation: `${animName} ${animDuration} ease-in-out ${animFill}`,
+                    ['--rise' as string]: `${-(sky.h + px + 60)}px`,
+                    animation: `${animName} ${animDuration} ${bubble.state === 'floating' ? 'linear' : 'ease-in-out'} ${animFill}`,
                     animationDelay: bubble.state === 'floating' ? `${animDelay}s` : '0s',
+                    willChange: 'transform',
                     cursor: canInteract && isPlaying && bubble.state === 'floating' && waitingForTap ? 'pointer' : 'default',
                     opacity,
                     zIndex: bubble.state === 'popped' ? 6 : 3,
@@ -1215,7 +1400,7 @@ export default function BubbleSplash({ sessionId, role, isLocked }: BubbleSplash
                   position: 'absolute',
                   left: `${star.x}%`,
                   top: `${star.y}%`,
-                  fontSize: 26,
+                  fontSize: 28.5,
                   zIndex: 10,
                   pointerEvents: 'none',
                   animation: 'bsFloatStar 1.4s ease forwards',
@@ -1233,7 +1418,7 @@ export default function BubbleSplash({ sessionId, role, isLocked }: BubbleSplash
                   top: 74,
                   left: '50%',
                   transform: 'translateX(-50%)',
-                  fontSize: 13,
+                  fontSize: 15,
                   fontWeight: 800,
                   color: '#ffffff',
                   background: GREEN,
@@ -1297,10 +1482,10 @@ export default function BubbleSplash({ sessionId, role, isLocked }: BubbleSplash
                       />
                     ))}
                   </div>
-                  <div style={{ fontSize: 16, fontWeight: 800, color: INK, letterSpacing: -0.2 }}>
+                  <div style={{ fontSize: 18.5, fontWeight: 800, color: INK, letterSpacing: -0.2 }}>
                     {isTherapist ? 'Press Start to begin' : 'Waiting for your therapist to start…'}
                   </div>
-                  <div style={{ fontSize: 12.5, fontWeight: 600, color: MUTED, lineHeight: 1.6 }}>
+                  <div style={{ fontSize: 15, fontWeight: 600, color: MUTED, lineHeight: 1.6 }}>
                     Bubbles float up carrying words. Tap the one that matches the prompt before it drifts away.
                   </div>
                 </div>

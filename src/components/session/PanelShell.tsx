@@ -58,9 +58,9 @@ export default function PanelShell({
         }}
       >
         <div style={{ flex: 1, minWidth: 0 }}>
-          <div style={{ fontSize: 14, fontWeight: 500, color: GLASS.ink }}>{title}</div>
+          <div style={{ fontSize: 16, fontWeight: 500, color: GLASS.ink }}>{title}</div>
           {subtitle && (
-            <div style={{ fontSize: 11, color: GLASS.inkMuted, marginTop: 1 }}>{subtitle}</div>
+            <div style={{ fontSize: 13, color: GLASS.inkMuted, marginTop: 1 }}>{subtitle}</div>
           )}
         </div>
         {headerExtra}

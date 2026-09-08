@@ -960,11 +960,11 @@ function PillControls({
 /* ===== PARTICIPANT THUMBNAIL — top strip ===== */
 function ParticipantThumb({ name, online, self }: { name: string; online: boolean; self: boolean }) {
   return (
-    <div style={{ position: 'relative', width: 132, height: 78, borderRadius: 14, flexShrink: 0, overflow: 'hidden', background: '#f3f5f8', border: `1px solid ${RC.border}`, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-      <div style={{ width: 42, height: 42, borderRadius: '50%', background: RC.greenSoft, border: `2px solid ${RC.green}`, display: 'flex', alignItems: 'center', justifyContent: 'center', color: RC.greenDark, fontSize: 18, fontWeight: 600 }}>
+    <div style={{ position: 'relative', width: 168, height: 100, borderRadius: 14, flexShrink: 0, overflow: 'hidden', background: '#f3f5f8', border: `1px solid ${RC.border}`, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+      <div style={{ width: 50, height: 50, borderRadius: '50%', background: RC.greenSoft, border: `2px solid ${RC.green}`, display: 'flex', alignItems: 'center', justifyContent: 'center', color: RC.greenDark, fontSize: 24, fontWeight: 600 }}>
         {name?.charAt(0)?.toUpperCase() || '?'}
       </div>
-      <div style={{ position: 'absolute', bottom: 6, left: 8, display: 'flex', alignItems: 'center', gap: 5, padding: '2px 8px', borderRadius: 10, background: 'rgba(255,255,255,0.92)', fontSize: 10, fontWeight: 600, color: RC.ink }}>
+      <div style={{ position: 'absolute', bottom: 7, left: 9, display: 'flex', alignItems: 'center', gap: 5, padding: '3px 9px', borderRadius: 10, background: 'rgba(255,255,255,0.92)', fontSize: 12.5, fontWeight: 600, color: RC.ink, maxWidth: 'calc(100% - 18px)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
         <span style={{ width: 6, height: 6, borderRadius: '50%', background: online ? RC.green : RC.inkMuted }} />
         {self ? 'You' : name}
       </div>

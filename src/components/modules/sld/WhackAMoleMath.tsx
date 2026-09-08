@@ -50,7 +50,27 @@ const WAM_MOLE_SHEET = A('ChatGPT Image Sep 4, 2026, 01_21_07 PM.png')
 const WAM_MOLE_COLS = 3
 const WAM_MOLE_ROWS = 2
 const WAM_MOLE_CELL = 512
-const WAM_MOLE_CROP = 380
+/* How much of a 512px cell the rise window shows. The window floor is pinned
+   behind the burrow rim, so a TALLER crop lifts the whole sprite: at 380 only the
+   head cleared the rim and there was no chest to put a number on. 440 shows head,
+   chest and paws while still cutting the sprite below the rim line. */
+const WAM_MOLE_CROP = 440
+
+/* Where each mole's topmost opaque pixel actually sits inside its own 512px
+   cell, measured off the sheet's alpha channel:
+
+     cell 0..2 (top row)     y = 30, 30, 33
+     cell 3..5 (bottom row)  y =  0,  0,  7
+
+   The sheet is NOT registered — the bottom row is drawn ~30px higher in its cell
+   than the top row. Cropping every cell from the same fixed offset therefore sat
+   the top-row moles low in their burrow and left the bottom-row moles floating
+   above it, and pushed some heads against the crop edge. Sampling each mole from
+   its own measured top puts every head the same small distance below the window
+   ceiling, so all six rise out of the hole identically. */
+const WAM_MOLE_TOP = [30, 30, 33, 0, 0, 7]
+/* Clear air kept above every head so the crop can never touch it. */
+const WAM_MOLE_HEADROOM = 8
 
 /* Four whack reactions in a 543x724 strip: surprised, ouch, dizzy-stars,
    sinking. Every frame is bottom-registered on an identical rim, so a frame can
@@ -128,118 +148,143 @@ const OPERATIONS: { key: Operation; label: string; glyph: string; tint: string; 
   { key: 'numbers', label: 'Numbers', glyph: '▦', tint: '#2563EB', wash: '#E8F0FE' },
 ]
 
-const DIFFICULTIES: { key: DifficultyLevel; label: string; maxNum: number; maxSum: number }[] = [
-  { key: 'easy', label: 'Easy', maxNum: 5, maxSum: 10 },
-  { key: 'medium', label: 'Medium', maxNum: 10, maxSum: 20 },
-  { key: 'hard', label: 'Hard', maxNum: 20, maxSum: 50 },
+/* Per level: the operand ceilings, the largest result allowed, the range the
+   "Find N" round draws from, and how often the moles re-deal.
+
+   The ceilings used to be one `maxNum` shared by every operation, which made
+   Medium and Hard multiplication identical (both clamped to 9) and left Easy
+   asking 5x5. Each operation now has its own ceiling per level, so Easy really
+   is easy and the three levels genuinely differ. `numberMax` is never below 10,
+   because a round needs 9 distinct cards and Easy used to offer only 5. */
+const DIFFICULTIES: {
+  key: DifficultyLevel
+  label: string
+  addMax: number
+  sumMax: number
+  subMax: number
+  mulMax: number
+  numberMax: number
+  speedMs: number
+}[] = [
+  { key: 'easy',   label: 'Easy',   addMax: 5,  sumMax: 10, subMax: 10, mulMax: 5,  numberMax: 10,  speedMs: 2600 },
+  { key: 'medium', label: 'Medium', addMax: 10, sumMax: 20, subMax: 20, mulMax: 10, numberMax: 25,  speedMs: 1900 },
+  { key: 'hard',   label: 'Hard',   addMax: 25, sumMax: 50, subMax: 50, mulMax: 12, numberMax: 100, speedMs: 1300 },
 ]
 
 const SPEEDS: { key: string; label: string; ms: number }[] = [
-  { key: 'slow', label: 'Slow', ms: 3000 },
-  { key: 'normal', label: 'Normal', ms: 2000 },
-  { key: 'fast', label: 'Fast', ms: 1200 },
+  { key: 'slow', label: 'Slow', ms: 2600 },
+  { key: 'normal', label: 'Normal', ms: 1900 },
+  { key: 'fast', label: 'Fast', ms: 1300 },
 ]
 
+/** Fisher-Yates, on a copy. */
+function shuffled<T>(arr: T[]): T[] {
+  const a = [...arr]
+  for (let i = a.length - 1; i > 0; i--) {
+    const j = Math.floor(Math.random() * (i + 1))
+    ;[a[i], a[j]] = [a[j], a[i]]
+  }
+  return a
+}
+
+/* Eight distinct wrong cards drawn from a window around the answer.
+
+   The old loop guessed `answer ± 1..4` a hundred times and then fell into a
+   `while (numbers.length < 9)` top-up that could add nothing on either branch —
+   an infinite loop that froze the tab whenever the pool was too small (an Easy
+   "Find N" round only had five numbers to choose from). Enumerating a window
+   that is guaranteed wider than the number of cards needed cannot fail. */
+function pickDistractors(answer: number, count: number, lo: number, hi: number): number[] {
+  let low = Math.max(0, lo)
+  let high = Math.min(100, hi)
+  // Guarantee the window holds more values than we need to draw.
+  while (high - low < count + 2) {
+    if (low > 0) low--
+    else if (high < 100) high++
+    else break
+  }
+  const pool: number[] = []
+  for (let n = low; n <= high; n++) if (n !== answer) pool.push(n)
+  // Nearest values first, so the choice stays a real discrimination task, then
+  // shuffled so the same neighbours don't appear in the same order every round.
+  pool.sort((x, y) => Math.abs(x - answer) - Math.abs(y - answer))
+  return shuffled(pool.slice(0, Math.max(count, Math.min(pool.length, count * 2)))).slice(0, count)
+}
+
 function generateQuestion(operation: Operation, difficulty: DifficultyLevel): { question: Question; numbers: number[] } {
-  const diff = DIFFICULTIES.find((d) => d.key === difficulty)!
-  const max = diff.maxNum
-  const maxSum = diff.maxSum
+  const d = DIFFICULTIES.find((x) => x.key === difficulty)!
   let answer = 0
   let display = ''
 
   if (operation === 'numbers') {
-    answer = 1 + Math.floor(Math.random() * max)
+    answer = 1 + Math.floor(Math.random() * d.numberMax)
     display = `Find ${answer}`
   } else if (operation === 'add') {
-    const a = 1 + Math.floor(Math.random() * max)
-    const b = 1 + Math.floor(Math.random() * Math.min(max, maxSum - a))
+    const a = 1 + Math.floor(Math.random() * d.addMax)
+    // Keep the total inside the level's ceiling without ever asking for b < 1.
+    const bMax = Math.max(1, Math.min(d.addMax, d.sumMax - a))
+    const b = 1 + Math.floor(Math.random() * bMax)
     answer = a + b
     display = `${a} + ${b} = ?`
   } else if (operation === 'sub') {
-    const a = 2 + Math.floor(Math.random() * maxSum)
-    const b = 1 + Math.floor(Math.random() * Math.min(a - 1, max))
+    const a = 2 + Math.floor(Math.random() * (d.subMax - 1))
+    const b = 1 + Math.floor(Math.random() * (a - 1))
     answer = a - b
     display = `${a} - ${b} = ?`
-  } else if (operation === 'multiply') {
-    const a = 1 + Math.floor(Math.random() * Math.min(max, 9))
-    const b = 1 + Math.floor(Math.random() * Math.min(max, 9))
+  } else {
+    const a = 1 + Math.floor(Math.random() * d.mulMax)
+    // The number-card sheet only carries 1..100, so the product is held inside
+    // that range — Hard's 12x table would otherwise deal a 144 card that the
+    // sprite cannot draw.
+    const bMax = Math.max(1, Math.min(d.mulMax, Math.floor(100 / a)))
+    const b = 1 + Math.floor(Math.random() * bMax)
     answer = a * b
     display = `${a} × ${b} = ?`
   }
 
-  const numbers: number[] = [answer]
-  const usedNums = new Set([answer])
-  const maxAttempts = 100
-  let attempts = 0
+  /* "Find N" draws its wrong cards from the level's own number range; the sums
+     draw from a window around the answer. Either way the pool is enumerated, so
+     nine distinct cards are always produced. */
+  const distractors =
+    operation === 'numbers'
+      ? pickDistractors(answer, 8, 1, Math.max(10, d.numberMax))
+      : pickDistractors(answer, 8, answer - 6, answer + 6)
 
-  while (numbers.length < 9 && attempts < maxAttempts) {
-    attempts++
-    let distractor: number
-    if (operation === 'numbers') {
-      distractor = 1 + Math.floor(Math.random() * max)
-    } else {
-      const offset = 1 + Math.floor(Math.random() * 4)
-      distractor = Math.random() > 0.5 ? answer + offset : answer - offset
-    }
-    if (!usedNums.has(distractor) && distractor >= 0 && distractor <= 100) {
-      numbers.push(distractor)
-      usedNums.add(distractor)
-    }
-  }
-
-  while (numbers.length < 9) {
-    let fallback = answer + numbers.length
-    if (!usedNums.has(fallback) && fallback <= 100) {
-      numbers.push(fallback)
-      usedNums.add(fallback)
-    } else {
-      fallback = answer - numbers.length
-      if (!usedNums.has(fallback) && fallback >= 0) {
-        numbers.push(fallback)
-        usedNums.add(fallback)
-      }
-    }
-  }
-
-  const shuffled: number[] = []
-  const src = [...numbers]
-  for (let i = src.length - 1; i > 0; i--) {
-    const j = Math.floor(Math.random() * (i + 1))
-    ;[src[i], src[j]] = [src[j], src[i]]
-  }
-
-  return { question: { display, answer }, numbers: src }
+  return { question: { display, answer }, numbers: shuffled([answer, ...distractors]) }
 }
 
-function buildMoles(numbers: number[], answerHoleIndex: number): Mole[] {
-  return numbers.map((n, i) => ({
+/* How many moles are above ground at once. */
+const UP_MIN = 4
+const UP_MAX = 5
+
+/**
+ * Deal the nine numbers across the nine holes and choose which are up.
+ *
+ * Both halves matter. `holeIndex` used to be frozen at the card's array index,
+ * so a number sat in one burrow for the whole round and only its up/down state
+ * changed — the answer never moved. Re-dealing the hole assignment every tick is
+ * what makes the moles actually shuffle. The answer is always among the moles
+ * that are up, so the round is always winnable.
+ */
+function dealMoles(numbers: number[], answer: number): Mole[] {
+  const holes = shuffled(Array.from({ length: numbers.length }, (_, i) => i))
+  const dealt: Mole[] = numbers.map((n, i) => ({
     id: i,
     number: n,
     isUp: false,
-    holeIndex: i,
+    holeIndex: holes[i],
   }))
-}
 
-function pickUpMoles(moles: Mole[], answerHoleIndex: number): Mole[] {
-  const count = 3 + Math.floor(Math.random() * 2)
-  const upSet = new Set<number>([answerHoleIndex])
-  const candidates = moles
-    .map((_, i) => i)
-    .filter((i) => i !== answerHoleIndex)
-
-  for (let i = candidates.length - 1; i > 0; i--) {
-    const j = Math.floor(Math.random() * (i + 1))
-    ;[candidates[i], candidates[j]] = [candidates[j], candidates[i]]
+  const answerId = dealt.findIndex((m) => m.number === answer)
+  const upCount = UP_MIN + Math.floor(Math.random() * (UP_MAX - UP_MIN + 1))
+  const up = new Set<number>()
+  if (answerId >= 0) up.add(answerId)
+  for (const m of shuffled(dealt)) {
+    if (up.size >= upCount) break
+    up.add(m.id)
   }
 
-  for (let k = 0; k < count - 1 && k < candidates.length; k++) {
-    upSet.add(candidates[k])
-  }
-
-  return moles.map((m) => ({
-    ...m,
-    isUp: upSet.has(m.holeIndex),
-  }))
+  return dealt.map((m) => ({ ...m, isUp: up.has(m.id) }))
 }
 
 /* ---------------------------------------------------------------------------
@@ -311,10 +356,14 @@ function NumberCard({ n }: { n: number }) {
   )
 }
 
-/** One cheerful mole cropped free of the sheet's own rim. */
+/** One cheerful mole cropped free of the sheet's own rim, registered by its
+    own measured top so every variant sits at the same height in the burrow. */
 function MoleSprite({ variant }: { variant: number }) {
-  const col = variant % WAM_MOLE_COLS
-  const row = Math.floor(variant / WAM_MOLE_COLS) % WAM_MOLE_ROWS
+  const v = ((variant % (WAM_MOLE_COLS * WAM_MOLE_ROWS)) + WAM_MOLE_COLS * WAM_MOLE_ROWS) % (WAM_MOLE_COLS * WAM_MOLE_ROWS)
+  const col = v % WAM_MOLE_COLS
+  const row = Math.floor(v / WAM_MOLE_COLS)
+  // Sheet row where this mole's crop begins: its own head top, less the headroom.
+  const sourceY = row * WAM_MOLE_CELL + WAM_MOLE_TOP[v] - WAM_MOLE_HEADROOM
   return (
     <img
       src={WAM_MOLE_SHEET}
@@ -329,7 +378,7 @@ function MoleSprite({ variant }: { variant: number }) {
         // % offsets resolve against the window box, whose width is one cell and
         // whose height is the 380px crop — hence the two different multipliers.
         left: `${-col * 100}%`,
-        top: `${(-row * WAM_MOLE_CELL) / WAM_MOLE_CROP * 100}%`,
+        top: `${(-sourceY / WAM_MOLE_CROP) * 100}%`,
         pointerEvents: 'none',
       }}
     />
@@ -395,15 +444,15 @@ function MotionTicks({ flip }: { flip?: boolean }) {
       style={{
         display: 'flex',
         flexDirection: 'column',
-        gap: 7,
+        gap: 5,
         flexShrink: 0,
         transform: flip ? 'scaleX(-1)' : undefined,
         opacity: 0.85,
       }}
     >
-      <span style={{ display: 'block', width: 22, height: 4, borderRadius: 999, background: '#86EFAC', transform: 'rotate(-24deg)' }} />
-      <span style={{ display: 'block', width: 30, height: 4, borderRadius: 999, background: '#4ADE80' }} />
-      <span style={{ display: 'block', width: 22, height: 4, borderRadius: 999, background: '#86EFAC', transform: 'rotate(24deg)' }} />
+      <span style={{ display: 'block', width: 16, height: 3, borderRadius: 999, background: '#86EFAC', transform: 'rotate(-24deg)' }} />
+      <span style={{ display: 'block', width: 22, height: 3, borderRadius: 999, background: '#4ADE80' }} />
+      <span style={{ display: 'block', width: 16, height: 3, borderRadius: 999, background: '#86EFAC', transform: 'rotate(24deg)' }} />
     </span>
   )
 }
@@ -422,11 +471,20 @@ export default function WhackAMoleMath({ sessionId, role, isLocked }: WhackAMole
   const [score, setScore] = useState(0)
   const [streak, setStreak] = useState(0)
   const [wrongCount, setWrongCount] = useState(0)
-  const [answerHoleIndex, setAnswerHoleIndex] = useState(0)
   const [holeFlashes, setHoleFlashes] = useState<Record<number, 'correct' | 'wrong'>>({})
   const [spinningHole, setSpinningHole] = useState<number | null>(null)
   const [streakBadge, setStreakBadge] = useState<string | null>(null)
   const [reactions, setReactions] = useState<{ id: number; x: number; emoji: string }[]>([])
+
+  /* Which burrow holds the answer is DERIVED from the two things that are
+     actually synced — the question and the deal. It used to be local state set
+     only inside startNewQuestion, so the child's browser (the one that does the
+     whacking) never learned where the answer was: it kept comparing against a
+     stale 0, which is why the right mole could not be whacked. Card numbers are
+     distinct within a round, so the lookup is unambiguous. */
+  const answerHoleIndex = question
+    ? moles.find((m) => m.number === question.answer)?.holeIndex ?? -1
+    : -1
 
   const timerRef = useRef<ReturnType<typeof setInterval>>()
   const gameRef = useRef({ question, moles, isPlaying, operation, difficulty, speed, score, streak, wrongCount, answerHoleIndex })
@@ -511,13 +569,10 @@ export default function WhackAMoleMath({ sessionId, role, isLocked }: WhackAMole
     const operation = override?.operation ?? gameRef.current.operation
     const difficulty = override?.difficulty ?? gameRef.current.difficulty
     const { question: q, numbers } = generateQuestion(operation, difficulty)
-    const answerIdx = numbers.indexOf(q.answer)
-    const molesArr = buildMoles(numbers, answerIdx)
-    const upMoles = pickUpMoles(molesArr, answerIdx)
+    const upMoles = dealMoles(numbers, q.answer)
 
     setQuestion(q)
     setMoles(upMoles)
-    setAnswerHoleIndex(answerIdx)
     setWrongCount(0)
     setHoleFlashes({})
     setSpinningHole(null)
@@ -532,8 +587,13 @@ export default function WhackAMoleMath({ sessionId, role, isLocked }: WhackAMole
     }
   }, [writeToFirestore])
 
+  /* The therapist's browser owns the shuffle timer and both screens follow the
+     deal it writes. Previously BOTH browsers ran this interval and both wrote
+     `wamMoles`, so the two clocks fought over the board — moles appeared to jump
+     and re-spawn at random, and a mole could move out from under the pointer
+     between the client's render and the therapist's write. */
   useEffect(() => {
-    if (!isPlaying) {
+    if (!isPlaying || !isTherapist) {
       if (timerRef.current) {
         clearInterval(timerRef.current)
         timerRef.current = undefined
@@ -542,9 +602,9 @@ export default function WhackAMoleMath({ sessionId, role, isLocked }: WhackAMole
     }
 
     timerRef.current = setInterval(() => {
-      const { moles, answerHoleIndex } = gameRef.current
-      if (moles.length === 0) return
-      const updated = pickUpMoles(moles, answerHoleIndex)
+      const { moles, question } = gameRef.current
+      if (moles.length === 0 || !question) return
+      const updated = dealMoles(moles.map((m) => m.number), question.answer)
       setMoles(updated)
       writeToFirestore({ 'moduleState.wamMoles': updated })
     }, speed)
@@ -552,7 +612,7 @@ export default function WhackAMoleMath({ sessionId, role, isLocked }: WhackAMole
     return () => {
       if (timerRef.current) clearInterval(timerRef.current)
     }
-  }, [isPlaying, speed, writeToFirestore])
+  }, [isPlaying, isTherapist, speed, writeToFirestore])
 
   const triggerReaction = (emoji: string) => {
     const id = reactIdRef.current++
@@ -564,9 +624,14 @@ export default function WhackAMoleMath({ sessionId, role, isLocked }: WhackAMole
   }
 
   const handleMoleClick = (holeIdx: number) => {
-    const { question, moles, isPlaying, operation, difficulty, score, streak, wrongCount, answerHoleIndex } = gameRef.current
-    if (isTherapist) return
+    const { question, moles, isPlaying, score, streak, wrongCount, answerHoleIndex } = gameRef.current
+    // The therapist can whack as well — every other module lets them drive the
+    // activity, and blocking it here made the board look dead when a therapist
+    // tried the game out.
     if (!isPlaying || !canInteract || !question || moles.length === 0) return
+    if (answerHoleIndex < 0) return
+    // Only a mole that is actually above ground can be struck.
+    if (!moles.find((m) => m.holeIndex === holeIdx)?.isUp) return
 
     if (holeIdx === answerHoleIndex) {
       setSpinningHole(holeIdx)
@@ -625,7 +690,11 @@ export default function WhackAMoleMath({ sessionId, role, isLocked }: WhackAMole
     if (!isTherapist) return
     if (diff === gameRef.current.difficulty) return
     setDifficulty(diff)
-    writeToFirestore({ 'moduleState.wamDifficulty': diff })
+    // Each level shuffles at its own tempo — Easy slow enough to find the answer,
+    // Hard quick. The Speed pills still override it afterwards.
+    const levelSpeed = DIFFICULTIES.find((d) => d.key === diff)!.speedMs
+    setSpeed(levelSpeed)
+    writeToFirestore({ 'moduleState.wamDifficulty': diff, 'moduleState.wamSpeed': levelSpeed })
     // Same immediate-effect reasoning as the operation switch above.
     startNewQuestion({ difficulty: diff, forceWrite: true })
   }
@@ -650,21 +719,8 @@ export default function WhackAMoleMath({ sessionId, role, isLocked }: WhackAMole
       })
     }
 
-    if (next) {
-      if (!question) {
-        const { question: q, numbers } = generateQuestion(operation, difficulty)
-        const answerIdx = numbers.indexOf(q.answer)
-        const molesArr = buildMoles(numbers, answerIdx)
-        const upMoles = pickUpMoles(molesArr, answerIdx)
-        setQuestion(q)
-        setMoles(upMoles)
-        setAnswerHoleIndex(answerIdx)
-        writeToFirestore({
-          'moduleState.wamQuestion': q,
-          'moduleState.wamMoles': upMoles,
-        })
-      }
-    }
+    // Always open on a fresh deal so Start never resumes a stale board.
+    if (next) startNewQuestion({ forceWrite: true })
   }
 
   /* ---- Derived layout numbers ------------------------------------------- */
@@ -686,14 +742,14 @@ export default function WhackAMoleMath({ sessionId, role, isLocked }: WhackAMole
     display: 'inline-flex',
     alignItems: 'center',
     gap: 8,
-    padding: '9px 16px',
+    padding: '7px 12px',
     borderRadius: 999,
     border: `1.5px solid ${on ? tint : BORDER}`,
     background: on ? wash : '#ffffff',
     // The mockup colours the GLYPH, not the word — which also keeps the label
     // at full contrast instead of mid-tone-on-pale.
     color: on ? INK : INK_BODY,
-    fontSize: 13,
+    fontSize: 16,
     fontWeight: 700,
     lineHeight: 1.2,
     cursor: 'pointer',
@@ -702,12 +758,12 @@ export default function WhackAMoleMath({ sessionId, role, isLocked }: WhackAMole
   })
 
   const outlinePill = (on: boolean): React.CSSProperties => ({
-    padding: '9px 18px',
+    padding: '7px 14px',
     borderRadius: 999,
     border: `1.5px solid ${on ? GREEN : BORDER}`,
     background: '#ffffff',
     color: on ? GREEN_DEEP : MUTED,
-    fontSize: 13,
+    fontSize: 16,
     fontWeight: 700,
     lineHeight: 1.2,
     cursor: 'pointer',
@@ -716,12 +772,12 @@ export default function WhackAMoleMath({ sessionId, role, isLocked }: WhackAMole
   })
 
   const tintPill = (on: boolean): React.CSSProperties => ({
-    padding: '9px 18px',
+    padding: '7px 14px',
     borderRadius: 999,
     border: `1.5px solid ${on ? 'rgba(22,163,74,0.28)' : BORDER}`,
     background: on ? GREEN_TINT : '#ffffff',
     color: on ? GREEN_DEEP : MUTED,
-    fontSize: 13,
+    fontSize: 16,
     fontWeight: 700,
     lineHeight: 1.2,
     cursor: 'pointer',
@@ -736,7 +792,7 @@ export default function WhackAMoleMath({ sessionId, role, isLocked }: WhackAMole
     const flash = holeFlashes[holeIdx]
     const isSpinning = spinningHole === holeIdx
     const isUp = !!mole?.isUp
-    const live = canInteract && isPlaying && !isTherapist
+    const live = canInteract && isPlaying && isUp
 
     return (
       <div
@@ -821,8 +877,12 @@ export default function WhackAMoleMath({ sessionId, role, isLocked }: WhackAMole
                 position: 'absolute',
                 left: 0,
                 right: 0,
-                // Window floor sits on the burrow's mouth line.
-                bottom: '19.2%',
+                /* Window floor sits below the burrow's mouth line, well behind
+                   the near rim. The 440px crop lifts the sprite (the head is
+                   pinned near the window ceiling), so the floor is dropped by
+                   the same amount to keep the mole seated IN the hole rather
+                   than hovering above its rim. */
+                bottom: '12%',
                 aspectRatio: `${WAM_MOLE_CELL} / ${WAM_MOLE_CROP}`,
                 overflow: 'hidden',
                 pointerEvents: 'none',
@@ -857,20 +917,22 @@ export default function WhackAMoleMath({ sessionId, role, isLocked }: WhackAMole
           </>
         )}
 
-        {/* Number card, in front of the rim exactly as the mockup shows it. */}
+        {/* Number card, held against the mole's lower chest — below the face,
+            above the paws and the burrow rim. With every variant now registered
+            to the same head height, the card lands on the same spot on all six
+            moles instead of drifting onto a face. */}
         {mole && (
           <div
             className="wam-card"
             style={{
               position: 'absolute',
-              left: '28%',
-              width: '44%',
-              bottom: '15.4%',
+              left: '29%',
+              width: '42%',
+              bottom: '17.3%',
               zIndex: 4,
               pointerEvents: 'none',
-              // Stays mounted so it can sink and fade WITH the mole; it cannot
-              // live inside the clip window because it belongs in front of the
-              // near rim, which the window sits behind.
+              filter: 'drop-shadow(0 2px 5px rgba(20,30,45,0.28))',
+              // Stays mounted so it can sink and fade WITH the mole.
               opacity: isUp || flash ? 1 : 0,
               transform: `translateY(${isUp || flash ? '0%' : '55%'}) scale(${isSpinning ? 1.14 : 1})`,
             }}
@@ -909,11 +971,11 @@ export default function WhackAMoleMath({ sessionId, role, isLocked }: WhackAMole
         height: '100%',
         // Belt and braces: in a BLOCK parent `height: 100%` can resolve to auto
         // and collapse the board to 0px.
-        minHeight: 420,
+        minHeight: 300,
         maxWidth: '100%',
         display: 'flex',
         flexDirection: 'column',
-        gap: 16,
+        gap: 9,
         fontFamily: '"DM Sans", system-ui, sans-serif',
       }}
     >
@@ -979,15 +1041,15 @@ export default function WhackAMoleMath({ sessionId, role, isLocked }: WhackAMole
             alignItems: 'center',
             justifyContent: 'center',
             flexWrap: 'wrap',
-            gap: 18,
-            padding: '14px 18px',
-            borderRadius: 20,
+            gap: 12,
+            padding: '8px 12px',
+            borderRadius: 16,
             border: `1px solid ${BORDER}`,
             background: '#ffffff',
             boxShadow: CARD_SHADOW,
           }}
         >
-          <div style={{ display: 'flex', alignItems: 'center', gap: 10, flexWrap: 'wrap' }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 7, flexWrap: 'wrap' }}>
             {OPERATIONS.map((op) => {
               const on = operation === op.key
               return (
@@ -998,7 +1060,7 @@ export default function WhackAMoleMath({ sessionId, role, isLocked }: WhackAMole
                   aria-pressed={on}
                   style={opPill(on, op.tint, op.wash)}
                 >
-                  <span aria-hidden style={{ fontSize: 15, fontWeight: 800, color: op.tint, lineHeight: 1 }}>
+                  <span aria-hidden style={{ fontSize: 19.5, fontWeight: 800, color: op.tint, lineHeight: 1 }}>
                     {op.glyph}
                   </span>
                   {op.label}
@@ -1009,7 +1071,7 @@ export default function WhackAMoleMath({ sessionId, role, isLocked }: WhackAMole
 
           <span aria-hidden style={{ width: 1, height: 26, background: BORDER, flexShrink: 0 }} />
 
-          <div style={{ display: 'flex', alignItems: 'center', gap: 10, flexWrap: 'wrap' }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 7, flexWrap: 'wrap' }}>
             {DIFFICULTIES.map((d) => (
               <button
                 key={d.key}
@@ -1025,7 +1087,7 @@ export default function WhackAMoleMath({ sessionId, role, isLocked }: WhackAMole
 
           <span aria-hidden style={{ width: 1, height: 26, background: BORDER, flexShrink: 0 }} />
 
-          <div style={{ display: 'flex', alignItems: 'center', gap: 10, flexWrap: 'wrap' }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 7, flexWrap: 'wrap' }}>
             {SPEEDS.map((s) => (
               <button
                 key={s.key}
@@ -1046,13 +1108,13 @@ export default function WhackAMoleMath({ sessionId, role, isLocked }: WhackAMole
               display: 'inline-flex',
               alignItems: 'center',
               gap: 8,
-              padding: '10px 22px',
+              padding: '8px 18px',
               borderRadius: 999,
               border: 'none',
               background: isPlaying ? AMBER : GREEN_DEEP,
               // White type only ever lands on these solid saturated fills.
               color: '#ffffff',
-              fontSize: 13,
+              fontSize: 16,
               fontWeight: 800,
               lineHeight: 1.2,
               cursor: 'pointer',
@@ -1060,7 +1122,7 @@ export default function WhackAMoleMath({ sessionId, role, isLocked }: WhackAMole
               transition: 'all 0.15s',
             }}
           >
-            <span aria-hidden style={{ fontSize: 12 }}>{isPlaying ? '⏸' : '▶'}</span>
+            <span aria-hidden style={{ fontSize: 14.5 }}>{isPlaying ? '⏸' : '▶'}</span>
             {isPlaying ? 'Pause' : 'Start'}
           </button>
         </div>
@@ -1078,9 +1140,9 @@ export default function WhackAMoleMath({ sessionId, role, isLocked }: WhackAMole
             display: 'flex',
             alignItems: 'center',
             justifyContent: 'center',
-            gap: 26,
-            padding: '20px 28px',
-            borderRadius: 22,
+            gap: 14,
+            padding: '8px 18px',
+            borderRadius: 16,
             border: `1px solid ${BORDER}`,
             background: '#ffffff',
             boxShadow: CARD_SHADOW,
@@ -1091,8 +1153,8 @@ export default function WhackAMoleMath({ sessionId, role, isLocked }: WhackAMole
             style={{
               // Floor is the size this card has always used; it only ever grows
               // with the canvas, never shrinks.
-              fontSize: 'clamp(26px, 4.6vw, 54px)',
-              lineHeight: 1.08,
+              fontSize: 'clamp(22px, 3.1vw, 38px)',
+              lineHeight: 1.05,
               textAlign: 'center',
               minWidth: 0,
             }}
@@ -1104,7 +1166,7 @@ export default function WhackAMoleMath({ sessionId, role, isLocked }: WhackAMole
       )}
 
       {!canInteract && isPlaying && question && (
-        <div style={{ flexShrink: 0, fontSize: 12, fontWeight: 600, color: MUTED, textAlign: 'center' }}>
+        <div style={{ flexShrink: 0, fontSize: 14.5, fontWeight: 600, color: MUTED, textAlign: 'center' }}>
           Your therapist is controlling this activity
         </div>
       )}
@@ -1118,9 +1180,9 @@ export default function WhackAMoleMath({ sessionId, role, isLocked }: WhackAMole
             minHeight: 0,
             position: 'relative',
             display: 'flex',
-            padding: 16,
+            padding: 8,
             boxSizing: 'border-box',
-            borderRadius: 26,
+            borderRadius: 18,
             border: `1px solid ${BORDER}`,
             boxShadow: CARD_SHADOW,
             overflow: 'hidden',
@@ -1142,8 +1204,8 @@ export default function WhackAMoleMath({ sessionId, role, isLocked }: WhackAMole
               minHeight: 0,
               position: 'relative',
               boxSizing: 'border-box',
-              padding: 18,
-              borderRadius: 22,
+              padding: 8,
+              borderRadius: 16,
               background: 'linear-gradient(180deg, rgba(196,232,146,0.70) 0%, rgba(163,214,106,0.78) 100%)',
               border: '1px solid rgba(255,255,255,0.55)',
               boxShadow: 'inset 0 1px 0 rgba(255,255,255,0.65), 0 10px 26px rgba(38,74,22,0.16)',
@@ -1185,8 +1247,8 @@ export default function WhackAMoleMath({ sessionId, role, isLocked }: WhackAMole
                   style={{
                     display: 'flex',
                     alignItems: 'center',
-                    gap: 12,
-                    padding: '14px 22px',
+                    gap: 10,
+                    padding: '9px 16px',
                     borderRadius: 999,
                     background: 'rgba(255,255,255,0.94)',
                     border: `1px solid ${BORDER}`,
@@ -1200,7 +1262,7 @@ export default function WhackAMoleMath({ sessionId, role, isLocked }: WhackAMole
                     draggable={false}
                     style={{ width: 30, height: 30, objectFit: 'contain', flexShrink: 0 }}
                   />
-                  <span style={{ fontSize: 14, fontWeight: 700, color: INK_BODY }}>
+                  <span style={{ fontSize: 16, fontWeight: 700, color: INK_BODY }}>
                     {!question
                       ? isT
                         ? 'Press Start to begin'
@@ -1228,14 +1290,14 @@ export default function WhackAMoleMath({ sessionId, role, isLocked }: WhackAMole
             alignItems: 'center',
             justifyContent: 'space-between',
             gap: 16,
-            padding: '14px 22px',
-            borderRadius: 18,
+            padding: '7px 16px',
+            borderRadius: 14,
             border: `1px solid ${BORDER}`,
             background: '#ffffff',
             boxShadow: CARD_SHADOW,
           }}
         >
-          <span style={{ display: 'inline-flex', alignItems: 'center', gap: 9, fontSize: 14, fontWeight: 700, color: INK_BODY }}>
+          <span style={{ display: 'inline-flex', alignItems: 'center', gap: 8, fontSize: 16, fontWeight: 700, color: INK_BODY }}>
             <span
               aria-hidden
               style={{
@@ -1247,7 +1309,7 @@ export default function WhackAMoleMath({ sessionId, role, isLocked }: WhackAMole
                 display: 'inline-flex',
                 alignItems: 'center',
                 justifyContent: 'center',
-                fontSize: 13,
+                fontSize: 15,
                 fontWeight: 800,
               }}
             >
@@ -1255,8 +1317,8 @@ export default function WhackAMoleMath({ sessionId, role, isLocked }: WhackAMole
             </span>
             {score} correct
           </span>
-          <span style={{ display: 'inline-flex', alignItems: 'center', gap: 9, fontSize: 14, fontWeight: 700, color: INK_BODY }}>
-            <span aria-hidden style={{ fontSize: 15 }}>🔥</span>
+          <span style={{ display: 'inline-flex', alignItems: 'center', gap: 8, fontSize: 16, fontWeight: 700, color: INK_BODY }}>
+            <span aria-hidden style={{ fontSize: 19.5 }}>🔥</span>
             {streak} streak
           </span>
 
@@ -1266,7 +1328,7 @@ export default function WhackAMoleMath({ sessionId, role, isLocked }: WhackAMole
                 position: 'absolute',
                 left: '50%',
                 top: -16,
-                fontSize: 12,
+                fontSize: 14.5,
                 fontWeight: 800,
                 color: '#ffffff',
                 background: GREEN_DEEP,
@@ -1288,7 +1350,7 @@ export default function WhackAMoleMath({ sessionId, role, isLocked }: WhackAMole
                 position: 'absolute',
                 left: `${r.x}%`,
                 bottom: 0,
-                fontSize: 24,
+                fontSize: 26.5,
                 zIndex: 10,
                 pointerEvents: 'none',
                 animation: 'wamFloatUp 1.6s ease forwards',

@@ -262,7 +262,7 @@ export function AnimatedScene({ meta }: { meta: SceneMeta }) {
         style={{
           position: 'absolute', top: 8, left: 8, zIndex: 8, width: 26, height: 26, borderRadius: 8, cursor: 'pointer',
           background: 'rgba(255,255,255,0.85)', border: '1px solid rgba(0,0,0,0.15)', color: '#5a4632',
-          fontSize: 13, display: 'flex', alignItems: 'center', justifyContent: 'center',
+          fontSize: 15, display: 'flex', alignItems: 'center', justifyContent: 'center',
         }}
       >
         ↺
