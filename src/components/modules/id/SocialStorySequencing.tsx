@@ -1,7 +1,7 @@
 'use client'
 
 import { useState, useEffect, useRef, useCallback, useMemo } from 'react'
-import { doc, onSnapshot, updateDoc } from 'firebase/firestore'
+import { deleteField, doc, onSnapshot, updateDoc } from 'firebase/firestore'
 import { db } from '@/lib/firebase'
 import { logModuleEvent } from '@/lib/sessionEvents'
 import { staadSpeak, staadCancel } from '@/lib/voice/staadVoice'
@@ -111,6 +111,11 @@ const PICKER_EMOJIS = ['😊','😢','😡','😕','🤩','😞','😌','😰','
 const PLAY_DUR = 1200
 const TRANS_DUR = 300
 
+/** Cheap deep-equality for the plain JSON the session doc round-trips. */
+function same(a: unknown, b: unknown): boolean {
+  return JSON.stringify(a) === JSON.stringify(b)
+}
+
 function shuffle<T>(a: T[]): T[] {
   const b = [...a]
   for (let i = b.length - 1; i > 0; i--) { const j = Math.floor(Math.random() * (i + 1)); [b[i], b[j]] = [b[j], b[i]] }
@@ -145,6 +150,9 @@ export default function SocialStorySequencing({ sessionId, role, isLocked }: Soc
   const [customTitle, setCustomTitle] = useState('')
   const [customPanels, setCustomPanels] = useState<{ emoji: string; caption: string }[]>(Array.from({ length: 4 }, () => ({ emoji: '😊', caption: '' })))
   const [toast, setToast] = useState<{ msg: string } | null>(null)
+  // The celebration replay runs on the board itself; `waiting` flips to true only
+  // once every panel has been walked through and read, and that is what reveals
+  // the same-set / new-set choice.
   const [waiting, setWaiting] = useState(false)
 
   const cRef = useRef<HTMLDivElement>(null)
@@ -153,6 +161,9 @@ export default function SocialStorySequencing({ sessionId, role, isLocked }: Soc
   const toastT = useRef<ReturnType<typeof setTimeout>>()
   const playT = useRef<ReturnType<typeof setTimeout>>()
   const chain = useRef<ReturnType<typeof setTimeout>[]>([])
+  // Bumped whenever a replay is superseded (new story, reset, skip, unmount) so
+  // timers and speech callbacks still in flight from the old run bail out.
+  const replayRun = useRef(0)
 
   const write = useCallback(async (d: Record<string, unknown>) => {
     try { await updateDoc(doc(db, 'liveSessions', sessionId), { ...d, 'timestamps.updatedAt': new Date().toISOString() }) } catch {}
@@ -163,18 +174,32 @@ export default function SocialStorySequencing({ sessionId, role, isLocked }: Soc
       if (!snap.exists()) return
       const s = snap.data().moduleState || {}
       if (typeof s.ssStoryId === 'string') setStoryId(s.ssStoryId)
-      if (Array.isArray(s.ssPanels)) setPanels(s.ssPanels as Panel[])
-      if (Array.isArray(s.ssShuffled)) setShuffled(s.ssShuffled)
-      if (typeof s.ssPlaced === 'object' && s.ssPlaced !== null) setPlaced(s.ssPlaced as Record<string, string>)
       if (typeof s.ssDifficulty === 'string') setDifficulty(s.ssDifficulty)
       if (typeof s.ssReadAloud === 'boolean') setReadAloud(s.ssReadAloud)
       if (typeof s.ssAttempts === 'number') setAttempts(s.ssAttempts)
       if (typeof s.ssCompleted === 'boolean') setCompleted(s.ssCompleted)
       if (typeof s.ssStoriesCompleted === 'number') setStoriesDone(s.ssStoriesCompleted)
       if (typeof s.ssShowedAnswer === 'boolean') setShowedAnswer(s.ssShowedAnswer)
+
+      // Every module shares one session doc, so a snapshot fires for writes that
+      // have nothing to do with this game. Handing back a fresh array/object each
+      // time would churn identities all the way up to the replay effect and cut
+      // the read-back short, so only set state when the value really changed.
+      if (Array.isArray(s.ssPanels)) setPanels(prev => same(prev, s.ssPanels) ? prev : s.ssPanels as Panel[])
+      if (Array.isArray(s.ssShuffled)) setShuffled(prev => same(prev, s.ssShuffled) ? prev : s.ssShuffled)
+      if (typeof s.ssPlaced === 'object' && s.ssPlaced !== null) {
+        setPlaced(prev => same(prev, s.ssPlaced) ? prev : s.ssPlaced as Record<string, string>)
+      }
       if (s.ssCustomStory && typeof s.ssCustomStory === 'object') {
         const cs = s.ssCustomStory as { title: string; panels: Panel[] }
-        if (Array.isArray(cs.panels)) setCustomStory({ id: 'custom', title: cs.title || 'Custom Story', panels: cs.panels })
+        if (Array.isArray(cs.panels)) {
+          const next: Story = { id: 'custom', title: cs.title || 'Custom Story', panels: cs.panels }
+          setCustomStory(prev => same(prev, next) ? prev : next)
+        }
+      } else {
+        // The therapist removed it — drop the local copy too, otherwise the chip
+        // lingers and the module keeps reopening on a story that no longer exists.
+        setCustomStory(prev => prev === null ? prev : null)
       }
     })
     return () => unsub()
@@ -193,10 +218,19 @@ export default function SocialStorySequencing({ sessionId, role, isLocked }: Soc
     toastT.current = setTimeout(() => setToast(null), 2000)
   }, [])
 
-  const activePanels = useMemo(() => {
-    if (customStory && storyId === 'custom') return customStory.panels
-    return STORIES.find(s => s.id === storyId)?.panels || panels
+  // Resolved once here (not again at render time) so activePanels and the board
+  // can never disagree about which story is on screen.
+  const currentStory = useMemo<Story | null>(() => {
+    if (storyId === 'custom') {
+      if (customStory) return customStory
+      // ssCustomStory is gone but the panel copy survived: still playable rather
+      // than a blank board.
+      return panels.length ? { id: 'custom', title: 'Custom Story', panels } : null
+    }
+    return STORIES.find(s => s.id === storyId) ?? null
   }, [storyId, customStory, panels])
+
+  const activePanels = useMemo(() => currentStory?.panels ?? [], [currentStory])
 
   const panelMap = useMemo(() => {
     const m = new Map<string, Panel>()
@@ -224,7 +258,9 @@ export default function SocialStorySequencing({ sessionId, role, isLocked }: Soc
   }, [placed, slotCount, panelMap, allFilled])
 
   const loadStory = useCallback((sid: string) => {
-    const story = STORIES.find(s => s.id === sid)
+    // 'custom' lives on the session, not in STORIES — without this the custom
+    // chip did nothing and the only way onto that story was re-saving the form.
+    const story = sid === 'custom' ? customStory : STORIES.find(s => s.id === sid)
     if (!story) return
     const ord = shuffle(story.panels.map(p => p.id))
     write({
@@ -241,7 +277,7 @@ export default function SocialStorySequencing({ sessionId, role, isLocked }: Soc
     setHintPanel(null)
     setShowAnswer(false)
     setPlayIdx(-1)
-  }, [write])
+  }, [write, customStory])
 
   const handleDrop = useCallback((panelId: string, slotIdx: number) => {
     if (!canDrop || completed) return
@@ -262,7 +298,9 @@ export default function SocialStorySequencing({ sessionId, role, isLocked }: Soc
 
   const removeFromSlot = useCallback((slotIdx: number) => {
     if (!canDrop || completed) return
-    write({ [`moduleState.ssPlaced.${slotIdx}`]: {} }) // remove by setting to empty
+    // Must delete the key, not blank it: an empty value still counts toward
+    // placedCount and leaves the slot permanently occupied-but-unrenderable.
+    write({ [`moduleState.ssPlaced.${slotIdx}`]: deleteField() })
     chain.current.forEach(t => clearTimeout(t))
     chain.current = []
     setPlayIdx(-1)
@@ -282,7 +320,7 @@ export default function SocialStorySequencing({ sessionId, role, isLocked }: Soc
     }
     if (wrong.size === 0) {
       setCorrectSlots(correct)
-      write({ 'moduleState.ssCompleted': true, 'moduleState.ssStoriesDone': storiesDone + 1 })
+      write({ 'moduleState.ssCompleted': true, 'moduleState.ssStoriesCompleted': storiesDone + 1 })
       const storyTitle = customStory && storyId === 'custom'
         ? customStory.title
         : STORIES.find(s => s.id === storyId)?.title ?? storyId
@@ -292,26 +330,8 @@ export default function SocialStorySequencing({ sessionId, role, isLocked }: Soc
         detail: `Sequenced "${storyTitle}" correctly in ${(attempts || 0) + 1} attempt${(attempts || 0) + 1 === 1 ? '' : 's'}`,
       })
       showToast('🌟 You got the story right!')
-      setTimeout(() => {
-        const p = activePanels.sort((a, b) => a.correctIndex - b.correctIndex)
-        const arr: ReturnType<typeof setTimeout>[] = []
-        p.forEach((panel, i) => {
-          const t = setTimeout(() => {
-            setPlayIdx(i)
-            if (readAloud) {
-              staadCancel()
-              staadSpeak({ text: panel.caption, language: 'en-IN', type: 'instruction' })
-            }
-          }, i * (PLAY_DUR + TRANS_DUR))
-          arr.push(t)
-        })
-        const last = setTimeout(() => {
-          setPlayIdx(-1)
-          setWaiting(true)
-        }, p.length * (PLAY_DUR + TRANS_DUR) + 500)
-        arr.push(last)
-        chain.current = arr
-      }, 600)
+      // The replay itself is driven by the effect below, so both therapist and
+      // client walk through the finished story, not just whoever hit Check.
     } else {
       setWrongSlots(wrong)
       setCorrectSlots(correct)
@@ -324,7 +344,90 @@ export default function SocialStorySequencing({ sessionId, role, isLocked }: Soc
         if (correctPanelId) setHintPanel(correctPanelId)
       }
     }
-  }, [allFilled, placed, slotCount, panelMap, write, storiesDone, showToast, activePanels, readAloud, attempts, sessionId, storyId, customStory])
+  }, [allFilled, placed, slotCount, panelMap, write, storiesDone, showToast, activePanels, attempts, sessionId, storyId, customStory])
+
+  const orderedPanels = useMemo(
+    () => [...activePanels].sort((a, b) => a.correctIndex - b.correctIndex),
+    [activePanels],
+  )
+  const orderedRef = useRef(orderedPanels)
+  orderedRef.current = orderedPanels
+  /** Changes only when the story's actual content does, unlike the array identity. */
+  const replaySig = useMemo(
+    () => `${storyId}::${orderedPanels.map(p => `${p.correctIndex}:${p.caption}`).join('|')}`,
+    [storyId, orderedPanels],
+  )
+
+  const stopReplay = useCallback(() => {
+    replayRun.current += 1
+    chain.current.forEach(t => clearTimeout(t))
+    chain.current = []
+    staadCancel()
+  }, [])
+
+  // Once the story is right, hold on the board and walk the panels in order,
+  // reading each caption, before offering the same-set / new-set choice.
+  useEffect(() => {
+    if (!completed) {
+      stopReplay()
+      setPlayIdx(-1)
+      setWaiting(false)
+      return
+    }
+
+    const run = ++replayRun.current
+    const alive = () => replayRun.current === run
+    const ordered = orderedRef.current
+    const after = (ms: number, fn: () => void) => {
+      const t = setTimeout(() => { if (alive()) fn() }, ms)
+      chain.current.push(t)
+    }
+
+    let i = 0
+    const step = () => {
+      if (i >= ordered.length) {
+        setPlayIdx(-1)
+        after(600, () => setWaiting(true))
+        return
+      }
+      const panel = ordered[i]
+      i += 1
+      setPlayIdx(i - 1)
+      if (!readAloud) { after(PLAY_DUR + TRANS_DUR, step); return }
+
+      let advanced = false
+      const next = () => {
+        if (advanced || !alive()) return
+        advanced = true
+        after(TRANS_DUR, step)
+      }
+      staadSpeak({ text: panel.caption, language: 'en-IN', type: 'instruction', onEnd: next })
+      // Speech synthesis can go silent without ever firing onend (no voices, tab
+      // throttling). Keep the sequence moving on a deliberately generous estimate
+      // so the fallback never races a line that is still being spoken.
+      after(Math.max(PLAY_DUR, panel.caption.length * 140) + 4000, next)
+    }
+
+    staadCancel()
+    after(700, step)
+
+    return () => {
+      replayRun.current += 1
+      chain.current.forEach(t => clearTimeout(t))
+      chain.current = []
+      staadCancel()
+    }
+    // Deliberately keyed on replaySig, not on the activePanels array: the session
+    // doc is shared by every module, so an unrelated write used to hand back a new
+    // array, restart this effect and cancel the line that was mid-sentence.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [completed, replaySig, readAloud, stopReplay])
+
+  const skipReplay = useCallback(() => {
+    stopReplay()
+    setPlayIdx(-1)
+    setWaiting(true)
+  }, [stopReplay])
 
   useEffect(() => {
     if (completed && waiting && !showAnswer) {
@@ -353,23 +456,31 @@ export default function SocialStorySequencing({ sessionId, role, isLocked }: Soc
       'moduleState.ssCompleted': false,
       'moduleState.ssShowedAnswer': false,
     })
-    chain.current.forEach(t => clearTimeout(t))
-    chain.current = []
+    stopReplay()
     setPlayIdx(-1)
     setWrongSlots(new Set())
     setCorrectSlots(new Set())
     setHintPanel(null)
     setShowAnswer(false)
     setWaiting(false)
-  }, [write, activePanels])
+  }, [write, activePanels, stopReplay])
 
   const nextStory = useCallback(() => {
+    // findIndex is -1 on the custom story, so that case lands on STORIES[0].
     const currentIdx = STORIES.findIndex(s => s.id === storyId)
     const next = STORIES[(currentIdx + 1) % STORIES.length]
+    stopReplay()
     loadStory(next.id)
     setWaiting(false)
     setShowCustomForm(false)
-  }, [storyId, loadStory])
+  }, [storyId, loadStory, stopReplay])
+
+  /** Drop the session's custom story and fall back to a built-in one. */
+  const clearCustomStory = useCallback(() => {
+    write({ 'moduleState.ssCustomStory': deleteField() })
+    setCustomStory(null)
+    if (storyId === 'custom') loadStory(STORIES[0].id)
+  }, [write, storyId, loadStory])
 
   const saveCustomStory = useCallback(() => {
     if (!customTitle.trim()) return
@@ -451,8 +562,6 @@ export default function SocialStorySequencing({ sessionId, role, isLocked }: Soc
     setGhostPos({ x: e.touches[0].clientX, y: e.touches[0].clientY })
   }, [canDrop, completed])
 
-  const currentStory = customStory && storyId === 'custom' ? customStory : STORIES.find(s => s.id === storyId)
-
   const canCheck = allFilled && !completed && !showAnswer
 
   return (
@@ -481,14 +590,22 @@ export default function SocialStorySequencing({ sessionId, role, isLocked }: Soc
               >{s.title}</button>
             ))}
             {customStory && (
-              <button onClick={() => loadStory('custom')}
-                style={{
-                  whiteSpace: 'nowrap', padding: '3px 8px', borderRadius: 10, cursor: 'pointer', fontSize: 13,
-                  border: storyId === 'custom' ? '1px solid rgba(74,124,111,0.6)' : '1px solid rgba(0,0,0,0.08)',
-                  background: storyId === 'custom' ? 'rgba(74,124,111,0.2)' : 'transparent',
-                  color: storyId === 'custom' ? 'rgba(0,0,0,0.85)' : 'rgba(0,0,0,0.4)',
-                }}
-              >📝 {customStory.title}</button>
+              <span style={{
+                display: 'inline-flex', alignItems: 'center', flexShrink: 0, borderRadius: 10, overflow: 'hidden',
+                border: storyId === 'custom' ? '1px solid rgba(74,124,111,0.6)' : '1px solid rgba(0,0,0,0.08)',
+                background: storyId === 'custom' ? 'rgba(74,124,111,0.2)' : 'transparent',
+              }}>
+                <button onClick={() => loadStory('custom')}
+                  style={{
+                    whiteSpace: 'nowrap', padding: '3px 4px 3px 8px', border: 'none', background: 'transparent',
+                    cursor: 'pointer', fontSize: 13,
+                    color: storyId === 'custom' ? 'rgba(0,0,0,0.85)' : 'rgba(0,0,0,0.4)',
+                  }}
+                >📝 {customStory.title}</button>
+                <button onClick={clearCustomStory} title="Remove this custom story"
+                  style={{ padding: '3px 7px 3px 3px', border: 'none', background: 'transparent', cursor: 'pointer', fontSize: 12, color: 'rgba(0,0,0,0.35)' }}
+                >✕</button>
+              </span>
             )}
             <button onClick={() => setShowCustomForm(true)}
               style={{ whiteSpace: 'nowrap', padding: '3px 8px', borderRadius: 10, cursor: 'pointer', fontSize: 13, border: '1px dashed rgba(0,0,0,0.2)', background: 'transparent', color: 'rgba(0,0,0,0.4)' }}
@@ -559,10 +676,10 @@ export default function SocialStorySequencing({ sessionId, role, isLocked }: Soc
         </div>
       )}
 
-      {/* No story selected (client) */}
-      {!currentStory && !isT && (
-        <div style={{ flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center', color: 'rgba(0,0,0,0.3)', fontSize: 16.5 }}>
-          Waiting for therapist to choose a story...
+      {/* No story resolved — previously the therapist just got a blank panel here */}
+      {!currentStory && (
+        <div style={{ flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center', textAlign: 'center', padding: 20, color: 'rgba(0,0,0,0.3)', fontSize: 16.5 }}>
+          {isT ? 'Pick a story above to begin.' : 'Waiting for therapist to choose a story...'}
         </div>
       )}
 
@@ -590,11 +707,14 @@ export default function SocialStorySequencing({ sessionId, role, isLocked }: Soc
                   onDragLeave={onSlotDragLeave}
                   onDrop={e => onSlotDrop(e, idx)}
                   style={{
-                    flex: 1, aspectRatio: '0.85', borderRadius: 12,
+                    // minHeight rather than aspectRatio: with six panels each slot
+                    // is only ~55px wide, and a fixed ratio left no room for the
+                    // caption to wrap.
+                    flex: 1, minWidth: 0, minHeight: slotCount >= 5 ? 100 : 92, borderRadius: 12,
                     background: isPlay ? 'rgba(74,124,111,0.2)' : isWrong ? 'rgba(200,96,42,0.15)' : isCorrect ? 'rgba(74,124,111,0.15)' : isHover ? 'rgba(74,124,111,0.1)' : 'rgba(0,0,0,0.04)',
                     border: isPlay ? '2px solid #4a7c6f' : isWrong ? '1.5px solid rgba(200,96,42,0.5)' : isCorrect ? '1.5px solid rgba(74,124,111,0.6)' : isHover ? '1.5px solid rgba(74,124,111,0.4)' : '1.5px dashed rgba(0,0,0,0.15)',
                     borderStyle: isHover ? 'solid' : isPlay ? 'solid' : isWrong ? 'solid' : isCorrect ? 'solid' : 'dashed',
-                    display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', gap: 3,
+                    display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', gap: 3, padding: '4px 3px',
                     transition: 'all 0.2s', cursor: canDrop && !isOccupied ? 'pointer' : 'default',
                     transform: isPlay ? 'scale(1.08)' : isHover ? 'scale(1.03)' : 'scale(1)',
                     boxShadow: isPlay ? '0 0 16px rgba(74,124,111,0.3)' : 'none',
@@ -604,9 +724,9 @@ export default function SocialStorySequencing({ sessionId, role, isLocked }: Soc
                 >
                   {panel ? (
                     <>
-                      <span style={{ fontSize: 31.5, lineHeight: 1 }}>{panel.emoji}</span>
+                      <span style={{ fontSize: slotCount >= 5 ? 26 : 31.5, lineHeight: 1 }}>{panel.emoji}</span>
                       {difficulty !== 'challenge' && (
-                        <span style={{ fontSize: 12, color: 'rgba(0,0,0,0.7)', textAlign: 'center', lineHeight: 1.2, padding: '0 2px' }}>{panel.caption}</span>
+                        <span style={{ fontSize: slotCount >= 5 ? 9.5 : 11, color: 'rgba(0,0,0,0.7)', textAlign: 'center', lineHeight: 1.15, overflowWrap: 'anywhere' }}>{panel.caption}</span>
                       )}
                     </>
                   ) : (
@@ -624,7 +744,7 @@ export default function SocialStorySequencing({ sessionId, role, isLocked }: Soc
           </div>
 
           {/* Shuffled panel cards */}
-          <div style={{ display: 'flex', flexWrap: 'wrap', gap: 12, padding: 16, minHeight: 110, alignContent: 'flex-start', background: 'rgba(0,0,0,0.035)', borderRadius: 14, border: '1px dashed rgba(0,0,0,0.14)', flex: 1, overflowY: 'auto' }}>
+          <div style={{ display: 'flex', flexWrap: 'wrap', gap: 10, padding: 12, minHeight: 132, alignContent: 'flex-start', alignItems: 'flex-start', justifyContent: 'center', background: 'rgba(0,0,0,0.035)', borderRadius: 14, border: '1px dashed rgba(0,0,0,0.14)', flex: 1, overflowY: 'auto' }}>
             {unplacedIds.map(id => {
               const panel = panelMap.get(id)
               if (!panel) return null
@@ -637,9 +757,12 @@ export default function SocialStorySequencing({ sessionId, role, isLocked }: Soc
                   onTouchStart={onTouchStart(id)}
                   className={isHint ? 'hint-pulse' : ''}
                   style={{
-                    width: 68, height: 80, borderRadius: 12,
+                    // Sized to fit three per row in the 420px panel. Height is a
+                    // minimum, not a fixed box, and the caption is unclamped, so a
+                    // long line grows the card instead of ending in an ellipsis.
+                    width: 104, minHeight: difficulty === 'challenge' ? 76 : 112, borderRadius: 12,
                     background: 'rgba(0,0,0,0.07)', border: isHint ? '1.5px solid rgba(74,124,111,0.5)' : '1.5px solid rgba(0,0,0,0.12)',
-                    display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', gap: 3, padding: 4,
+                    display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', gap: 5, padding: '8px 6px',
                     cursor: canDrop && !completed ? 'grab' : 'default',
                     transition: 'all 0.15s', userSelect: 'none', WebkitUserSelect: 'none',
                     boxShadow: dragItem === id ? '0 8px 20px rgba(0,0,0,0.3)' : '0 2px 6px rgba(0,0,0,0.2)',
@@ -649,7 +772,7 @@ export default function SocialStorySequencing({ sessionId, role, isLocked }: Soc
                 >
                   <span style={{ fontSize: 30, lineHeight: 1 }}>{panel.emoji}</span>
                   {difficulty !== 'challenge' && (
-                    <span style={{ fontSize: 10, color: 'rgba(0,0,0,0.65)', textAlign: 'center', lineHeight: 1.2, overflow: 'hidden', display: '-webkit-box', WebkitLineClamp: 2, WebkitBoxOrient: 'vertical' }}>
+                    <span style={{ fontSize: 11, color: 'rgba(0,0,0,0.72)', textAlign: 'center', lineHeight: 1.25, overflowWrap: 'anywhere' }}>
                       {panel.caption}
                     </span>
                   )}
@@ -659,7 +782,21 @@ export default function SocialStorySequencing({ sessionId, role, isLocked }: Soc
             {unplacedIds.length === 0 && <div style={{ width: '100%', textAlign: 'center', color: 'rgba(0,0,0,0.2)', fontSize: 13, padding: 8 }}>All panels placed!</div>}
           </div>
 
-          {/* Check button */}
+          {/* Check button, or the read-back banner once the story is solved */}
+          {completed && !waiting ? (
+            <div style={{
+              display: 'flex', alignItems: 'center', gap: 10, flexShrink: 0,
+              padding: '8px 12px', borderRadius: 8,
+              background: 'rgba(74,124,111,0.14)', border: '1px solid rgba(74,124,111,0.35)',
+            }}>
+              <span style={{ fontSize: 15, color: '#1F7A44' }}>
+                🔊 Reading your story in order… {Math.min(playIdx + 1, slotCount) || 1} of {slotCount}
+              </span>
+              <button onClick={skipReplay}
+                style={{ marginLeft: 'auto', padding: '4px 12px', borderRadius: 6, border: '1px solid rgba(0,0,0,0.12)', background: 'rgba(255,255,255,0.5)', color: 'rgba(0,0,0,0.6)', cursor: 'pointer', fontSize: 14 }}
+              >Skip</button>
+            </div>
+          ) : (
           <div style={{ display: 'flex', gap: 10, flexShrink: 0 }}>
             <button onClick={handleCheck}
               disabled={!canCheck}
@@ -677,6 +814,7 @@ export default function SocialStorySequencing({ sessionId, role, isLocked }: Soc
               >Show answer</button>
             )}
           </div>
+          )}
 
           {/* Score */}
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', fontSize: 14, color: 'rgba(0,0,0,0.4)', flexShrink: 0 }}>
@@ -689,21 +827,21 @@ export default function SocialStorySequencing({ sessionId, role, isLocked }: Soc
       {/* Touch ghost */}
       {ghostPos && dragId.current && panelMap.get(dragId.current) && (
         <div style={{
-          position: 'fixed', left: ghostPos.x - 34, top: ghostPos.y - 60,
-          width: 68, height: 80, borderRadius: 12, zIndex: 1000, pointerEvents: 'none',
+          position: 'fixed', left: ghostPos.x - 52, top: ghostPos.y - 76,
+          width: 104, minHeight: 112, borderRadius: 12, zIndex: 1000, pointerEvents: 'none',
           background: 'rgba(74,124,111,0.15)', border: '1.5px solid rgba(74,124,111,0.4)',
-          display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', gap: 3,
-          boxShadow: '0 8px 20px rgba(0,0,0,0.3)', transform: 'scale(1.1)', opacity: 0.85, padding: 4,
+          display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', gap: 5,
+          boxShadow: '0 8px 20px rgba(0,0,0,0.3)', transform: 'scale(1.1)', opacity: 0.85, padding: '8px 6px',
         }}>
           <span style={{ fontSize: 30, lineHeight: 1 }}>{panelMap.get(dragId.current)!.emoji}</span>
           {difficulty !== 'challenge' && (
-            <span style={{ fontSize: 10, color: 'rgba(0,0,0,0.65)', textAlign: 'center', lineHeight: 1.2 }}>{panelMap.get(dragId.current)!.caption}</span>
+            <span style={{ fontSize: 11, color: 'rgba(0,0,0,0.72)', textAlign: 'center', lineHeight: 1.25, overflowWrap: 'anywhere' }}>{panelMap.get(dragId.current)!.caption}</span>
           )}
         </div>
       )}
 
-      {/* Completion overlay */}
-      {completed && (
+      {/* Completion overlay — held back until the full read-back has played */}
+      {completed && waiting && (
         <div style={{
           position: 'absolute', inset: 0, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', gap: 10,
           background: 'rgba(74,124,111,0.2)', backdropFilter: 'blur(6px)', zIndex: 50, padding: 20,
@@ -711,14 +849,17 @@ export default function SocialStorySequencing({ sessionId, role, isLocked }: Soc
           <div style={{ fontSize: 39 }}>🌟</div>
           <div style={{ fontSize: 21, fontFamily: '"DM Serif Display", serif', color: '#2b2f33', textAlign: 'center' }}>You got the story right!</div>
           <div style={{ fontSize: 16, color: 'rgba(0,0,0,0.5)' }}>Attempts: {attempts || 0}</div>
+          <div style={{ fontSize: 14, color: 'rgba(0,0,0,0.45)', textAlign: 'center' }}>
+            {isT ? 'Play the same set again, or move on to a new one.' : 'Play the same set again, or wait for a new one.'}
+          </div>
           <div style={{ display: 'flex', gap: 8 }}>
             <button onClick={resetStory}
               style={{ padding: '8px 20px', borderRadius: 8, border: '1px solid rgba(0,0,0,0.12)', background: 'rgba(0,0,0,0.07)', color: 'rgba(0,0,0,0.8)', cursor: 'pointer', fontSize: 16 }}
-            >Same story</button>
+            >Same set</button>
             {isT && (
               <button onClick={nextStory}
                 style={{ padding: '8px 20px', borderRadius: 8, border: '1px solid rgba(74,124,111,0.4)', background: 'rgba(74,124,111,0.2)', color: '#1F7A44', cursor: 'pointer', fontSize: 16 }}
-              >New story</button>
+              >New set</button>
             )}
           </div>
         </div>
