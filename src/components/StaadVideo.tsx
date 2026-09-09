@@ -11,6 +11,10 @@ interface StaadVideoProps {
   sessionId: string
   userName: string
   role: 'therapist' | 'client'
+  /** Language this participant SPEAKS — selects the STT model for their audio. */
+  sourceLang?: string
+  /** Language this participant READS — the language their captions arrive in. */
+  targetLang?: string
   children: React.ReactNode
 }
 
@@ -23,7 +27,14 @@ const RoomCtx = createContext<RoomContextValue>({ disconnect: () => {}, room: nu
 
 export const useSessionRoom = () => useContext(RoomCtx)
 
-export default function StaadVideo({ sessionId, userName, role, children }: StaadVideoProps) {
+export default function StaadVideo({
+  sessionId,
+  userName,
+  role,
+  sourceLang,
+  targetLang,
+  children,
+}: StaadVideoProps) {
   const [token, setToken] = useState<string>('')
   const [error, setError] = useState('')
 
@@ -32,14 +43,22 @@ export default function StaadVideo({ sessionId, userName, role, children }: Staa
 
   useEffect(() => {
     if (!sessionId || !userName) return
-    fetch(`/api/livekit-token?room=${sessionId}&name=${encodeURIComponent(userName)}&role=${role}`)
+    // Languages are signed into the token as participant attributes, which is
+    // how the translation agent learns who speaks and reads what. Changing them
+    // mid-session therefore requires a reconnect — the effect re-runs and a
+    // fresh token is minted.
+    const params = new URLSearchParams({ room: sessionId, name: userName, role })
+    if (sourceLang) params.set('sourceLang', sourceLang)
+    if (targetLang) params.set('targetLang', targetLang)
+
+    fetch(`/api/livekit-token?${params.toString()}`)
       .then(r => r.json())
       .then(d => {
         if (d.token) setToken(d.token)
         else setError('Could not get video token')
       })
       .catch(() => setError('Video connection failed'))
-  }, [sessionId, userName, role])
+  }, [sessionId, userName, role, sourceLang, targetLang])
 
   const disconnect = useCallback(() => {
     room.disconnect()

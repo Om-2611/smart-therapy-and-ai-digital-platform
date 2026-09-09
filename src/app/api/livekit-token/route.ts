@@ -1,5 +1,6 @@
 import { AccessToken } from 'livekit-server-sdk'
 import { NextRequest, NextResponse } from 'next/server'
+import { isTranslationLanguage } from '@/lib/translationLanguages'
 
 export const dynamic = 'force-dynamic';
 
@@ -8,6 +9,8 @@ export async function GET(req: NextRequest) {
   const roomName = searchParams.get('room')
   const participantName = searchParams.get('name')
   const role = searchParams.get('role')
+  const sourceLang = searchParams.get('sourceLang')
+  const targetLang = searchParams.get('targetLang')
 
   if (!roomName || !participantName) {
     return NextResponse.json({ error: 'Missing params' }, { status: 400 })
@@ -32,12 +35,29 @@ export async function GET(req: NextRequest) {
   const claimedRole =
     role === 'therapist' || role === 'client' ? role : null
 
+  // Live-translation languages, read by the translation agent from participant
+  // attributes. `source_lang` is what this person SPEAKS (which STT model to
+  // run on their audio); `target_lang` is what they READ (which language their
+  // captions arrive in).
+  //
+  // Signed into the token rather than set by the browser, for the same reason
+  // as the role: a participant must not be able to redirect another person's
+  // audio to a different model. Anything not on the allow-list is dropped, so
+  // the agent falls back to its own defaults rather than trusting free text.
+  const attributes: Record<string, string> = {}
+  if (claimedRole) attributes.role = claimedRole
+  if (isTranslationLanguage(sourceLang)) attributes.source_lang = sourceLang
+  if (isTranslationLanguage(targetLang)) attributes.target_lang = targetLang
+
   const at = new AccessToken(
     process.env.LIVEKIT_API_KEY!,
     process.env.LIVEKIT_API_SECRET!,
     {
       identity: participantName,
+      // Metadata is kept for backwards compatibility: attention scoring reads
+      // the role from here, not from attributes.
       ...(claimedRole ? { metadata: JSON.stringify({ role: claimedRole }) } : {}),
+      ...(Object.keys(attributes).length ? { attributes } : {}),
     }
   )
 

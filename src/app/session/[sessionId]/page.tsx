@@ -24,6 +24,9 @@ import ReactionOverlay from '@/components/ReactionOverlay';
 import { resolveAllowedModuleIds, isSkillModule } from '@/lib/modules';
 import { RC, SIDEBAR_WIDTH } from '@/components/session/roomTheme';
 import type { SidebarPanel } from '@/components/session/sessionPanels';
+import CaptionOverlay from '@/components/session/CaptionOverlay';
+import TranslationControl from '@/components/session/TranslationControl';
+import { useTranslationSettings, pairForRole, writeTranslationSettings } from '@/lib/translation';
 import SessionTopBar from '@/components/session/SessionTopBar';
 import SessionBottomBar from '@/components/session/SessionBottomBar';
 import AIAssistantPanel from '@/components/session/AIAssistantPanel';
@@ -491,6 +494,12 @@ export default function SessionRoomPage({ params }: { params: { sessionId: strin
   const timerStr = `${String(minutes).padStart(2, '0')}:${String(seconds).padStart(2, '0')}`;
 
   const userRole = isTherapist ? 'therapist' as const : 'client' as const;
+
+  // Live-translation languages for this session. `source` is what this
+  // participant speaks, `target` is what they read.
+  const translationSettings = useTranslationSettings(sessionId);
+  const translationPair = pairForRole(translationSettings, userRole);
+
   const therapistConsented = consentStatus?.therapist === true;
   const clientConsented = consentStatus?.client === true;
   const bothConsented = therapistConsented && clientConsented;
@@ -576,7 +585,19 @@ export default function SessionRoomPage({ params }: { params: { sessionId: strin
       sessionId={sessionId}
       userName={profile ? `${profile.firstName} ${profile.lastName}` : 'User'}
       role={isTherapist ? 'therapist' : 'client'}
+      // Signed into the access token as participant attributes; this is how the
+      // translation agent knows which STT model to run on this person's audio
+      // and which language to caption them in.
+      //
+      // Omitted while captions are off, which is also the agent's off switch:
+      // with no language attribute it skips the track entirely rather than
+      // transcribing on a GPU for output nobody is showing.
+      sourceLang={translationSettings.enabled ? translationPair.source : undefined}
+      targetLang={translationSettings.enabled ? translationPair.target : undefined}
     >
+      {/* Renders translated captions published by the translation agent on the
+          lk.transcription topic. Inside the room provider, like the bridges. */}
+      <CaptionOverlay enabled={translationSettings.enabled} />
       {/* Runs the Sarvam pipeline inside the room provider so it can access the
           LiveKit room; reports recording state up to this page for the chip. */}
       <TranscriptionBridge
@@ -631,19 +652,28 @@ export default function SessionRoomPage({ params }: { params: { sessionId: strin
             sessionId={sessionId}
             onlineCount={onlineCount}
             transcriptLine={
-              isTherapist && transcriptionEnabled ? (
-                <div
-                  style={{
-                    display: 'flex',
-                    alignItems: 'center',
-                    gap: 6,
-                    fontSize: 12,
-                    fontWeight: 600,
-                    color: transcription.isRecording ? RC.greenDark : RC.inkMuted,
-                  }}
-                >
-                  <div style={{ width: 7, height: 7, borderRadius: '50%', background: transcription.isRecording ? RC.green : RC.border, animation: transcription.isRecording ? 'pulse 1.4s ease infinite' : 'none' }} />
-                  {transcription.isRecording ? `${transcription.chunkCount} lines` : 'transcript off'}
+              isTherapist ? (
+                <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
+                  {transcriptionEnabled && (
+                    <div
+                      style={{
+                        display: 'flex',
+                        alignItems: 'center',
+                        gap: 6,
+                        fontSize: 12,
+                        fontWeight: 600,
+                        color: transcription.isRecording ? RC.greenDark : RC.inkMuted,
+                      }}
+                    >
+                      <div style={{ width: 7, height: 7, borderRadius: '50%', background: transcription.isRecording ? RC.green : RC.border, animation: transcription.isRecording ? 'pulse 1.4s ease infinite' : 'none' }} />
+                      {transcription.isRecording ? `${transcription.chunkCount} lines` : 'transcript off'}
+                    </div>
+                  )}
+                  {/* Therapist-only: turns captions on and sets who speaks what. */}
+                  <TranslationControl
+                    settings={translationSettings}
+                    onChange={(patch) => writeTranslationSettings(sessionId, patch)}
+                  />
                 </div>
               ) : null
             }
