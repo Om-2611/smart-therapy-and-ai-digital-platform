@@ -1095,10 +1095,10 @@ export default function StoryChoiceAdventure({ sessionId, role, isLocked }: Stor
       <div style={{ display: 'flex', flexDirection: 'column', gap: 20, width: '100%', maxWidth: 760, padding: 24 }}>
       {/* 1 — Header */}
       <div style={{ display: 'flex', alignItems: 'center', gap: 8, minHeight: 40 }}>
-        <span style={{ flexShrink: 0, background: badge.bg, color: badge.color, fontSize: 12, fontWeight: 700, padding: '3px 9px', borderRadius: 999 }}>
+        <span style={{ flexShrink: 0, background: badge.bg, color: badge.color, fontSize: 13, fontWeight: 700, padding: '3px 9px', borderRadius: 999 }}>
           {badge.label}
         </span>
-        <span style={{ flex: 1, textAlign: 'center', fontSize: 13, color: 'rgba(255,255,255,0.55)', whiteSpace: 'nowrap' }}>
+        <span style={{ flex: 1, textAlign: 'center', fontSize: 14, color: 'rgba(255,255,255,0.55)', whiteSpace: 'nowrap' }}>
           Story Choice Adventure
         </span>
         {isT ? (
@@ -1109,7 +1109,7 @@ export default function StoryChoiceAdventure({ sessionId, role, isLocked }: Stor
                   key={key}
                   onClick={() => write({ 'moduleState.scaLanguage': key })}
                   style={{
-                    border: 'none', cursor: 'pointer', borderRadius: 999, padding: '3px 7px', fontSize: 11.5, fontWeight: 600,
+                    border: 'none', cursor: 'pointer', borderRadius: 999, padding: '3px 7px', fontSize: 13, fontWeight: 600,
                     fontFamily: key === 'hi' ? DEVANAGARI : undefined,
                     background: language === key ? 'rgba(74,124,111,0.35)' : 'transparent',
                     color: language === key ? '#cfe6df' : 'rgba(255,255,255,0.45)',
@@ -1124,7 +1124,7 @@ export default function StoryChoiceAdventure({ sessionId, role, isLocked }: Stor
               onClick={() => startLevel(level)}
               title="Reset level"
               style={{
-                width: 24, height: 24, borderRadius: 6, cursor: 'pointer', fontSize: 13,
+                width: 24, height: 24, borderRadius: 6, cursor: 'pointer', fontSize: 14,
                 background: 'rgba(255,255,255,0.06)', border: '1px solid rgba(255,255,255,0.12)', color: 'rgba(255,255,255,0.6)',
               }}
             >
@@ -1142,7 +1142,7 @@ export default function StoryChoiceAdventure({ sessionId, role, isLocked }: Stor
               key={l}
               onClick={() => startLevel(l)}
               style={{
-                flex: 1, padding: '4px 0', borderRadius: 7, cursor: 'pointer', fontSize: 11.5, fontWeight: 600, textTransform: 'capitalize',
+                flex: 1, padding: '4px 0', borderRadius: 7, cursor: 'pointer', fontSize: 13, fontWeight: 600, textTransform: 'capitalize',
                 background: level === l ? 'rgba(74,124,111,0.3)' : 'rgba(255,255,255,0.05)',
                 border: `1px solid ${level === l ? 'rgba(74,124,111,0.45)' : 'rgba(255,255,255,0.1)'}`,
                 color: level === l ? '#cfe6df' : 'rgba(255,255,255,0.45)',
@@ -1164,7 +1164,7 @@ export default function StoryChoiceAdventure({ sessionId, role, isLocked }: Stor
             style={{ height: '100%', background: 'rgba(74,124,111,0.7)', borderRadius: 999 }}
           />
         </div>
-        <span style={{ fontSize: 12, color: 'rgba(255,255,255,0.45)', flexShrink: 0 }}>
+        <span style={{ fontSize: 13, color: 'rgba(255,255,255,0.45)', flexShrink: 0 }}>
           {levelComplete ? levelScenarios.length : idx + 1} / {levelScenarios.length}
         </span>
       </div>
@@ -1183,19 +1183,19 @@ export default function StoryChoiceAdventure({ sessionId, role, isLocked }: Stor
               padding: 20, textAlign: 'center', display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 8,
             }}
           >
-            <div style={{ fontSize: 42.5, lineHeight: 1 }}>🎉</div>
-            <div style={{ fontFamily: "'DM Serif Display', serif", fontSize: 22 }}>Level complete!</div>
-            <div style={{ fontSize: 16, color: 'rgba(255,255,255,0.8)' }}>
+            <div style={{ fontSize: 44, lineHeight: 1 }}>🎉</div>
+            <div style={{ fontFamily: "'DM Serif Display', serif", fontSize: 23.5 }}>Level complete!</div>
+            <div style={{ fontSize: 17.5, color: 'rgba(255,255,255,0.8)' }}>
               Score: {score} / {levelScenarios.length}
             </div>
-            <div style={{ fontSize: 14.5, fontWeight: 600, color: scoreBand.color }}>{scoreBand.msg}</div>
+            <div style={{ fontSize: 16, fontWeight: 600, color: scoreBand.color }}>{scoreBand.msg}</div>
             {isT && (
               <div style={{ display: 'flex', flexDirection: 'column', gap: 6, width: '100%', marginTop: 6 }}>
                 {nextLevel && (
                   <button
                     onClick={() => startLevel(nextLevel)}
                     style={{
-                      width: '100%', padding: '8px 0', borderRadius: 999, cursor: 'pointer', fontSize: 14.5, fontWeight: 600,
+                      width: '100%', padding: '8px 0', borderRadius: 999, cursor: 'pointer', fontSize: 16, fontWeight: 600,
                       background: 'rgba(74,124,111,0.3)', border: '1px solid rgba(74,124,111,0.45)', color: '#cfe6df',
                     }}
                   >
@@ -1205,7 +1205,7 @@ export default function StoryChoiceAdventure({ sessionId, role, isLocked }: Stor
                 <button
                   onClick={() => startLevel(level)}
                   style={{
-                    width: '100%', padding: '7px 0', borderRadius: 999, cursor: 'pointer', fontSize: 13,
+                    width: '100%', padding: '7px 0', borderRadius: 999, cursor: 'pointer', fontSize: 14,
                     background: 'transparent', border: '1px solid rgba(255,255,255,0.14)', color: 'rgba(255,255,255,0.6)',
                   }}
                 >
@@ -1227,7 +1227,7 @@ export default function StoryChoiceAdventure({ sessionId, role, isLocked }: Stor
                     })
                   }}
                   style={{
-                    width: '100%', padding: '7px 0', borderRadius: 999, cursor: 'pointer', fontSize: 13,
+                    width: '100%', padding: '7px 0', borderRadius: 999, cursor: 'pointer', fontSize: 14,
                     background: 'transparent', border: '1px solid rgba(255,255,255,0.14)', color: 'rgba(255,255,255,0.6)',
                   }}
                 >
@@ -1251,7 +1251,7 @@ export default function StoryChoiceAdventure({ sessionId, role, isLocked }: Stor
                   borderRadius: 14, position: 'relative', overflow: 'hidden',
                 }}
               >
-                <div style={{ position: 'absolute', top: 10, right: 12, fontSize: 12, fontWeight: 600, color: '#5a4632', background: 'rgba(255,255,255,0.72)', padding: '1px 8px', borderRadius: 999, zIndex: 8 }}>
+                <div style={{ position: 'absolute', top: 10, right: 12, fontSize: 13, fontWeight: 600, color: '#5a4632', background: 'rgba(255,255,255,0.72)', padding: '1px 8px', borderRadius: 999, zIndex: 8 }}>
                   Scenario {idx + 1}
                 </div>
                 {/* Illustrated animated scene — shows the moment before any text */}
@@ -1315,26 +1315,26 @@ export default function StoryChoiceAdventure({ sessionId, role, isLocked }: Stor
                       style={{
                         position: 'absolute', top: 10, left: 10, width: 22, height: 22, borderRadius: '50%',
                         background: 'rgba(255,255,255,0.12)', display: 'flex', alignItems: 'center', justifyContent: 'center',
-                        fontSize: 13, fontWeight: 700, color: '#fff',
+                        fontSize: 14, fontWeight: 700, color: '#fff',
                       }}
                     >
                       {choice.label}
                     </span>
-                    {isSel && <span style={{ position: 'absolute', top: 10, right: 10, fontSize: 17 }}>{QUALITY_ICON[choice.quality]}</span>}
+                    {isSel && <span style={{ position: 'absolute', top: 10, right: 10, fontSize: 18.5 }}>{QUALITY_ICON[choice.quality]}</span>}
                     {/* icon ring */}
                     <span
                       style={{
                         flexShrink: 0, width: 64, height: 64, borderRadius: '50%', background: 'rgba(255,255,255,0.10)',
-                        display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 32,
+                        display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 33,
                       }}
                     >
                       {choice.icon}
                     </span>
                     {/* text */}
                     <span style={{ minWidth: 0 }}>
-                      {showEn && <span style={{ display: 'block', fontSize: 15, lineHeight: 1.35, color: 'rgba(255,255,255,0.92)' }}>{choice.en}</span>}
+                      {showEn && <span style={{ display: 'block', fontSize: 16.5, lineHeight: 1.35, color: 'rgba(255,255,255,0.92)' }}>{choice.en}</span>}
                       {showHi && (
-                        <span style={{ display: 'block', fontSize: 14, fontFamily: DEVANAGARI, color: showEn ? 'rgba(255,255,255,0.6)' : 'rgba(255,255,255,0.9)', marginTop: showEn ? 4 : 0, lineHeight: 1.4 }}>
+                        <span style={{ display: 'block', fontSize: 15.5, fontFamily: DEVANAGARI, color: showEn ? 'rgba(255,255,255,0.6)' : 'rgba(255,255,255,0.9)', marginTop: showEn ? 4 : 0, lineHeight: 1.4 }}>
                           {choice.hi}
                         </span>
                       )}
@@ -1346,7 +1346,7 @@ export default function StoryChoiceAdventure({ sessionId, role, isLocked }: Stor
 
             {/* Locked notice */}
             {!canInteract && (
-              <div style={{ fontSize: 11.5, color: 'rgba(255,255,255,0.4)', textAlign: 'center' }}>
+              <div style={{ fontSize: 13, color: 'rgba(255,255,255,0.4)', textAlign: 'center' }}>
                 Therapist is controlling
               </div>
             )}
@@ -1369,14 +1369,14 @@ export default function StoryChoiceAdventure({ sessionId, role, isLocked }: Stor
                       borderRadius: '0 8px 8px 0', padding: '16px 20px', marginTop: 10,
                     }}
                   >
-                    <div style={{ fontSize: 13, color: 'rgba(255,255,255,0.4)', marginBottom: 5 }}>What happens next:</div>
+                    <div style={{ fontSize: 14, color: 'rgba(255,255,255,0.4)', marginBottom: 5 }}>What happens next:</div>
                     {showEn && (
-                      <div style={{ fontSize: 15, color: 'rgba(255,255,255,0.85)', lineHeight: 1.45 }}>
+                      <div style={{ fontSize: 16.5, color: 'rgba(255,255,255,0.85)', lineHeight: 1.45 }}>
                         {selectedChoice.consequence_en}
                       </div>
                     )}
                     {showHi && (
-                      <div style={{ fontSize: 15, fontFamily: DEVANAGARI, color: showEn ? 'rgba(255,255,255,0.6)' : 'rgba(255,255,255,0.85)', lineHeight: 1.5, marginTop: showEn ? 4 : 0 }}>
+                      <div style={{ fontSize: 16.5, fontFamily: DEVANAGARI, color: showEn ? 'rgba(255,255,255,0.6)' : 'rgba(255,255,255,0.85)', lineHeight: 1.5, marginTop: showEn ? 4 : 0 }}>
                         {selectedChoice.consequence_hi}
                       </div>
                     )}
@@ -1390,7 +1390,7 @@ export default function StoryChoiceAdventure({ sessionId, role, isLocked }: Stor
               <button
                 onClick={handleNext}
                 style={{
-                  width: '100%', padding: '12px 0', borderRadius: 999, cursor: 'pointer', fontSize: 15, fontWeight: 600,
+                  width: '100%', padding: '12px 0', borderRadius: 999, cursor: 'pointer', fontSize: 16.5, fontWeight: 600,
                   background: 'rgba(74,124,111,0.3)', border: '1px solid rgba(74,124,111,0.45)', color: '#cfe6df',
                   transition: 'all 0.15s',
                 }}
@@ -1425,10 +1425,10 @@ export default function StoryChoiceAdventure({ sessionId, role, isLocked }: Stor
                   zIndex: 49, boxShadow: '0 12px 32px rgba(0,0,0,0.4)',
                 }}
               >
-                <div style={{ fontSize: 13, fontWeight: 600, color: '#a99cf0', marginBottom: 6 }}>💬 Facilitator questions</div>
+                <div style={{ fontSize: 14, fontWeight: 600, color: '#a99cf0', marginBottom: 6 }}>💬 Facilitator questions</div>
                 <ol style={{ margin: 0, paddingLeft: 16, display: 'flex', flexDirection: 'column', gap: 5 }}>
                   {FACILITATOR_QS.map((q, i) => (
-                    <li key={i} style={{ fontSize: 13, color: 'rgba(255,255,255,0.75)', lineHeight: 1.4 }}>
+                    <li key={i} style={{ fontSize: 14, color: 'rgba(255,255,255,0.75)', lineHeight: 1.4 }}>
                       <span style={{ display: 'block' }}>{q.en}</span>
                       <span style={{ display: 'block', fontFamily: DEVANAGARI, color: 'rgba(255,255,255,0.5)' }}>{q.hi}</span>
                     </li>
@@ -1443,7 +1443,7 @@ export default function StoryChoiceAdventure({ sessionId, role, isLocked }: Stor
             style={{
               position: 'fixed', bottom: 20, right: 20, width: 44, height: 44, borderRadius: '50%',
               background: 'rgba(107,92,231,0.9)', display: 'flex', alignItems: 'center', justifyContent: 'center',
-              fontSize: 20, cursor: 'pointer', zIndex: 50, boxShadow: '0 6px 20px rgba(107,92,231,0.4)', border: 'none',
+              fontSize: 21, cursor: 'pointer', zIndex: 50, boxShadow: '0 6px 20px rgba(107,92,231,0.4)', border: 'none',
             }}
           >
             💬

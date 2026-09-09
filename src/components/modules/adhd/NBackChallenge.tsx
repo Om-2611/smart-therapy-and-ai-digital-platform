@@ -92,7 +92,7 @@ const card: React.CSSProperties = {
 }
 
 const microLabel: React.CSSProperties = {
-  fontSize: 12.5,
+  fontSize: 13.5,
   fontWeight: 800,
   letterSpacing: 0.7,
   color: INDIGO,
@@ -285,7 +285,7 @@ function PillGroup({
               borderRadius: 999,
               border: 'none',
               cursor: disabled ? 'default' : 'pointer',
-              fontSize: 13,
+              fontSize: 14,
               fontWeight: 700,
               lineHeight: 1.2,
               whiteSpace: 'nowrap',
@@ -817,7 +817,7 @@ export default function NBackChallenge({ sessionId, role, isLocked }: NBackChall
                   color: '#ffffff',
                   borderRadius: 999,
                   padding: '6px 18px',
-                  fontSize: 14,
+                  fontSize: 15.5,
                   fontWeight: 800,
                   letterSpacing: 0.9,
                   boxShadow: '0 4px 12px rgba(40,32,150,0.28)',
@@ -851,7 +851,7 @@ export default function NBackChallenge({ sessionId, role, isLocked }: NBackChall
                     display: 'flex',
                     alignItems: 'center',
                     justifyContent: 'center',
-                    fontSize: 19.5,
+                    fontSize: 20.5,
                   }}
                 >
                   {s.icon}
@@ -861,12 +861,12 @@ export default function NBackChallenge({ sessionId, role, isLocked }: NBackChall
                     <span
                       aria-hidden
                       style={{
-                        width: 17,
-                        height: 17,
+                        width: 19,
+                        height: 19,
                         borderRadius: '50%',
                         background: INDIGO,
                         color: '#ffffff',
-                        fontSize: 12,
+                        fontSize: 13,
                         fontWeight: 800,
                         display: 'flex',
                         alignItems: 'center',
@@ -876,9 +876,9 @@ export default function NBackChallenge({ sessionId, role, isLocked }: NBackChall
                     >
                       {i + 1}
                     </span>
-                    <span style={{ fontSize: 15, fontWeight: 800, color: INDIGO }}>{s.title}</span>
+                    <span style={{ fontSize: 16.5, fontWeight: 800, color: INDIGO }}>{s.title}</span>
                   </div>
-                  <div style={{ fontSize: 13, lineHeight: 1.45, color: INK_BODY }}>{s.body}</div>
+                  <div style={{ fontSize: 14, lineHeight: 1.45, color: INK_BODY }}>{s.body}</div>
                 </div>
               </div>
             ))}
@@ -890,7 +890,7 @@ export default function NBackChallenge({ sessionId, role, isLocked }: NBackChall
                 const isMatchTile = i === exampleTiles.length - 1
                 return (
                   <div key={i} style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
-                    {i > 0 && <span aria-hidden style={{ fontSize: 13, color: INK_MUTED }}>→</span>}
+                    {i > 0 && <span aria-hidden style={{ fontSize: 14, color: INK_MUTED }}>→</span>}
                     <div
                       style={{
                         width: exampleTileSize,
@@ -922,7 +922,7 @@ export default function NBackChallenge({ sessionId, role, isLocked }: NBackChall
                 borderRadius: 12,
                 background: GREEN_SOFT,
                 border: `1px solid #BBF0CD`,
-                fontSize: 15,
+                fontSize: 16.5,
                 fontWeight: 800,
                 color: '#0F7A38',
               }}
@@ -943,7 +943,7 @@ export default function NBackChallenge({ sessionId, role, isLocked }: NBackChall
                   border: `1px solid ${BORDER}`,
                   background: SURFACE,
                   color: VIOLET,
-                  fontSize: 14,
+                  fontSize: 15.5,
                   fontWeight: 700,
                   cursor: canInteract ? 'pointer' : 'default',
                   opacity: canInteract ? 1 : 0.5,
@@ -962,7 +962,7 @@ export default function NBackChallenge({ sessionId, role, isLocked }: NBackChall
               {/* Cards keep a content-sized floor so a narrow stage wraps the row
                   instead of clipping the pill labels. */}
               <div style={{ ...card, flex: '1 1 250px', minWidth: 250, padding: '7px 10px 9px' }}>
-                <div style={{ textAlign: 'center', fontSize: 13, fontWeight: 800, color: INDIGO, marginBottom: 5 }}>Category</div>
+                <div style={{ textAlign: 'center', fontSize: 14, fontWeight: 800, color: INDIGO, marginBottom: 5 }}>Category</div>
                 <PillGroup
                   value={stimulusType}
                   disabled={settingsDisabled}
@@ -977,7 +977,7 @@ export default function NBackChallenge({ sessionId, role, isLocked }: NBackChall
               </div>
 
               <div style={{ ...card, flex: '1 1 165px', minWidth: 165, padding: '7px 10px 9px' }}>
-                <div style={{ textAlign: 'center', fontSize: 13, fontWeight: 800, color: INDIGO, marginBottom: 5 }}>Speed</div>
+                <div style={{ textAlign: 'center', fontSize: 14, fontWeight: 800, color: INDIGO, marginBottom: 5 }}>Speed</div>
                 <PillGroup
                   value={String(speed)}
                   disabled={settingsDisabled}
@@ -991,7 +991,7 @@ export default function NBackChallenge({ sessionId, role, isLocked }: NBackChall
               </div>
 
               <div style={{ ...card, flex: '1 1 235px', minWidth: 235, padding: '7px 10px 9px' }}>
-                <div style={{ textAlign: 'center', fontSize: 13, fontWeight: 800, color: INDIGO, marginBottom: 5 }}>Sequence Length</div>
+                <div style={{ textAlign: 'center', fontSize: 14, fontWeight: 800, color: INDIGO, marginBottom: 5 }}>Sequence Length</div>
                 <PillGroup
                   value={String(seqLength)}
                   disabled={settingsDisabled}
@@ -1033,7 +1033,7 @@ export default function NBackChallenge({ sessionId, role, isLocked }: NBackChall
                   borderRadius: 999,
                   background: '#ffffff',
                   border: `1px solid ${BORDER}`,
-                  fontSize: 12.5,
+                  fontSize: 13.5,
                   fontWeight: 800,
                   color: VIOLET,
                   letterSpacing: 0.3,
@@ -1048,7 +1048,7 @@ export default function NBackChallenge({ sessionId, role, isLocked }: NBackChall
                     position: 'absolute',
                     top: 10,
                     right: 12,
-                    fontSize: 12,
+                    fontSize: 13,
                     fontWeight: 700,
                     color: INK_MUTED,
                   }}
@@ -1068,25 +1068,25 @@ export default function NBackChallenge({ sessionId, role, isLocked }: NBackChall
                     maxWidth: 340,
                   }}
                 >
-                  <div style={{ fontSize: 20, fontWeight: 800, color: INDIGO, marginBottom: 4 }}>Session Complete!</div>
-                  <div style={{ fontSize: 14.5, fontWeight: 600, color: INK_MUTED, marginBottom: 14 }}>
+                  <div style={{ fontSize: 21, fontWeight: 800, color: INDIGO, marginBottom: 4 }}>Session Complete!</div>
+                  <div style={{ fontSize: 16, fontWeight: 600, color: INK_MUTED, marginBottom: 14 }}>
                     {n}-Back · {stimTypeLabel} · {seqLength} items
                   </div>
                   <div style={{ display: 'flex', justifyContent: 'center', gap: 22, marginBottom: 14 }}>
                     <div>
-                      <div style={{ fontSize: 24, fontWeight: 800, color: GREEN }}>{hits}</div>
-                      <div style={{ fontSize: 12.5, fontWeight: 700, color: INK_MUTED }}>Hits</div>
+                      <div style={{ fontSize: 25.5, fontWeight: 800, color: GREEN }}>{hits}</div>
+                      <div style={{ fontSize: 13.5, fontWeight: 700, color: INK_MUTED }}>Hits</div>
                     </div>
                     <div>
-                      <div style={{ fontSize: 24, fontWeight: 800, color: RED }}>{misses}</div>
-                      <div style={{ fontSize: 12.5, fontWeight: 700, color: INK_MUTED }}>Misses</div>
+                      <div style={{ fontSize: 25.5, fontWeight: 800, color: RED }}>{misses}</div>
+                      <div style={{ fontSize: 13.5, fontWeight: 700, color: INK_MUTED }}>Misses</div>
                     </div>
                     <div>
-                      <div style={{ fontSize: 24, fontWeight: 800, color: INDIGO }}>{accuracy}%</div>
-                      <div style={{ fontSize: 12.5, fontWeight: 700, color: INK_MUTED }}>Accuracy</div>
+                      <div style={{ fontSize: 25.5, fontWeight: 800, color: INDIGO }}>{accuracy}%</div>
+                      <div style={{ fontSize: 13.5, fontWeight: 700, color: INK_MUTED }}>Accuracy</div>
                     </div>
                   </div>
-                  <div style={{ fontSize: 15, fontWeight: 700, color: INK_BODY, marginBottom: isTherapist ? 14 : 0 }}>
+                  <div style={{ fontSize: 16.5, fontWeight: 700, color: INK_BODY, marginBottom: isTherapist ? 14 : 0 }}>
                     {accuracy >= 70 ? 'Well done! 🎉' : 'Keep practising 💪'}
                   </div>
                   {isTherapist && (
@@ -1101,7 +1101,7 @@ export default function NBackChallenge({ sessionId, role, isLocked }: NBackChall
                           cursor: 'pointer',
                           background: INDIGO,
                           color: '#ffffff',
-                          fontSize: 14.5,
+                          fontSize: 16,
                           fontWeight: 800,
                           boxShadow: '0 4px 12px rgba(40,32,150,0.26)',
                         }}
@@ -1119,7 +1119,7 @@ export default function NBackChallenge({ sessionId, role, isLocked }: NBackChall
                             cursor: 'pointer',
                             background: '#ffffff',
                             color: VIOLET,
-                            fontSize: 14.5,
+                            fontSize: 16,
                             fontWeight: 800,
                           }}
                         >
@@ -1144,7 +1144,7 @@ export default function NBackChallenge({ sessionId, role, isLocked }: NBackChall
                         background: '#FFF6E3',
                         border: '1px solid #F3D79A',
                         color: '#8A5A06',
-                        fontSize: 12.5,
+                        fontSize: 13.5,
                         fontWeight: 800,
                         letterSpacing: 0.3,
                         whiteSpace: 'nowrap',
@@ -1200,10 +1200,10 @@ export default function NBackChallenge({ sessionId, role, isLocked }: NBackChall
                       {practiceActive ? (
                         practiceFinished ? (
                           <div style={{ textAlign: 'center', padding: 12 }}>
-                            <div style={{ fontSize: 16, fontWeight: 800, color: '#8A5A06', marginBottom: 4 }}>
+                            <div style={{ fontSize: 17.5, fontWeight: 800, color: '#8A5A06', marginBottom: 4 }}>
                               Practice done
                             </div>
-                            <div style={{ fontSize: 14.5, fontWeight: 700, color: INK_BODY }}>
+                            <div style={{ fontSize: 16, fontWeight: 700, color: INK_BODY }}>
                               You spotted {practiceHits} of 2
                             </div>
                           </div>
@@ -1212,7 +1212,7 @@ export default function NBackChallenge({ sessionId, role, isLocked }: NBackChall
                             <Stimulus item={practiceItem} type={stimulusType} size="clamp(78px, 14vh, 130px)" />
                           </div>
                         ) : (
-                          <span style={{ fontSize: 14.5, fontWeight: 700, color: INK_MUTED }}>Get ready…</span>
+                          <span style={{ fontSize: 16, fontWeight: 700, color: INK_MUTED }}>Get ready…</span>
                         )
                       ) : currentStimulus ? (
                         <div key={animKey} style={{ animation: 'nbStimulusIn 0.3s ease' }}>
@@ -1220,10 +1220,10 @@ export default function NBackChallenge({ sessionId, role, isLocked }: NBackChall
                         </div>
                       ) : (
                         <div style={{ textAlign: 'center', padding: 14 }}>
-                          <div style={{ fontSize: 15, fontWeight: 800, color: VIOLET, marginBottom: 3 }}>
+                          <div style={{ fontSize: 16.5, fontWeight: 800, color: VIOLET, marginBottom: 3 }}>
                             {isPlaying ? 'Get ready…' : `${n}-Back`}
                           </div>
-                          <div style={{ fontSize: 13, fontWeight: 600, color: INK_MUTED, lineHeight: 1.4 }}>
+                          <div style={{ fontSize: 14, fontWeight: 600, color: INK_MUTED, lineHeight: 1.4 }}>
                             {isTherapist ? 'Configure and press Start' : 'Waiting for your therapist…'}
                           </div>
                         </div>
@@ -1268,10 +1268,10 @@ export default function NBackChallenge({ sessionId, role, isLocked }: NBackChall
                         transition: 'border-color 0.15s, opacity 0.15s',
                       }}
                     >
-                      <span aria-hidden style={{ fontSize: 24, lineHeight: 1 }}>✋</span>
+                      <span aria-hidden style={{ fontSize: 25.5, lineHeight: 1 }}>✋</span>
                       <span
                         style={{
-                          fontSize: 22,
+                          fontSize: 23.5,
                           fontWeight: 800,
                           color:
                             feedback?.type === 'correct'
@@ -1293,7 +1293,7 @@ export default function NBackChallenge({ sessionId, role, isLocked }: NBackChall
                           borderRadius: 999,
                           background: INDIGO_SOFT,
                           color: VIOLET,
-                          fontSize: 14.5,
+                          fontSize: 16,
                           fontWeight: 800,
                           whiteSpace: 'nowrap',
                         }}
@@ -1309,7 +1309,7 @@ export default function NBackChallenge({ sessionId, role, isLocked }: NBackChall
                           style={{
                             flex: 1,
                             minWidth: 0,
-                            fontSize: 13,
+                            fontSize: 14,
                             fontWeight: 600,
                             lineHeight: 1.4,
                             color: practiceFeedback ? (practiceFeedback.ok ? '#0F7A38' : '#A8123A') : INK_MUTED,
@@ -1333,7 +1333,7 @@ export default function NBackChallenge({ sessionId, role, isLocked }: NBackChall
                               style={{
                                 flexShrink: 0, padding: '6px 13px', borderRadius: 999,
                                 border: `1px solid ${BORDER}`, background: '#ffffff',
-                                color: INK_BODY, fontSize: 13, fontWeight: 700, cursor: 'pointer',
+                                color: INK_BODY, fontSize: 14, fontWeight: 700, cursor: 'pointer',
                               }}
                             >
                               Practice again
@@ -1343,7 +1343,7 @@ export default function NBackChallenge({ sessionId, role, isLocked }: NBackChall
                               onClick={endPractice}
                               style={{
                                 flexShrink: 0, padding: '6px 13px', borderRadius: 999, border: 'none',
-                                background: INDIGO, color: '#ffffff', fontSize: 13, fontWeight: 800, cursor: 'pointer',
+                                background: INDIGO, color: '#ffffff', fontSize: 14, fontWeight: 800, cursor: 'pointer',
                               }}
                             >
                               I&apos;m ready
@@ -1356,7 +1356,7 @@ export default function NBackChallenge({ sessionId, role, isLocked }: NBackChall
                             style={{
                               flexShrink: 0, padding: '6px 13px', borderRadius: 999,
                               border: `1px solid ${BORDER}`, background: '#ffffff',
-                              color: INK_MUTED, fontSize: 13, fontWeight: 700, cursor: 'pointer',
+                              color: INK_MUTED, fontSize: 14, fontWeight: 700, cursor: 'pointer',
                             }}
                           >
                             Skip practice
@@ -1376,7 +1376,7 @@ export default function NBackChallenge({ sessionId, role, isLocked }: NBackChall
             {isTherapist && (
               <>
                 <div style={{ ...card, flexShrink: 0, padding: '7px 10px 9px' }}>
-                  <div style={{ textAlign: 'center', fontSize: 13, fontWeight: 800, color: INDIGO, marginBottom: 5 }}>N-Level</div>
+                  <div style={{ textAlign: 'center', fontSize: 14, fontWeight: 800, color: INDIGO, marginBottom: 5 }}>N-Level</div>
                   <PillGroup
                     value={String(n)}
                     disabled={false}
@@ -1401,7 +1401,7 @@ export default function NBackChallenge({ sessionId, role, isLocked }: NBackChall
                         border: `1px solid ${BORDER}`,
                         background: '#ffffff',
                         color: '#8A5A06',
-                        fontSize: 16,
+                        fontSize: 17.5,
                         fontWeight: 800,
                         cursor: 'pointer',
                         boxShadow: CARD_SHADOW,
@@ -1421,7 +1421,7 @@ export default function NBackChallenge({ sessionId, role, isLocked }: NBackChall
                         border: 'none',
                         background: `linear-gradient(180deg, ${INDIGO}, ${INDIGO_DEEP})`,
                         color: '#ffffff',
-                        fontSize: 17,
+                        fontSize: 18.5,
                         fontWeight: 800,
                         cursor: complete ? 'default' : 'pointer',
                         opacity: complete ? 0.45 : 1,
@@ -1441,7 +1441,7 @@ export default function NBackChallenge({ sessionId, role, isLocked }: NBackChall
                       border: `1px solid ${BORDER}`,
                       background: '#ffffff',
                       color: INK_BODY,
-                      fontSize: 15.5,
+                      fontSize: 17,
                       fontWeight: 800,
                       cursor: 'pointer',
                       boxShadow: CARD_SHADOW,
@@ -1466,7 +1466,7 @@ export default function NBackChallenge({ sessionId, role, isLocked }: NBackChall
                 gap: 11,
               }}
             >
-              <div style={{ textAlign: 'center', fontSize: 14, fontWeight: 800, letterSpacing: 0.8, color: INDIGO, textTransform: 'uppercase' }}>
+              <div style={{ textAlign: 'center', fontSize: 15.5, fontWeight: 800, letterSpacing: 0.8, color: INDIGO, textTransform: 'uppercase' }}>
                 Your Performance
               </div>
 
@@ -1492,8 +1492,8 @@ export default function NBackChallenge({ sessionId, role, isLocked }: NBackChall
                     }}
                   >
                     <img src={t.icon} alt="" aria-hidden width={26} height={26} style={{ display: 'block' }} />
-                    <div style={{ fontSize: 22, fontWeight: 800, color: t.ink, lineHeight: 1.1 }}>{t.value}</div>
-                    <div style={{ fontSize: 12.5, fontWeight: 700, color: t.ink }}>{t.label}</div>
+                    <div style={{ fontSize: 23.5, fontWeight: 800, color: t.ink, lineHeight: 1.1 }}>{t.value}</div>
+                    <div style={{ fontSize: 13.5, fontWeight: 700, color: t.ink }}>{t.label}</div>
                   </div>
                 ))}
               </div>
@@ -1520,7 +1520,7 @@ export default function NBackChallenge({ sessionId, role, isLocked }: NBackChall
                       }}
                     />
                   </div>
-                  <span style={{ fontSize: 16, fontWeight: 800, color: INDIGO, flexShrink: 0 }}>{progressPct}%</span>
+                  <span style={{ fontSize: 17.5, fontWeight: 800, color: INDIGO, flexShrink: 0 }}>{progressPct}%</span>
                 </div>
               </div>
             </div>

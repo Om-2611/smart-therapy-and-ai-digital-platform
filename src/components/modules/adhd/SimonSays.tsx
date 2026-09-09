@@ -73,7 +73,7 @@ const card: React.CSSProperties = {
 }
 
 const microLabel: React.CSSProperties = {
-  fontSize: 13,
+  fontSize: 14,
   fontWeight: 700,
   color: INK,
   letterSpacing: 0.1,
@@ -130,7 +130,7 @@ function PillGroup({
               borderRadius: 999,
               border: 'none',
               cursor: disabled ? 'default' : 'pointer',
-              fontSize: 14,
+              fontSize: 15.5,
               fontWeight: 700,
               lineHeight: 1.2,
               background: on ? o.fill : 'transparent',
@@ -140,7 +140,7 @@ function PillGroup({
               whiteSpace: 'nowrap',
             }}
           >
-            {o.icon && <span aria-hidden style={{ fontSize: 14.5 }}>{o.icon}</span>}
+            {o.icon && <span aria-hidden style={{ fontSize: 16 }}>{o.icon}</span>}
             {o.label}
           </button>
         )
@@ -672,15 +672,15 @@ export default function SimonSays({ sessionId, role, isLocked }: SimonSaysProps)
         {/* Round + Score */}
         <div style={{ ...card, gap: 0, padding: '7px 6px' }}>
           <div style={{ padding: '0 14px', textAlign: 'center', minWidth: 74 }}>
-            <div style={{ fontSize: 13, fontWeight: 700, color: VIOLET }}>Round</div>
-            <div style={{ fontSize: 18.5, fontWeight: 800, color: INK, lineHeight: 1.25 }}>{roundLabel}</div>
+            <div style={{ fontSize: 14, fontWeight: 700, color: VIOLET }}>Round</div>
+            <div style={{ fontSize: 19.5, fontWeight: 800, color: INK, lineHeight: 1.25 }}>{roundLabel}</div>
           </div>
           <div style={{ width: 1, alignSelf: 'stretch', background: CARD_BORDER }} />
           <div style={{ padding: '0 14px', textAlign: 'center', minWidth: 66 }}>
-            <div style={{ fontSize: 13, fontWeight: 700, color: VIOLET, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 4 }}>
+            <div style={{ fontSize: 14, fontWeight: 700, color: VIOLET, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 4 }}>
               <span aria-hidden>⭐</span> Score
             </div>
-            <div style={{ fontSize: 18.5, fontWeight: 800, color: INK, lineHeight: 1.25 }}>{score}</div>
+            <div style={{ fontSize: 19.5, fontWeight: 800, color: INK, lineHeight: 1.25 }}>{score}</div>
           </div>
         </div>
 
@@ -701,17 +701,17 @@ export default function SimonSays({ sessionId, role, isLocked }: SimonSaysProps)
               <button type="button" onClick={handleStart} style={{
                 padding: '7px 16px', borderRadius: 999, border: 'none', cursor: 'pointer',
                 background: `linear-gradient(180deg, ${VIOLET_MID}, ${VIOLET})`, color: '#ffffff',
-                fontSize: 14.5, fontWeight: 800, boxShadow: '0 3px 10px rgba(91,33,182,0.32)',
+                fontSize: 16, fontWeight: 800, boxShadow: '0 3px 10px rgba(91,33,182,0.32)',
               }}>▶ Start</button>
             ) : (
               <button type="button" onClick={handlePause} style={{
                 padding: '7px 16px', borderRadius: 999, border: `1px solid ${CARD_BORDER}`, cursor: 'pointer',
-                background: '#F3F4F8', color: INK, fontSize: 14.5, fontWeight: 800,
+                background: '#F3F4F8', color: INK, fontSize: 16, fontWeight: 800,
               }}>⏸ Pause</button>
             )}
             <button type="button" onClick={handleReset} style={{
               padding: '7px 13px', borderRadius: 999, border: '1px solid rgba(225,29,72,0.35)', cursor: 'pointer',
-              background: 'transparent', color: '#BE123C', fontSize: 14.5, fontWeight: 700,
+              background: 'transparent', color: '#BE123C', fontSize: 16, fontWeight: 700,
             }}>↺ Reset</button>
           </div>
         )}
@@ -754,13 +754,13 @@ export default function SimonSays({ sessionId, role, isLocked }: SimonSaysProps)
               }} />
               <div aria-hidden style={{
                 position: 'absolute', left: '50%', transform: 'translate(-50%, 50%)',
-                bottom: `${levelPct}%`, fontSize: 15, lineHeight: 1,
+                bottom: `${levelPct}%`, fontSize: 16.5, lineHeight: 1,
                 transition: 'bottom 0.45s cubic-bezier(.4,0,.2,1)',
               }}>⭐</div>
             </div>
             <div style={{ textAlign: 'center' }}>
-              <div style={{ fontSize: 12, fontWeight: 700, color: INK_MUTED }}>Level</div>
-              <div style={{ fontSize: 16, fontWeight: 800, color: INK, lineHeight: 1.2 }}>{levelValue}</div>
+              <div style={{ fontSize: 13, fontWeight: 700, color: INK_MUTED }}>Level</div>
+              <div style={{ fontSize: 17.5, fontWeight: 800, color: INK, lineHeight: 1.2 }}>{levelValue}</div>
             </div>
           </div>
 
@@ -773,7 +773,7 @@ export default function SimonSays({ sessionId, role, isLocked }: SimonSaysProps)
             padding: '10px 10px 12px',
             borderRadius: 20,
           }}>
-            <div style={{ fontSize: 14.5, fontWeight: 800, color: VIOLET }}>Lives</div>
+            <div style={{ fontSize: 16, fontWeight: 800, color: VIOLET }}>Lives</div>
             <div style={{ display: 'flex', gap: 4, justifyContent: 'center', flexWrap: 'wrap' }}>
               {Array.from({ length: livesTotal }, (_, i) => (
                 <span key={i} style={{
@@ -850,7 +850,7 @@ export default function SimonSays({ sessionId, role, isLocked }: SimonSaysProps)
                 border: `1px solid ${CARD_BORDER}`,
                 boxShadow: '0 6px 20px rgba(50,30,110,0.18)',
                 display: 'flex', alignItems: 'center', justifyContent: 'center',
-                fontSize: 36, zIndex: 5,
+                fontSize: 37, zIndex: 5,
               }}>🧠</div>
             </div>
           ) : (
@@ -867,11 +867,11 @@ export default function SimonSays({ sessionId, role, isLocked }: SimonSaysProps)
                 padding: 22,
               }}>
                 {currentCmd?.hasSimonSays ? (
-                  <div style={{ fontSize: 14.5, fontWeight: 800, color: VIOLET, letterSpacing: 0.3 }}>SIMON SAYS...</div>
+                  <div style={{ fontSize: 16, fontWeight: 800, color: VIOLET, letterSpacing: 0.3 }}>SIMON SAYS...</div>
                 ) : (
-                  <div style={{ fontSize: 14.5, fontWeight: 800, color: 'transparent' }}>&nbsp;</div>
+                  <div style={{ fontSize: 16, fontWeight: 800, color: 'transparent' }}>&nbsp;</div>
                 )}
-                <div style={{ fontSize: 28.5, fontWeight: 800, color: INK, textAlign: 'center', lineHeight: 1.25 }}>
+                <div style={{ fontSize: 30, fontWeight: 800, color: INK, textAlign: 'center', lineHeight: 1.25 }}>
                   {currentCmd ? `${currentCmd.text} ${currentCmd.emoji}` : 'Waiting for the first command...'}
                 </div>
                 <div style={{ width: '100%', height: 6, borderRadius: 3, background: '#F1EDFC', marginTop: 6 }}>
@@ -887,14 +887,14 @@ export default function SimonSays({ sessionId, role, isLocked }: SimonSaysProps)
                   flex: 1, height: 56, borderRadius: 18, border: 'none',
                   cursor: canInteract ? 'pointer' : 'default',
                   background: 'linear-gradient(180deg,#34D77F,#1E9E56)', color: '#ffffff',
-                  fontSize: 17, fontWeight: 800, letterSpacing: 0.2,
+                  fontSize: 18.5, fontWeight: 800, letterSpacing: 0.2,
                   boxShadow: '0 6px 16px rgba(30,158,86,0.28)',
                 }}>✅ DO IT!</button>
                 <button type="button" onClick={() => handleSimonRespond(false)} style={{
                   flex: 1, height: 56, borderRadius: 18, border: 'none',
                   cursor: canInteract ? 'pointer' : 'default',
                   background: 'linear-gradient(180deg,#F4667B,#C81E38)', color: '#ffffff',
-                  fontSize: 17, fontWeight: 800, letterSpacing: 0.2,
+                  fontSize: 18.5, fontWeight: 800, letterSpacing: 0.2,
                   boxShadow: '0 6px 16px rgba(200,30,56,0.26)',
                 }}>❌ SKIP!</button>
               </div>
@@ -922,12 +922,12 @@ export default function SimonSays({ sessionId, role, isLocked }: SimonSaysProps)
         <div aria-hidden style={{
           flexShrink: 0, width: 46, height: 46, borderRadius: '50%',
           background: '#ffffff', border: `1px solid ${CARD_BORDER}`,
-          display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 26.5,
+          display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 28,
           boxShadow: '0 3px 10px rgba(50,30,110,0.12)',
         }}>{banner.icon}</div>
         <div style={{ flex: 1, minWidth: 0 }}>
-          <div style={{ fontSize: 19.5, fontWeight: 800, color: VIOLET, lineHeight: 1.25 }}>{banner.title}</div>
-          <div style={{ fontSize: 15, fontWeight: 600, color: '#4A4560', lineHeight: 1.35 }}>{banner.sub}</div>
+          <div style={{ fontSize: 20.5, fontWeight: 800, color: VIOLET, lineHeight: 1.25 }}>{banner.title}</div>
+          <div style={{ fontSize: 16.5, fontWeight: 600, color: '#4A4560', lineHeight: 1.35 }}>{banner.sub}</div>
         </div>
         <Waveform active={isPlaying && !gameOver} />
         <button
@@ -938,7 +938,7 @@ export default function SimonSays({ sessionId, role, isLocked }: SimonSaysProps)
           style={{
             flexShrink: 0, width: 34, height: 34, borderRadius: '50%',
             border: `1px solid ${CARD_BORDER}`, background: '#ffffff', cursor: 'pointer',
-            fontSize: 16, lineHeight: 1, color: INK,
+            fontSize: 17.5, lineHeight: 1, color: INK,
           }}
         >{muted ? '🔇' : '🔊'}</button>
       </div>
@@ -950,7 +950,7 @@ export default function SimonSays({ sessionId, role, isLocked }: SimonSaysProps)
           padding: '9px 20px', borderRadius: 999,
           background: '#ffffff', border: `1px solid ${CARD_BORDER}`,
           boxShadow: '0 8px 24px rgba(50,30,110,0.20)',
-          fontSize: 18.5, fontWeight: 800, zIndex: 30, pointerEvents: 'none', whiteSpace: 'nowrap',
+          fontSize: 19.5, fontWeight: 800, zIndex: 30, pointerEvents: 'none', whiteSpace: 'nowrap',
           color: feedback.type === 'correct' ? '#15803D' : feedback.type === 'gold' ? '#B45309' : '#BE123C',
         }}>
           {feedback.msg}
@@ -968,24 +968,24 @@ export default function SimonSays({ sessionId, role, isLocked }: SimonSaysProps)
             boxShadow: '0 16px 44px rgba(50,30,110,0.22)', padding: '24px 32px',
             display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 10, maxWidth: 420,
           }}>
-            <div aria-hidden style={{ fontSize: 36 }}>🎮</div>
-            <div style={{ fontSize: 24, fontWeight: 800, color: VIOLET }}>Game Over!</div>
+            <div aria-hidden style={{ fontSize: 37 }}>🎮</div>
+            <div style={{ fontSize: 25.5, fontWeight: 800, color: VIOLET }}>Game Over!</div>
             {mode === 'classic' ? (
               <>
-                <div style={{ fontSize: 15, fontWeight: 600, color: INK_MUTED, textAlign: 'center', lineHeight: 1.5 }}>
+                <div style={{ fontSize: 16.5, fontWeight: 600, color: INK_MUTED, textAlign: 'center', lineHeight: 1.5 }}>
                   You reached round {round}<br />
                   Best this session: {Math.max(bestRound, round)}
                 </div>
-                <div style={{ fontSize: 22 }}>{starRating(Math.max(bestRound, round))}</div>
+                <div style={{ fontSize: 23.5 }}>{starRating(Math.max(bestRound, round))}</div>
               </>
             ) : (
               <>
-                <div style={{ fontSize: 15, fontWeight: 600, color: INK_MUTED, textAlign: 'center', lineHeight: 1.5 }}>
+                <div style={{ fontSize: 16.5, fontWeight: 600, color: INK_MUTED, textAlign: 'center', lineHeight: 1.5 }}>
                   {score} correct out of {cmdList.length} commands<br />
                   Traps dodged: {trapsAv}<br />
                   Fell for traps: {trapsHit}
                 </div>
-                <div style={{ fontSize: 16, fontWeight: 700, color: INK, textAlign: 'center' }}>
+                <div style={{ fontSize: 17.5, fontWeight: 700, color: INK, textAlign: 'center' }}>
                   {cmdList.length > 0 ? (trapsAv / Math.max(1, trapsAv + trapsHit) > 0.8 ? 'Amazing self-control! ⭐⭐⭐' : trapsAv / Math.max(1, trapsAv + trapsHit) > 0.6 ? 'Great job! ⭐⭐' : 'Keep practising! ⭐') : '⭐'}
                 </div>
               </>
@@ -994,10 +994,10 @@ export default function SimonSays({ sessionId, role, isLocked }: SimonSaysProps)
               <button type="button" onClick={handlePlayAgain} style={{
                 marginTop: 4, padding: '10px 26px', borderRadius: 999, border: 'none', cursor: 'pointer',
                 background: `linear-gradient(180deg, ${VIOLET_MID}, ${VIOLET})`, color: '#ffffff',
-                fontSize: 15, fontWeight: 800, boxShadow: '0 4px 14px rgba(91,33,182,0.32)',
+                fontSize: 16.5, fontWeight: 800, boxShadow: '0 4px 14px rgba(91,33,182,0.32)',
               }}>Play again</button>
             ) : (
-              <div style={{ marginTop: 4, fontSize: 14.5, fontWeight: 600, color: INK_MUTED }}>
+              <div style={{ marginTop: 4, fontSize: 16, fontWeight: 600, color: INK_MUTED }}>
                 Your therapist can start another round.
               </div>
             )}
@@ -1011,7 +1011,7 @@ export default function SimonSays({ sessionId, role, isLocked }: SimonSaysProps)
           position: 'absolute', top: 14, left: '50%', transform: 'translateX(-50%)',
           background: '#ffffff', border: `1px solid ${CARD_BORDER}`, borderRadius: 999,
           boxShadow: '0 8px 22px rgba(50,30,110,0.18)',
-          padding: '7px 18px', color: INK, fontSize: 15, fontWeight: 700,
+          padding: '7px 18px', color: INK, fontSize: 16.5, fontWeight: 700,
           zIndex: 100, pointerEvents: 'none', whiteSpace: 'nowrap',
         }}>
           {toast.msg}

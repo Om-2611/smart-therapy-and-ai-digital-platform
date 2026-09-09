@@ -14,8 +14,8 @@ export default function LocalVideoPip({ docked = false }: { docked?: boolean }) 
   // `docked` renders the self-view as a tile in the top strip (replacing the
   // static "You" thumbnail). Default is the floating overlay over the video.
   const positionStyle: CSSProperties = docked
-    ? { position: 'relative', width: 168, height: 100, flexShrink: 0 }
-    : { position: 'absolute', bottom: 92, left: 18, width: 190, height: 138, zIndex: 18 }
+    ? { position: 'relative', width: 200, height: 120, flexShrink: 0 }
+    : { position: 'absolute', bottom: 92, left: 18, width: 224, height: 162, zIndex: 18 }
 
   return (
     <div

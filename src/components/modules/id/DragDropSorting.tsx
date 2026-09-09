@@ -12,6 +12,75 @@ import VoiceLanguageToggle from '@/components/modules/VoiceLanguageToggle'
 // to the edges, so bins and item tiles stay readable over the middle.
 const DD_SCENE = `/assets/modules/Background/${encodeURIComponent('Drag and drop sorting_.png')}`
 
+/* ---------------------------------------------------------------------------
+   Palette + shared controls. Like the other ID modules, this one was authored
+   against the dark glass sidebar — its controls were transparent with
+   rgba(0,0,0,0.35) text, which on the white ModuleStage canvas reads as grey on
+   white. Stated ink and a solid green selected state bring it in line.
+--------------------------------------------------------------------------- */
+const GREEN = '#1F7A44'
+const GREEN_SOFT = '#E8F4EC'
+const INK = '#1F2A24'
+const INK_SOFT = '#48544D'
+const LINE = '#e7eaef'
+const DANGER = '#B4432C'
+
+const segBtn = (active: boolean): React.CSSProperties => ({
+  padding: '6px 13px', borderRadius: 999, cursor: 'pointer',
+  fontSize: 14.5, fontWeight: active ? 800 : 600, textTransform: 'capitalize',
+  border: `1.5px solid ${active ? GREEN : LINE}`,
+  background: active ? GREEN_SOFT : '#ffffff',
+  color: active ? GREEN : INK_SOFT,
+  transition: 'background .15s, border-color .15s, color .15s',
+})
+
+const toolBtn: React.CSSProperties = {
+  padding: '6px 13px', borderRadius: 10, cursor: 'pointer',
+  fontSize: 14.5, fontWeight: 700,
+  border: `1.5px solid ${LINE}`, background: '#ffffff', color: INK_SOFT,
+}
+
+/* ---------------------------------------------------------------------------
+   Item artwork.
+
+   Every item is drawn from Google's Noto emoji SVG set rather than left to the
+   system font. Two reasons: the platform glyph differs on every machine (a
+   Windows shark and an iPad shark are not the same picture, and the therapist
+   and client see different art for the same card), and the system glyph is a
+   FONT — it cannot be sized or styled like an image. These are real SVG images.
+
+   Noto's filenames are the codepoints joined by '_', with the U+FE0F variation
+   selector dropped: shark U+1F988 -> emoji_u1f988.svg.
+--------------------------------------------------------------------------- */
+const NOTO_BASE = 'https://cdn.jsdelivr.net/gh/googlefonts/noto-emoji@main/svg'
+
+function notoUrl(emoji: string): string {
+  const cps = Array.from(emoji)
+    .map(c => c.codePointAt(0) || 0)
+    .filter(cp => cp !== 0xfe0f)
+    .map(cp => cp.toString(16).padStart(4, '0'))
+  return `${NOTO_BASE}/emoji_u${cps.join('_')}.svg`
+}
+
+/** The picture for one item. Falls back to the platform glyph if the image
+    cannot load, so the activity still works offline or behind a proxy. */
+function ItemArt({ emoji, size, alt }: { emoji: string; size: number; alt?: string }) {
+  const [failed, setFailed] = useState(false)
+  if (failed) {
+    return <span aria-hidden style={{ fontSize: size, lineHeight: 1 }}>{emoji}</span>
+  }
+  return (
+    // eslint-disable-next-line @next/next/no-img-element
+    <img
+      src={notoUrl(emoji)}
+      alt={alt || ''}
+      draggable={false}
+      onError={() => setFailed(true)}
+      style={{ width: size, height: size, display: 'block', objectFit: 'contain', userSelect: 'none' }}
+    />
+  )
+}
+
 interface DragDropSortingProps {
   sessionId: string
   role: 'therapist' | 'client'
@@ -23,6 +92,20 @@ interface ItemDef { id: string; emoji: string; label: string; binId: string }
 interface CategorySet { id: string; name: string; bins: BinDef[]; items: ItemDef[] }
 
 const DIFF: Record<string, { total: number }> = { easy: { total: 6 }, medium: { total: 10 }, hard: { total: 14 } }
+
+function buildPool(set: CategorySet, bins: BinDef[], difficulty: string, round: number): ItemDef[] {
+  const total = DIFF[difficulty]?.total || 10
+  const perBin = Math.ceil(total / Math.max(1, bins.length))
+  const items: ItemDef[] = []
+  for (const bin of bins) {
+    const all = set.items.filter(i => i.binId === bin.id)
+    if (!all.length) continue
+    const start = (round * perBin) % all.length
+    const take = Math.min(perBin, all.length)
+    for (let k = 0; k < take; k++) items.push(all[(start + k) % all.length])
+  }
+  return items.slice(0, total)
+}
 
 const SETS: CategorySet[] = [
   {
@@ -121,7 +204,12 @@ export default function DragDropSorting({ sessionId, role, isLocked }: DragDropS
   const [setId, setSetId] = useState('fruits-vs-veggies')
   const [difficulty, setDifficulty] = useState('medium')
   const [displayMode, setDisplayMode] = useState<'emoji+label' | 'emoji'>('emoji+label')
+  /* The just-placed item's name, shown over the bin it landed in. */
+  const [namePop, setNamePop] = useState<{ binId: string; label: string; k: number } | null>(null)
   const [itemOrder, setItemOrder] = useState<string[]>([])
+  /* Which deal of the current category is in play. Shared so both screens draw
+     the same cards. */
+  const [setRound, setSetRound] = useState(0)
   const [sorted, setSorted] = useState<Record<string, string>>({})
   const [correct, setCorrect] = useState(0)
   const [wrong, setWrong] = useState(0)
@@ -160,6 +248,7 @@ export default function DragDropSorting({ sessionId, role, isLocked }: DragDropS
       if (typeof s.ddDifficulty === 'string') setDifficulty(s.ddDifficulty)
       if (s.ddDisplayMode === 'emoji' || s.ddDisplayMode === 'emoji+label') setDisplayMode(s.ddDisplayMode)
       if (Array.isArray(s.ddItemOrder)) setItemOrder(s.ddItemOrder)
+      if (typeof s.ddSetRound === 'number') setSetRound(s.ddSetRound)
       if (typeof s.ddSorted === 'object' && s.ddSorted !== null) setSorted(s.ddSorted as Record<string, string>)
       if (typeof s.ddCorrect === 'number') setCorrect(s.ddCorrect)
       if (typeof s.ddWrong === 'number') setWrong(s.ddWrong)
@@ -183,16 +272,15 @@ export default function DragDropSorting({ sessionId, role, isLocked }: DragDropS
     return currentSet.bins
   }, [currentSet, difficulty])
 
-  const poolItems = useMemo(() => {
-    const total = DIFF[difficulty]?.total || 10
-    const perBin = Math.ceil(total / usedBins.length)
-    const items: ItemDef[] = []
-    for (const bin of usedBins) {
-      const bi = currentSet.items.filter(i => i.binId === bin.id).slice(0, perBin)
-      items.push(...bi)
-    }
-    return items.slice(0, total)
-  }, [currentSet, usedBins, difficulty])
+  /* Which items this round draws. `slice(0, perBin)` always took the SAME first
+     N of each bin, so "New Set" dealt the identical cards every time — it only
+     cleared the score. The window now rotates by the round number, so each new
+     set draws different items from the same category. The round is shared, so
+     both screens deal the same cards. */
+  const poolItems = useMemo(
+    () => buildPool(currentSet, usedBins, difficulty, setRound),
+    [currentSet, usedBins, difficulty, setRound],
+  )
 
   const itemMap = useMemo(() => {
     const m = new Map<string, ItemDef>()
@@ -229,9 +317,12 @@ export default function DragDropSorting({ sessionId, role, isLocked }: DragDropS
       if (sortedCount + 1 >= totalItems) {
         setTimeout(() => write({ 'moduleState.ddCompleted': true }), 300)
       }
-      // Names the item just sorted. Labels are English nouns, so this stays
-      // 'en-IN' — only the praise below follows the therapist's language choice.
+      // Names the item just sorted, both ways: spoken, and shown over the bin
+      // so it lands even with the sound off. Labels are English nouns, so the
+      // speech stays 'en-IN' — only the praise follows the therapist's language.
       staadSpeak({ text: item.label, language: 'en-IN', type: 'feedback' })
+      setNamePop({ binId, label: item.label, k: n })
+      setTimeout(() => setNamePop(prev => (prev && prev.k === n ? null : prev)), 1500)
     } else {
       setAnimShake(prev => new Set(prev).add(itemId))
       setFlashWrong(prev => new Set(prev).add(binId))
@@ -274,28 +365,47 @@ export default function DragDropSorting({ sessionId, role, isLocked }: DragDropS
     write({ 'moduleState.ddItemOrder': fresh })
   }, [write, resolvedItems, sorted, sortedEntries])
 
+  /* New Set deals the NEXT window of the same category, jumbled. It used to
+     only zero the counters, so the same cards came back in the same order and
+     nothing about it was new. */
   const handleNewSet = useCallback(() => {
-    write({ 'moduleState.ddSorted': {}, 'moduleState.ddCorrect': 0, 'moduleState.ddWrong': 0, 'moduleState.ddCompleted': false })
-  }, [write])
+    const nextRound = setRound + 1
+    const order = shuffle(buildPool(currentSet, usedBins, difficulty, nextRound).map(i => i.id))
+    write({
+      'moduleState.ddSetRound': nextRound,
+      'moduleState.ddItemOrder': order,
+      'moduleState.ddSorted': {},
+      'moduleState.ddCorrect': 0,
+      'moduleState.ddWrong': 0,
+      'moduleState.ddCompleted': false,
+    })
+  }, [setRound, currentSet, usedBins, difficulty, write])
 
   const handleSetChange = useCallback((newSetId: string) => {
-    const s = SETS.find(x => x.id === newSetId) || SETS[0]
-    const total = DIFF[difficulty]?.total || 10
-    const perBin = Math.ceil(total / (difficulty === 'easy' ? Math.min(2, s.bins.length) : s.bins.length))
-    const items: ItemDef[] = []
-    const bins = difficulty === 'easy' ? s.bins.slice(0, 2) : s.bins
-    for (const bin of bins) {
-      const bi = s.items.filter(i => i.binId === bin.id).slice(0, perBin)
-      items.push(...bi)
-    }
-    const finalItems = items.slice(0, total)
-    const order = shuffle(finalItems.map(i => i.id))
-    write({ 'moduleState.ddSet': newSetId, 'moduleState.ddSorted': {}, 'moduleState.ddCorrect': 0, 'moduleState.ddWrong': 0, 'moduleState.ddCompleted': false, 'moduleState.ddItemOrder': order })
+    const nextSet = SETS.find(x => x.id === newSetId) || SETS[0]
+    const bins = difficulty === 'easy' ? nextSet.bins.slice(0, 2) : nextSet.bins
+    // Same builder poolItems uses, so the written order can never disagree with
+    // the items the board actually renders.
+    const order = shuffle(buildPool(nextSet, bins, difficulty, 0).map(i => i.id))
+    write({
+      'moduleState.ddSet': newSetId,
+      'moduleState.ddSetRound': 0,
+      'moduleState.ddItemOrder': order,
+      'moduleState.ddSorted': {}, 'moduleState.ddCorrect': 0, 'moduleState.ddWrong': 0,
+      'moduleState.ddCompleted': false,
+    })
   }, [difficulty, write])
 
   const handleDifficultyChange = useCallback((d: string) => {
-    write({ 'moduleState.ddDifficulty': d, 'moduleState.ddSorted': {}, 'moduleState.ddCorrect': 0, 'moduleState.ddWrong': 0, 'moduleState.ddCompleted': false })
-  }, [write])
+    const bins = d === 'easy' ? currentSet.bins.slice(0, 2) : currentSet.bins
+    const order = shuffle(buildPool(currentSet, bins, d, setRound).map(i => i.id))
+    write({
+      'moduleState.ddDifficulty': d,
+      'moduleState.ddItemOrder': order,
+      'moduleState.ddSorted': {}, 'moduleState.ddCorrect': 0, 'moduleState.ddWrong': 0,
+      'moduleState.ddCompleted': false,
+    })
+  }, [currentSet, setRound, write])
 
   // --- HTML5 Drag Handlers ---
   const onDragStart = useCallback((e: React.DragEvent, itemId: string) => {
@@ -386,6 +496,16 @@ export default function DragDropSorting({ sessionId, role, isLocked }: DragDropS
         @keyframes ws {0%,100%{transform:translateX(0)}25%{transform:translateX(-6px)}75%{transform:translateX(6px)}}
         @keyframes fb {0%{transform:scale(.8);opacity:.6}100%{transform:scale(1);opacity:1}}
         @keyframes cf {0%{opacity:0}100%{opacity:1}}
+        /* The name of the item that was just placed correctly, popping up over
+           the bin. The label was only ever SPOKEN, so with the volume down (or
+           a client who reads better than they hear) nothing named the item at
+           all — which is the vocabulary half of the exercise. */
+        @keyframes dd-name {
+          0%   {transform:translate(-50%,6px) scale(.8); opacity:0}
+          18%  {transform:translate(-50%,-4px) scale(1.06); opacity:1}
+          70%  {transform:translate(-50%,-8px) scale(1); opacity:1}
+          100% {transform:translate(-50%,-26px) scale(.95); opacity:0}
+        }
         .bi-a {animation:bi .4s ease forwards}
         .ws-a {animation:ws .35s ease}
         .fb-a {animation:fb .3s ease}
@@ -393,13 +513,13 @@ export default function DragDropSorting({ sessionId, role, isLocked }: DragDropS
 
       {/* Therapist controls */}
       {isT && (
-        <div style={{ flexShrink: 0, padding: '6px 10px', borderBottom: '1px solid var(--glass-border)', display: 'flex', flexDirection: 'column', gap: 5, fontSize: 12 }}>
+        <div style={{ flexShrink: 0, padding: '6px 10px', borderBottom: '1px solid var(--glass-border)', display: 'flex', flexDirection: 'column', gap: 5, fontSize: 13 }}>
           {/* Set selector */}
           <div style={{ display: 'flex', gap: 4, overflowX: 'auto', paddingBottom: 2, scrollbarWidth: 'thin' }}>
             {SETS.map(s => (
               <button key={s.id} onClick={() => handleSetChange(s.id)}
                 style={{
-                  whiteSpace: 'nowrap', padding: '3px 8px', borderRadius: 10, cursor: 'pointer', fontSize: 12,
+                  whiteSpace: 'nowrap', padding: '3px 8px', borderRadius: 10, cursor: 'pointer', fontSize: 13,
                   border: setId === s.id ? '1px solid rgba(74,124,111,0.6)' : '1px solid rgba(0,0,0,0.08)',
                   background: setId === s.id ? 'rgba(74,124,111,0.2)' : 'transparent',
                   color: setId === s.id ? 'rgba(0,0,0,0.85)' : 'rgba(0,0,0,0.4)',
@@ -408,23 +528,26 @@ export default function DragDropSorting({ sessionId, role, isLocked }: DragDropS
             ))}
           </div>
           <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
-            <span style={{ color: 'rgba(0,0,0,0.4)' }}>Difficulty:</span>
+            <span style={{ color: INK_SOFT, fontWeight: 700 }}>Difficulty:</span>
             {['easy', 'medium', 'hard'].map(d => (
-              <button key={d} onClick={() => handleDifficultyChange(d)}
-                style={{
-                  padding: '2px 10px', borderRadius: 4, cursor: 'pointer', fontSize: 12, textTransform: 'capitalize',
-                  border: difficulty === d ? '1px solid rgba(74,124,111,0.6)' : '1px solid rgba(0,0,0,0.08)',
-                  background: difficulty === d ? 'rgba(74,124,111,0.15)' : 'transparent',
-                  color: difficulty === d ? 'rgba(0,0,0,0.8)' : 'rgba(0,0,0,0.35)',
-                }}
-              >{d === 'easy' ? 'Easy' : d === 'medium' ? 'Medium' : 'Hard'}</button>
+              <button key={d} onClick={() => handleDifficultyChange(d)} style={segBtn(difficulty === d)}>
+                {d}
+              </button>
             ))}
-            <span style={{ marginLeft: 4, color: 'rgba(0,0,0,0.4)' }}>Show:</span>
-            <button onClick={() => write({ 'moduleState.ddDisplayMode': displayMode === 'emoji+label' ? 'emoji' : 'emoji+label' })}
-              style={{ padding: '2px 8px', borderRadius: 4, cursor: 'pointer', fontSize: 12, border: '1px solid rgba(0,0,0,0.1)', background: 'transparent', color: 'rgba(0,0,0,0.5)' }}
-            >{displayMode === 'emoji+label' ? 'Emoji+Label' : 'Emoji'}</button>
-            <button onClick={handleShuffle} style={{ marginLeft: 'auto', padding: '2px 8px', borderRadius: 4, cursor: 'pointer', fontSize: 12, border: '1px solid rgba(0,0,0,0.1)', background: 'transparent', color: 'rgba(0,0,0,0.5)' }}>🔀 Shuffle</button>
-            <button onClick={handleReset} style={{ padding: '2px 8px', borderRadius: 4, cursor: 'pointer', fontSize: 12, border: '1px solid rgba(200,60,60,0.3)', background: 'transparent', color: 'rgba(200,80,80,0.7)' }}>↺ Reset</button>
+            {/* Two named options rather than one button that renames itself.
+                The old control showed the CURRENT mode as its caption, so the
+                other mode was invisible and clicking it was a guess. */}
+            <span style={{ marginLeft: 4, color: INK_SOFT, fontWeight: 700 }}>Show:</span>
+            <button
+              onClick={() => write({ 'moduleState.ddDisplayMode': 'emoji' })}
+              style={segBtn(displayMode === 'emoji')}
+            >Picture only</button>
+            <button
+              onClick={() => write({ 'moduleState.ddDisplayMode': 'emoji+label' })}
+              style={segBtn(displayMode === 'emoji+label')}
+            >Picture + name</button>
+            <button onClick={handleShuffle} style={{ ...toolBtn, marginLeft: 'auto' }}>🔀 Shuffle</button>
+            <button onClick={handleReset} style={{ ...toolBtn, borderColor: 'rgba(180,67,44,0.45)', background: '#FDF1EE', color: DANGER }}>↺ Reset</button>
             <VoiceLanguageToggle sessionId={sessionId} language={voiceLanguage} />
           </div>
         </div>
@@ -471,27 +594,36 @@ export default function DragDropSorting({ sessionId, role, isLocked }: DragDropS
                 onTouchStart={onTouchStart(id)}
                 className={isShaking ? 'ws-a fb-a' : ''}
                 style={{
-                  width: 60, height: 60, borderRadius: 12,
-                  background: dragItem === id ? 'rgba(74,124,111,0.15)' : 'rgba(0,0,0,0.08)',
-                  border: `1.5px solid ${dragItem === id ? 'rgba(74,124,111,0.4)' : 'rgba(0,0,0,0.12)'}`,
-                  display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', gap: 2,
+                  /* 60px with a 30px glyph was the size of a toolbar icon. These
+                     are the things being identified, so they get a real tile and
+                     a real picture. */
+                  width: displayMode === 'emoji+label' ? 100 : 84,
+                  height: displayMode === 'emoji+label' ? 100 : 84,
+                  borderRadius: 16,
+                  background: dragItem === id ? GREEN_SOFT : '#ffffff',
+                  border: `2px solid ${dragItem === id ? GREEN : LINE}`,
+                  display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', gap: 3,
+                  padding: '6px 5px',
                   cursor: canInteract ? 'grab' : 'default',
                   transition: 'all 0.15s',
-                  boxShadow: dragItem === id ? '0 8px 20px rgba(0,0,0,0.3)' : '0 2px 6px rgba(0,0,0,0.2)',
-                  opacity: dragItem === id ? 0.85 : 1,
+                  boxShadow: dragItem === id ? '0 10px 22px rgba(31,122,68,0.28)' : '0 3px 10px rgba(20,30,40,0.10)',
+                  opacity: dragItem === id ? 0.9 : 1,
                   transform: dragItem === id ? 'scale(1.12)' : 'scale(1)',
                   userSelect: 'none', WebkitUserSelect: 'none',
                 }}
               >
-                <span style={{ fontSize: 28.5, lineHeight: 1 }}>{item.emoji}</span>
+                <ItemArt emoji={item.emoji} size={displayMode === 'emoji+label' ? 46 : 54} alt={item.label} />
                 {displayMode === 'emoji+label' && (
-                  <span style={{ fontSize: 10.5, color: 'rgba(0,0,0,0.7)', textAlign: 'center', lineHeight: 1.2 }}>{item.label}</span>
+                  <span style={{
+                    fontSize: 14, fontWeight: 700, color: INK, textAlign: 'center', lineHeight: 1.15,
+                    maxWidth: '100%', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap',
+                  }}>{item.label}</span>
                 )}
               </div>
             )
           })}
           {unsortedItems.length === 0 && !allDone && (
-            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', width: '100%', color: 'rgba(0,0,0,0.2)', fontSize: 13 }}>
+            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', width: '100%', color: 'rgba(0,0,0,0.2)', fontSize: 14 }}>
               {totalItems > 0 ? 'All items sorted!' : 'Loading items...'}
             </div>
           )}
@@ -518,25 +650,56 @@ export default function DragDropSorting({ sessionId, role, isLocked }: DragDropS
                   border: isFlash ? '1.5px solid rgba(200,96,42,0.5)' : isHover ? '1.5px solid rgba(74,124,111,0.5)' : '1.5px dashed rgba(0,0,0,0.18)',
                   borderStyle: isHover ? 'solid' : 'dashed',
                   transform: isHover ? 'scale(1.02)' : 'scale(1)',
+                  position: 'relative',
                 }}
               >
-                <span style={{ fontSize: 24 }}>{bin.emoji}</span>
-                <span style={{ fontSize: 13, fontWeight: 500, color: 'rgba(0,0,0,0.8)', textAlign: 'center' }}>{bin.label}</span>
+                {/* "Apple!" pops over the bin the moment it lands correctly. */}
+                {namePop && namePop.binId === bin.id && (
+                  <div
+                    key={namePop.k}
+                    aria-live="polite"
+                    style={{
+                      position: 'absolute', left: '50%', top: 8, zIndex: 5, pointerEvents: 'none',
+                      padding: '7px 16px', borderRadius: 999,
+                      background: GREEN, color: '#ffffff',
+                      fontSize: 19, fontWeight: 800, whiteSpace: 'nowrap',
+                      boxShadow: '0 6px 18px rgba(31,122,68,0.38)',
+                      animation: 'dd-name 1.5s ease forwards',
+                    }}
+                  >
+                    {namePop.label}!
+                  </div>
+                )}
+                <ItemArt emoji={bin.emoji} size={42} />
+                <span style={{ fontSize: 19, fontWeight: 800, color: INK, textAlign: 'center', letterSpacing: -0.2 }}>{bin.label}</span>
                 <div style={{ display: 'flex', flexWrap: 'wrap', gap: 4, justifyContent: 'center' }}>
                   {binItems.map(([itemId]) => {
                     const item = itemMap.get(itemId)
                     if (!item) return null
                     return (
                       <div key={itemId} className="bi-a"
+                        title={item.label}
                         style={{
-                          width: 44, height: 44, borderRadius: 8,
-                          background: 'rgba(0,0,0,0.06)', border: '1px solid rgba(0,0,0,0.08)',
-                          display: 'flex', alignItems: 'center', justifyContent: 'center', position: 'relative',
+                          width: 68, borderRadius: 12,
+                          background: GREEN_SOFT, border: `1.5px solid rgba(31,122,68,0.30)`,
+                          display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center',
+                          gap: 1, padding: '6px 4px', position: 'relative',
                           animation: 'bi 0.4s ease',
                         }}
                       >
-                        <span style={{ fontSize: 22 }}>{item.emoji}</span>
-                        <span style={{ position: 'absolute', top: -2, right: -2, fontSize: 10.5, opacity: 0.7 }}>✓</span>
+                        <ItemArt emoji={item.emoji} size={32} alt={item.label} />
+                        {/* The name stays on the tile after it lands, so the pairing
+                            of picture and word is still readable at the end. */}
+                        <span style={{
+                          fontSize: 11.5, fontWeight: 700, color: GREEN, textAlign: 'center', lineHeight: 1.1,
+                          maxWidth: '100%', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap',
+                        }}>{item.label}</span>
+                        <span style={{
+                          position: 'absolute', top: -6, right: -6, width: 18, height: 18, borderRadius: '50%',
+                          background: GREEN, color: '#ffffff', fontSize: 11, fontWeight: 800,
+                          display: 'flex', alignItems: 'center', justifyContent: 'center',
+                          boxShadow: '0 2px 5px rgba(31,122,68,0.35)',
+                        }}>✓</span>
                       </div>
                     )
                   })}
@@ -548,7 +711,7 @@ export default function DragDropSorting({ sessionId, role, isLocked }: DragDropS
 
         {/* Score bar */}
         <div style={{ flexShrink: 0, background: 'rgba(255,255,255,0.82)', borderRadius: 12, padding: '12px 14px', boxShadow: '0 4px 14px rgba(20,30,40,0.06)' }}>
-          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', fontSize: 13, color: 'rgba(0,0,0,0.62)', marginBottom: 8 }}>
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', fontSize: 14, color: 'rgba(0,0,0,0.62)', marginBottom: 8 }}>
             <span>✓ {correct} sorted correctly</span>
             <span>{remaining} left</span>
           </div>
@@ -561,16 +724,20 @@ export default function DragDropSorting({ sessionId, role, isLocked }: DragDropS
       {/* Touch ghost */}
       {ghostPos && dragId.current && itemMap.get(dragId.current) && (
         <div style={{
-          position: 'fixed', left: ghostPos.x - 30, top: ghostPos.y - 60,
-          width: 60, height: 60, borderRadius: 12, zIndex: 1000, pointerEvents: 'none',
-          background: 'rgba(74,124,111,0.15)', border: '1.5px solid rgba(74,124,111,0.4)',
-          display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', gap: 2,
-          boxShadow: '0 8px 20px rgba(0,0,0,0.3)', transform: 'scale(1.12)',
-          opacity: 0.85,
+          position: 'fixed', left: ghostPos.x - 50, top: ghostPos.y - 84,
+          width: 100, height: 100, borderRadius: 16, zIndex: 1000, pointerEvents: 'none',
+          background: GREEN_SOFT, border: `2px solid ${GREEN}`,
+          display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', gap: 3,
+          padding: '6px 5px',
+          boxShadow: '0 12px 26px rgba(31,122,68,0.34)', transform: 'scale(1.12)',
+          opacity: 0.92,
         }}>
-          <span style={{ fontSize: 28.5, lineHeight: 1 }}>{itemMap.get(dragId.current)!.emoji}</span>
+          <ItemArt emoji={itemMap.get(dragId.current)!.emoji} size={46} />
           {displayMode === 'emoji+label' && (
-            <span style={{ fontSize: 10.5, color: 'rgba(0,0,0,0.7)', textAlign: 'center', lineHeight: 1.2 }}>{itemMap.get(dragId.current)!.label}</span>
+            <span style={{
+              fontSize: 14, fontWeight: 700, color: INK, textAlign: 'center', lineHeight: 1.15,
+              maxWidth: '100%', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap',
+            }}>{itemMap.get(dragId.current)!.label}</span>
           )}
         </div>
       )}
@@ -581,18 +748,18 @@ export default function DragDropSorting({ sessionId, role, isLocked }: DragDropS
           position: 'absolute', inset: 0, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', gap: 10,
           background: 'rgba(74,124,111,0.2)', backdropFilter: 'blur(6px)', zIndex: 50, padding: 20,
         }}>
-          <div style={{ fontSize: 38, animation: 'cf 0.5s ease' }}>🎉</div>
-          <div style={{ fontSize: 20, fontFamily: '"DM Serif Display", serif', color: '#2b2f33', textAlign: 'center' }}>All sorted! 🎉</div>
-          <div style={{ fontSize: 14.5, color: 'rgba(0,0,0,0.6)', textAlign: 'center', lineHeight: 1.6 }}>
+          <div style={{ fontSize: 39, animation: 'cf 0.5s ease' }}>🎉</div>
+          <div style={{ fontSize: 21, fontFamily: '"DM Serif Display", serif', color: '#2b2f33', textAlign: 'center' }}>All sorted! 🎉</div>
+          <div style={{ fontSize: 16, color: 'rgba(0,0,0,0.6)', textAlign: 'center', lineHeight: 1.6 }}>
             Correct: {correct} | Wrong attempts: {wrong}
             <br />{starText}
           </div>
           <div style={{ display: 'flex', gap: 8 }}>
             <button onClick={handleReset}
-              style={{ padding: '8px 20px', borderRadius: 8, border: '1px solid rgba(0,0,0,0.12)', background: 'rgba(0,0,0,0.07)', color: 'rgba(0,0,0,0.8)', cursor: 'pointer', fontSize: 14.5 }}
+              style={{ padding: '8px 20px', borderRadius: 8, border: '1px solid rgba(0,0,0,0.12)', background: 'rgba(0,0,0,0.07)', color: 'rgba(0,0,0,0.8)', cursor: 'pointer', fontSize: 16 }}
             >Same set again</button>
             <button onClick={handleNewSet}
-              style={{ padding: '8px 20px', borderRadius: 8, border: '1px solid rgba(74,124,111,0.4)', background: 'rgba(74,124,111,0.2)', color: '#1F7A44', cursor: 'pointer', fontSize: 14.5 }}
+              style={{ padding: '8px 20px', borderRadius: 8, border: '1px solid rgba(74,124,111,0.4)', background: 'rgba(74,124,111,0.2)', color: '#1F7A44', cursor: 'pointer', fontSize: 16 }}
             >New set</button>
           </div>
         </div>
@@ -603,7 +770,7 @@ export default function DragDropSorting({ sessionId, role, isLocked }: DragDropS
         <div style={{
           position: 'absolute', top: '50%', left: '50%', transform: 'translate(-50%,-50%)',
           background: 'rgba(0,0,0,0.6)', backdropFilter: 'blur(8px)', borderRadius: 10,
-          padding: '8px 16px', color: '#fff', fontSize: 15, zIndex: 100, pointerEvents: 'none',
+          padding: '8px 16px', color: '#fff', fontSize: 16.5, zIndex: 100, pointerEvents: 'none',
         }}>
           {toast.msg}
         </div>

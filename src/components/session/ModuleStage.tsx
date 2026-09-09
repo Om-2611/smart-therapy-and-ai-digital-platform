@@ -24,8 +24,8 @@ import { MODULE_CATEGORIES } from '@/lib/modules'
 function VideoTile({
   trackRef,
   name,
-  width = 188,
-  height = 112,
+  width = 232,
+  height = 138,
 }: {
   trackRef: TrackReference | undefined
   name: string
@@ -84,7 +84,7 @@ function VideoTile({
           </div>
         )}
       </div>
-      <div style={{ marginTop: 5, textAlign: 'center', fontSize: 17, fontWeight: 600, color: RC.inkMuted }}>
+      <div style={{ marginTop: 5, textAlign: 'center', fontSize: 18.5, fontWeight: 600, color: RC.inkMuted }}>
         {name}
       </div>
     </div>
@@ -99,7 +99,7 @@ function VideoTile({
 
     Raised from 360 alongside the larger camera tiles and type: the activity
     body now needs more room before it starts clipping its own controls. */
-const MODULE_MIN_HEIGHT = 420
+const MODULE_MIN_HEIGHT = 450
 
 /** Registry lookup: the module's display identity and its category tint. */
 function moduleIdentity(moduleId: string | null) {
@@ -163,7 +163,7 @@ export default function ModuleStage({
     border: `1px solid ${RC.border}`,
     background: RC.panel,
     color: RC.ink,
-    fontSize: 12,
+    fontSize: 13,
     fontWeight: 600,
     cursor: 'pointer',
   }
@@ -212,7 +212,7 @@ export default function ModuleStage({
         }}
       >
         {/* LEFT: self */}
-        <VideoTile trackRef={selfTrack} name={selfName} width={188} height={112} />
+        <VideoTile trackRef={selfTrack} name={selfName} width={232} height={138} />
 
         {/* CENTRE: title, then the live status line */}
         <div style={{ flex: 1, minWidth: 0, display: 'flex', flexDirection: 'column', gap: 8, paddingTop: 2 }}>
@@ -226,7 +226,7 @@ export default function ModuleStage({
                 display: 'flex',
                 alignItems: 'center',
                 justifyContent: 'center',
-                fontSize: 23,
+                fontSize: 24.5,
                 background: id?.iconBg ?? RC.tile,
                 border: `1px solid ${id?.iconBorder ?? RC.border}`,
               }}
@@ -236,7 +236,7 @@ export default function ModuleStage({
             <div style={{ minWidth: 0 }}>
               <div
                 style={{
-                  fontSize: 27.5,
+                  fontSize: 29,
                   fontWeight: 800,
                   letterSpacing: -0.4,
                   lineHeight: 1.15,
@@ -250,7 +250,7 @@ export default function ModuleStage({
               </div>
               <div
                 style={{
-                  fontSize: 15.5,
+                  fontSize: 17,
                   fontWeight: 600,
                   color: RC.inkMuted,
                   whiteSpace: 'nowrap',
@@ -265,11 +265,11 @@ export default function ModuleStage({
 
           <div style={{ display: 'flex', alignItems: 'center', gap: 9 }}>
             <span style={{ width: 7, height: 7, borderRadius: '50%', background: RC.red, display: 'inline-block' }} />
-            <span style={{ fontSize: 13, fontWeight: 600, fontVariantNumeric: 'tabular-nums', color: RC.ink, fontFamily: 'monospace' }}>
+            <span style={{ fontSize: 14, fontWeight: 600, fontVariantNumeric: 'tabular-nums', color: RC.ink, fontFamily: 'monospace' }}>
               {timerStr}
             </span>
             <span style={{ width: 1, height: 11, background: RC.border, display: 'inline-block' }} />
-            <span style={{ display: 'flex', alignItems: 'center', gap: 5, fontSize: 13, fontWeight: 600, color: RC.greenDark }}>
+            <span style={{ display: 'flex', alignItems: 'center', gap: 5, fontSize: 14, fontWeight: 600, color: RC.greenDark }}>
               <span style={{ width: 6, height: 6, borderRadius: '50%', background: RC.green, display: 'inline-block' }} />
               {onlineCount} online
             </span>
@@ -278,7 +278,7 @@ export default function ModuleStage({
 
         {/* RIGHT: other participant */}
         <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-end', gap: 7, flexShrink: 0 }}>
-          <VideoTile trackRef={otherTrack} name={otherName} width={188} height={112} />
+          <VideoTile trackRef={otherTrack} name={otherName} width={232} height={138} />
 
           <div style={{ display: 'flex', alignItems: 'center', gap: 7 }}>
             {isTherapist && (

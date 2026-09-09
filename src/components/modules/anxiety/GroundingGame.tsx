@@ -48,19 +48,25 @@ const ART_STEP_FX = A('STAAD_Grounding_Step_Complete_FX.json')
 
 /* No "touch" icon shipped in the delivered set — this flat orange hand stands
    in for it so the sense row reads consistently. Swap the data URI for the real
-   asset the moment design supplies one. */
+   asset the moment design supplies one.
+
+   Redrawn: the previous version sat in a 160x200 box while the art only used
+   x 17-128 / y 22-176, so at the 27px it actually renders the hand came out
+   small and off-centre, and its thumb was rotated INTO the palm — it read as a
+   detached fifth finger. This one fills a square viewBox and the thumb angles
+   out of the palm, so it stays legible down to the 15px used in the recap row. */
 const TOUCH_HAND_SVG =
-  `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 160 200">` +
+  `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100">` +
   `<g fill="#F2762A">` +
-  `<rect x="40" y="46" width="19" height="76" rx="9.5"/>` +
-  `<rect x="63" y="26" width="19" height="96" rx="9.5"/>` +
-  `<rect x="86" y="22" width="19" height="100" rx="9.5"/>` +
-  `<rect x="109" y="40" width="19" height="82" rx="9.5"/>` +
-  `<rect x="26" y="84" width="19" height="58" rx="9.5" transform="rotate(26 35.5 113)"/>` +
-  `<rect x="40" y="92" width="88" height="84" rx="36"/>` +
+  `<rect x="20" y="46" width="60" height="44" rx="20"/>` +
+  `<rect x="24" y="20" width="13" height="44" rx="6.5"/>` +
+  `<rect x="39" y="12" width="13" height="52" rx="6.5"/>` +
+  `<rect x="54" y="15" width="13" height="49" rx="6.5"/>` +
+  `<rect x="69" y="24" width="13" height="40" rx="6.5"/>` +
+  `<rect x="8" y="44" width="13" height="40" rx="6.5" transform="rotate(-32 14.5 64)"/>` +
   `</g>` +
-  `<g fill="none" stroke="#D95F16" stroke-width="4" stroke-linecap="round" opacity="0.35">` +
-  `<path d="M62 140 h44"/><path d="M66 156 h36"/>` +
+  `<g fill="none" stroke="#D95F16" stroke-width="4" stroke-linecap="round" opacity="0.32">` +
+  `<path d="M38 68 h26"/><path d="M42 79 h18"/>` +
   `</g></svg>`
 const ART_TOUCH = `data:image/svg+xml,${encodeURIComponent(TOUCH_HAND_SVG)}`
 
@@ -317,7 +323,7 @@ export default function GroundingGame({ sessionId, role, isLocked }: GroundingGa
     border: `1px solid ${active ? GREEN : BORDER}`,
     background: active ? 'rgba(63,174,106,0.12)' : '#fff',
     color: active ? GREEN_DEEP : 'var(--ink-muted)',
-    fontSize: 12,
+    fontSize: 13,
     fontWeight: 600,
     cursor: 'pointer',
     transition: 'all 0.15s',
@@ -329,7 +335,7 @@ export default function GroundingGame({ sessionId, role, isLocked }: GroundingGa
     border: `1px solid ${BORDER}`,
     background: '#fff',
     color: 'var(--ink-muted)',
-    fontSize: 12,
+    fontSize: 13,
     fontWeight: 600,
     cursor: 'pointer',
   }
@@ -343,7 +349,7 @@ export default function GroundingGame({ sessionId, role, isLocked }: GroundingGa
 
   const progressRow = (
     <div style={{ flexShrink: 0, display: 'flex', alignItems: 'center', gap: 14 }}>
-      <span style={{ fontSize: 14.5, fontWeight: 700, color: INK_BODY, whiteSpace: 'nowrap' }}>
+      <span style={{ fontSize: 16, fontWeight: 700, color: INK_BODY, whiteSpace: 'nowrap' }}>
         {completed ? 'All 5 steps' : `Step ${currentStep + 1} of 5`}
       </span>
       <div style={{ flex: 1, minWidth: 40, height: 8, borderRadius: 999, background: '#eef1f4', overflow: 'hidden' }}>
@@ -357,13 +363,13 @@ export default function GroundingGame({ sessionId, role, isLocked }: GroundingGa
           }}
         />
       </div>
-      <span style={{ fontSize: 14.5, fontWeight: 700, color: GREEN_DEEP, whiteSpace: 'nowrap' }}>{pct}% Complete</span>
+      <span style={{ fontSize: 16, fontWeight: 700, color: GREEN_DEEP, whiteSpace: 'nowrap' }}>{pct}% Complete</span>
       <span
         style={{
           display: 'flex', alignItems: 'center', gap: 5,
           padding: '5px 11px', borderRadius: 999,
           border: `1px solid ${BORDER}`, background: '#f7f9fb',
-          fontSize: 13, fontWeight: 600, color: 'var(--ink-muted)', whiteSpace: 'nowrap',
+          fontSize: 14, fontWeight: 600, color: 'var(--ink-muted)', whiteSpace: 'nowrap',
         }}
       >
         <Clock size={12} strokeWidth={2.4} />
@@ -412,7 +418,7 @@ export default function GroundingGame({ sessionId, role, isLocked }: GroundingGa
                 </span>
               )}
             </div>
-            <span style={{ fontSize: 13, fontWeight: 700, color: s.ink, opacity: active || done ? 1 : 0.7 }}>
+            <span style={{ fontSize: 14, fontWeight: 700, color: s.ink, opacity: active || done ? 1 : 0.7 }}>
               {s.label}
             </span>
             <span
@@ -511,10 +517,10 @@ export default function GroundingGame({ sessionId, role, isLocked }: GroundingGa
       }}
     >
       <Check size={15} strokeWidth={3.2} color={GREEN} />
-      <span style={{ fontSize: 17, fontWeight: 800, color: INK }}>{filledCount}</span>
-      <span style={{ fontSize: 16, fontWeight: 600, color: 'var(--ink-faint)' }}>/</span>
-      <span style={{ fontSize: 17, fontWeight: 800, color: INK }}>{step.count}</span>
-      <span style={{ fontSize: 14.5, fontWeight: 600, color: 'var(--ink-muted)' }}>completed</span>
+      <span style={{ fontSize: 18.5, fontWeight: 800, color: INK }}>{filledCount}</span>
+      <span style={{ fontSize: 17.5, fontWeight: 600, color: 'var(--ink-faint)' }}>/</span>
+      <span style={{ fontSize: 18.5, fontWeight: 800, color: INK }}>{step.count}</span>
+      <span style={{ fontSize: 16, fontWeight: 600, color: 'var(--ink-muted)' }}>completed</span>
     </div>
   )
 
@@ -534,7 +540,7 @@ export default function GroundingGame({ sessionId, role, isLocked }: GroundingGa
       }}
     >
       <StarBadge />
-      <span style={{ fontSize: 15, fontWeight: 700, color: '#2b3b33', lineHeight: 1.4, maxWidth: 240 }}>
+      <span style={{ fontSize: 16.5, fontWeight: 700, color: '#2b3b33', lineHeight: 1.4, maxWidth: 240 }}>
         Great job! You&apos;re becoming more aware of your surroundings.
       </span>
       <div
@@ -590,7 +596,7 @@ export default function GroundingGame({ sessionId, role, isLocked }: GroundingGa
       {/* ---- Start-mood capture takes over the body ---- */}
       {captureStartMood && (
         <div style={{ flex: 1, minHeight: 0, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', gap: 18 }}>
-          <div style={{ fontSize: 22, fontWeight: 800, color: INK, letterSpacing: -0.3 }}>
+          <div style={{ fontSize: 23.5, fontWeight: 800, color: INK, letterSpacing: -0.3 }}>
             How are you feeling right now?
           </div>
           <div style={{ display: 'flex', gap: 12, justifyContent: 'center', flexWrap: 'wrap' }}>
@@ -608,11 +614,11 @@ export default function GroundingGame({ sessionId, role, isLocked }: GroundingGa
                     boxShadow: CARD_SHADOW,
                     cursor: canInteract ? 'pointer' : 'not-allowed',
                     display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', gap: 5,
-                    fontSize: 29.5, transition: 'all 0.15s',
+                    fontSize: 31.5, transition: 'all 0.15s',
                   }}
                 >
                   <span>{m.emoji}</span>
-                  <span style={{ fontSize: 13, fontWeight: 700, color: on ? GREEN_DEEP : INK_BODY }}>{m.label}</span>
+                  <span style={{ fontSize: 14, fontWeight: 700, color: on ? GREEN_DEEP : INK_BODY }}>{m.label}</span>
                 </button>
               )
             })}
@@ -672,7 +678,7 @@ export default function GroundingGame({ sessionId, role, isLocked }: GroundingGa
                   borderRadius: 999,
                   border: '1px solid #CFEBDB',
                   background: 'rgba(63,174,106,0.10)',
-                  fontSize: 14.5,
+                  fontSize: 16,
                   fontWeight: 700,
                   color: GREEN_DEEP,
                 }}
@@ -735,7 +741,7 @@ export default function GroundingGame({ sessionId, role, isLocked }: GroundingGa
                             outline: 'none',
                             background: 'transparent',
                             color: INK,
-                            fontSize: 15,
+                            fontSize: 16.5,
                             fontWeight: 600,
                             padding: 0,
                           }}
@@ -748,7 +754,7 @@ export default function GroundingGame({ sessionId, role, isLocked }: GroundingGa
                           border: `1px solid ${filled ? '#CFEBDB' : BORDER}`,
                           background: filled ? 'rgba(63,174,106,0.10)' : '#f7f9fb',
                           display: 'flex', alignItems: 'center', justifyContent: 'center',
-                          fontSize: 15, fontWeight: 700,
+                          fontSize: 16.5, fontWeight: 700,
                           color: filled ? GREEN_DEEP : 'var(--ink-muted)',
                           transition: 'all 0.18s ease',
                         }}
@@ -762,7 +768,7 @@ export default function GroundingGame({ sessionId, role, isLocked }: GroundingGa
 
               <div style={{ flexShrink: 0, display: 'flex', alignItems: 'center', gap: 10, minHeight: 30 }}>
                 {!canInteract && (
-                  <span style={{ fontSize: 13, fontWeight: 600, color: 'var(--ink-muted)' }}>
+                  <span style={{ fontSize: 14, fontWeight: 600, color: 'var(--ink-muted)' }}>
                     Therapist is guiding
                   </span>
                 )}
@@ -776,7 +782,7 @@ export default function GroundingGame({ sessionId, role, isLocked }: GroundingGa
                       border: 'none',
                       background: `linear-gradient(180deg, #47bd74 0%, ${GREEN} 100%)`,
                       color: '#fff',
-                      fontSize: 15,
+                      fontSize: 16.5,
                       fontWeight: 700,
                       cursor: 'pointer',
                       boxShadow: '0 4px 12px rgba(63,174,106,0.30)',
@@ -804,8 +810,8 @@ export default function GroundingGame({ sessionId, role, isLocked }: GroundingGa
             style={{ height: 128, width: 'auto', display: 'block', flexShrink: 0 }}
           />
           <div style={{ textAlign: 'center', flexShrink: 0 }}>
-            <div style={{ fontSize: 23, fontWeight: 800, color: INK, letterSpacing: -0.4 }}>You did it 🌱</div>
-            <div style={{ fontSize: 15, fontWeight: 600, color: 'var(--ink-muted)', marginTop: 3 }}>
+            <div style={{ fontSize: 24.5, fontWeight: 800, color: INK, letterSpacing: -0.4 }}>You did it 🌱</div>
+            <div style={{ fontSize: 16.5, fontWeight: 600, color: 'var(--ink-muted)', marginTop: 3 }}>
               You named 15 things around you
             </div>
           </div>
@@ -835,7 +841,7 @@ export default function GroundingGame({ sessionId, role, isLocked }: GroundingGa
                       background: 'transparent',
                       border: 'none',
                       color: INK_BODY,
-                      fontSize: 14.5,
+                      fontSize: 16,
                       fontWeight: 700,
                       cursor: 'pointer',
                       display: 'flex',
@@ -855,10 +861,10 @@ export default function GroundingGame({ sessionId, role, isLocked }: GroundingGa
                     </span>
                     <span>{s.count} things I {s.sense.toLowerCase()}</span>
                     <div style={{ flex: 1 }} />
-                    <span style={{ fontSize: 16, color: 'var(--ink-muted)', fontWeight: 700 }}>{isExpanded ? '−' : '+'}</span>
+                    <span style={{ fontSize: 17.5, color: 'var(--ink-muted)', fontWeight: 700 }}>{isExpanded ? '−' : '+'}</span>
                   </button>
                   {isExpanded && (
-                    <div style={{ padding: '2px 14px 10px 47px', fontSize: 14.5, color: INK_BODY, lineHeight: 1.75 }}>
+                    <div style={{ padding: '2px 14px 10px 47px', fontSize: 16, color: INK_BODY, lineHeight: 1.75 }}>
                       {list.length > 0 ? list.map((x, j) => (
                         <div key={j} style={{ display: 'flex', alignItems: 'center', gap: 7 }}>
                           <Check size={12} strokeWidth={3} color={GREEN} />
@@ -874,7 +880,7 @@ export default function GroundingGame({ sessionId, role, isLocked }: GroundingGa
 
           {/* End mood */}
           <div style={{ textAlign: 'center', width: '100%', flexShrink: 0 }}>
-            <div style={{ fontSize: 15, fontWeight: 700, color: INK_BODY, marginBottom: 9 }}>
+            <div style={{ fontSize: 16.5, fontWeight: 700, color: INK_BODY, marginBottom: 9 }}>
               How do you feel now?
             </div>
             <div style={{ display: 'flex', gap: 10, justifyContent: 'center', flexWrap: 'wrap' }}>
@@ -892,11 +898,11 @@ export default function GroundingGame({ sessionId, role, isLocked }: GroundingGa
                       boxShadow: CARD_SHADOW,
                       cursor: canInteract ? 'pointer' : 'not-allowed',
                       display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', gap: 3,
-                      fontSize: 25.5, transition: 'all 0.15s',
+                      fontSize: 27, transition: 'all 0.15s',
                     }}
                   >
                     <span>{m.emoji}</span>
-                    <span style={{ fontSize: 12, fontWeight: 700, color: on ? GREEN_DEEP : INK_BODY }}>{m.label}</span>
+                    <span style={{ fontSize: 13, fontWeight: 700, color: on ? GREEN_DEEP : INK_BODY }}>{m.label}</span>
                   </button>
                 )
               })}
@@ -913,7 +919,7 @@ export default function GroundingGame({ sessionId, role, isLocked }: GroundingGa
               border: 'none',
               background: `linear-gradient(180deg, #47bd74 0%, ${GREEN} 100%)`,
               color: '#fff',
-              fontSize: 15,
+              fontSize: 16.5,
               fontWeight: 700,
               cursor: 'pointer',
               boxShadow: '0 4px 12px rgba(63,174,106,0.30)',
@@ -937,11 +943,11 @@ export default function GroundingGame({ sessionId, role, isLocked }: GroundingGa
             flexWrap: 'wrap',
           }}
         >
-          <span style={{ fontSize: 12.5, fontWeight: 600, color: 'var(--ink-muted)' }}>
+          <span style={{ fontSize: 13.5, fontWeight: 600, color: 'var(--ink-muted)' }}>
             Step {currentStep + 1} of 5 · {filledCount}/{step.count} items entered
           </span>
           <span style={{ width: 1, height: 12, background: BORDER }} />
-          <span style={{ fontSize: 12, fontWeight: 600, color: 'var(--ink-faint)' }}>Breath</span>
+          <span style={{ fontSize: 13, fontWeight: 600, color: 'var(--ink-faint)' }}>Breath</span>
           {BREATH_OPTIONS.map(b => (
             <button
               key={b.value}
@@ -961,7 +967,7 @@ export default function GroundingGame({ sessionId, role, isLocked }: GroundingGa
             </button>
           )}
           {startMood && (
-            <span style={{ fontSize: 12.5, fontWeight: 600, color: 'var(--ink-muted)' }}>Mood: {startMood}</span>
+            <span style={{ fontSize: 13.5, fontWeight: 600, color: 'var(--ink-muted)' }}>Mood: {startMood}</span>
           )}
           <button onClick={handleSkip} style={ghostBtn}>
             Skip to next step →

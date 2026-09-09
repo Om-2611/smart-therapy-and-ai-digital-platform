@@ -749,7 +749,7 @@ export default function WhackAMoleMath({ sessionId, role, isLocked }: WhackAMole
     // The mockup colours the GLYPH, not the word — which also keeps the label
     // at full contrast instead of mid-tone-on-pale.
     color: on ? INK : INK_BODY,
-    fontSize: 16,
+    fontSize: 17.5,
     fontWeight: 700,
     lineHeight: 1.2,
     cursor: 'pointer',
@@ -763,7 +763,7 @@ export default function WhackAMoleMath({ sessionId, role, isLocked }: WhackAMole
     border: `1.5px solid ${on ? GREEN : BORDER}`,
     background: '#ffffff',
     color: on ? GREEN_DEEP : MUTED,
-    fontSize: 16,
+    fontSize: 17.5,
     fontWeight: 700,
     lineHeight: 1.2,
     cursor: 'pointer',
@@ -777,7 +777,7 @@ export default function WhackAMoleMath({ sessionId, role, isLocked }: WhackAMole
     border: `1.5px solid ${on ? 'rgba(22,163,74,0.28)' : BORDER}`,
     background: on ? GREEN_TINT : '#ffffff',
     color: on ? GREEN_DEEP : MUTED,
-    fontSize: 16,
+    fontSize: 17.5,
     fontWeight: 700,
     lineHeight: 1.2,
     cursor: 'pointer',
@@ -1060,7 +1060,7 @@ export default function WhackAMoleMath({ sessionId, role, isLocked }: WhackAMole
                   aria-pressed={on}
                   style={opPill(on, op.tint, op.wash)}
                 >
-                  <span aria-hidden style={{ fontSize: 19.5, fontWeight: 800, color: op.tint, lineHeight: 1 }}>
+                  <span aria-hidden style={{ fontSize: 20.5, fontWeight: 800, color: op.tint, lineHeight: 1 }}>
                     {op.glyph}
                   </span>
                   {op.label}
@@ -1114,7 +1114,7 @@ export default function WhackAMoleMath({ sessionId, role, isLocked }: WhackAMole
               background: isPlaying ? AMBER : GREEN_DEEP,
               // White type only ever lands on these solid saturated fills.
               color: '#ffffff',
-              fontSize: 16,
+              fontSize: 17.5,
               fontWeight: 800,
               lineHeight: 1.2,
               cursor: 'pointer',
@@ -1122,7 +1122,7 @@ export default function WhackAMoleMath({ sessionId, role, isLocked }: WhackAMole
               transition: 'all 0.15s',
             }}
           >
-            <span aria-hidden style={{ fontSize: 14.5 }}>{isPlaying ? '⏸' : '▶'}</span>
+            <span aria-hidden style={{ fontSize: 16 }}>{isPlaying ? '⏸' : '▶'}</span>
             {isPlaying ? 'Pause' : 'Start'}
           </button>
         </div>
@@ -1166,7 +1166,7 @@ export default function WhackAMoleMath({ sessionId, role, isLocked }: WhackAMole
       )}
 
       {!canInteract && isPlaying && question && (
-        <div style={{ flexShrink: 0, fontSize: 14.5, fontWeight: 600, color: MUTED, textAlign: 'center' }}>
+        <div style={{ flexShrink: 0, fontSize: 16, fontWeight: 600, color: MUTED, textAlign: 'center' }}>
           Your therapist is controlling this activity
         </div>
       )}
@@ -1262,7 +1262,7 @@ export default function WhackAMoleMath({ sessionId, role, isLocked }: WhackAMole
                     draggable={false}
                     style={{ width: 30, height: 30, objectFit: 'contain', flexShrink: 0 }}
                   />
-                  <span style={{ fontSize: 16, fontWeight: 700, color: INK_BODY }}>
+                  <span style={{ fontSize: 17.5, fontWeight: 700, color: INK_BODY }}>
                     {!question
                       ? isT
                         ? 'Press Start to begin'
@@ -1297,7 +1297,7 @@ export default function WhackAMoleMath({ sessionId, role, isLocked }: WhackAMole
             boxShadow: CARD_SHADOW,
           }}
         >
-          <span style={{ display: 'inline-flex', alignItems: 'center', gap: 8, fontSize: 16, fontWeight: 700, color: INK_BODY }}>
+          <span style={{ display: 'inline-flex', alignItems: 'center', gap: 8, fontSize: 17.5, fontWeight: 700, color: INK_BODY }}>
             <span
               aria-hidden
               style={{
@@ -1309,7 +1309,7 @@ export default function WhackAMoleMath({ sessionId, role, isLocked }: WhackAMole
                 display: 'inline-flex',
                 alignItems: 'center',
                 justifyContent: 'center',
-                fontSize: 15,
+                fontSize: 16.5,
                 fontWeight: 800,
               }}
             >
@@ -1317,8 +1317,8 @@ export default function WhackAMoleMath({ sessionId, role, isLocked }: WhackAMole
             </span>
             {score} correct
           </span>
-          <span style={{ display: 'inline-flex', alignItems: 'center', gap: 8, fontSize: 16, fontWeight: 700, color: INK_BODY }}>
-            <span aria-hidden style={{ fontSize: 19.5 }}>🔥</span>
+          <span style={{ display: 'inline-flex', alignItems: 'center', gap: 8, fontSize: 17.5, fontWeight: 700, color: INK_BODY }}>
+            <span aria-hidden style={{ fontSize: 20.5 }}>🔥</span>
             {streak} streak
           </span>
 
@@ -1328,7 +1328,7 @@ export default function WhackAMoleMath({ sessionId, role, isLocked }: WhackAMole
                 position: 'absolute',
                 left: '50%',
                 top: -16,
-                fontSize: 14.5,
+                fontSize: 16,
                 fontWeight: 800,
                 color: '#ffffff',
                 background: GREEN_DEEP,
@@ -1350,7 +1350,7 @@ export default function WhackAMoleMath({ sessionId, role, isLocked }: WhackAMole
                 position: 'absolute',
                 left: `${r.x}%`,
                 bottom: 0,
-                fontSize: 26.5,
+                fontSize: 28,
                 zIndex: 10,
                 pointerEvents: 'none',
                 animation: 'wamFloatUp 1.6s ease forwards',

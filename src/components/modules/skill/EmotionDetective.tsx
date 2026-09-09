@@ -605,7 +605,7 @@ export default function EmotionDetective({ sessionId, role, isLocked }: EmotionD
 
   const badge = LEVEL_BADGE[level]
   const ghostBtn = {
-    width: '100%', padding: '7px 0', borderRadius: 50, cursor: 'pointer', fontSize: 13, fontFamily: NUNITO, fontWeight: 700,
+    width: '100%', padding: '7px 0', borderRadius: 50, cursor: 'pointer', fontSize: 14, fontFamily: NUNITO, fontWeight: 700,
     background: 'transparent', border: '1px solid rgba(255,255,255,0.14)', color: 'rgba(255,255,255,0.6)',
   } as const
 
@@ -635,10 +635,10 @@ export default function EmotionDetective({ sessionId, role, isLocked }: EmotionD
       <div style={{ display: 'flex', flexDirection: 'column', gap: 20, width: '100%', maxWidth: 760, padding: 24 }}>
         {/* 1 — Header */}
         <div style={{ display: 'flex', alignItems: 'center', gap: 8, minHeight: 36 }}>
-          <span style={{ flexShrink: 0, background: badge.bg, color: badge.color, fontSize: 12, fontWeight: 800, padding: '3px 9px', borderRadius: 999 }}>
+          <span style={{ flexShrink: 0, background: badge.bg, color: badge.color, fontSize: 13, fontWeight: 800, padding: '3px 9px', borderRadius: 999 }}>
             {badge.label}
           </span>
-          <span style={{ flex: 1, textAlign: 'center', fontSize: 13, fontWeight: 700, color: 'rgba(255,255,255,0.55)', whiteSpace: 'nowrap' }}>
+          <span style={{ flex: 1, textAlign: 'center', fontSize: 14, fontWeight: 700, color: 'rgba(255,255,255,0.55)', whiteSpace: 'nowrap' }}>
             Emotion Detective
           </span>
           {isT ? (
@@ -649,7 +649,7 @@ export default function EmotionDetective({ sessionId, role, isLocked }: EmotionD
                     key={key}
                     onClick={() => write({ 'moduleState.edLanguage': key })}
                     style={{
-                      border: 'none', cursor: 'pointer', borderRadius: 999, padding: '3px 7px', fontSize: 11.5, fontWeight: 800,
+                      border: 'none', cursor: 'pointer', borderRadius: 999, padding: '3px 7px', fontSize: 13, fontWeight: 800,
                       fontFamily: key === 'hi' ? DEVANAGARI : NUNITO,
                       background: language === key ? 'rgba(74,124,111,0.35)' : 'transparent',
                       color: language === key ? '#cfe6df' : 'rgba(255,255,255,0.45)',
@@ -664,7 +664,7 @@ export default function EmotionDetective({ sessionId, role, isLocked }: EmotionD
                 onClick={() => startLevel(level)}
                 title="Reset level"
                 style={{
-                  width: 24, height: 24, borderRadius: 6, cursor: 'pointer', fontSize: 13,
+                  width: 24, height: 24, borderRadius: 6, cursor: 'pointer', fontSize: 14,
                   background: 'rgba(255,255,255,0.06)', border: '1px solid rgba(255,255,255,0.12)', color: 'rgba(255,255,255,0.6)',
                 }}
               >
@@ -682,7 +682,7 @@ export default function EmotionDetective({ sessionId, role, isLocked }: EmotionD
                 key={l}
                 onClick={() => startLevel(l)}
                 style={{
-                  flex: 1, padding: '4px 0', borderRadius: 7, cursor: 'pointer', fontSize: 11.5, fontWeight: 800,
+                  flex: 1, padding: '4px 0', borderRadius: 7, cursor: 'pointer', fontSize: 13, fontWeight: 800,
                   textTransform: 'capitalize', fontFamily: NUNITO,
                   background: level === l ? 'rgba(74,124,111,0.3)' : 'rgba(255,255,255,0.05)',
                   border: `1px solid ${level === l ? 'rgba(74,124,111,0.45)' : 'rgba(255,255,255,0.1)'}`,
@@ -705,7 +705,7 @@ export default function EmotionDetective({ sessionId, role, isLocked }: EmotionD
               style={{ height: '100%', background: 'rgba(74,124,111,0.7)', borderRadius: 999 }}
             />
           </div>
-          <span style={{ fontSize: 12, fontWeight: 700, color: 'rgba(255,255,255,0.45)', flexShrink: 0 }}>
+          <span style={{ fontSize: 13, fontWeight: 700, color: 'rgba(255,255,255,0.45)', flexShrink: 0 }}>
             {levelComplete ? levelScenarios.length : idx + 1}/{levelScenarios.length}
           </span>
         </div>
@@ -724,12 +724,12 @@ export default function EmotionDetective({ sessionId, role, isLocked }: EmotionD
                 padding: 20, textAlign: 'center', display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 8,
               }}
             >
-              <div style={{ fontSize: 68, lineHeight: 1, animation: 'edCheerBounce 1.6s ease-in-out infinite' }}>🎉</div>
-              <div style={{ fontSize: 22, fontWeight: 900 }}>Level complete!</div>
-              <div style={{ fontSize: 17, fontWeight: 700, color: 'rgba(255,255,255,0.8)' }}>
+              <div style={{ fontSize: 70, lineHeight: 1, animation: 'edCheerBounce 1.6s ease-in-out infinite' }}>🎉</div>
+              <div style={{ fontSize: 23.5, fontWeight: 900 }}>Level complete!</div>
+              <div style={{ fontSize: 18.5, fontWeight: 700, color: 'rgba(255,255,255,0.8)' }}>
                 Score: {score} / {levelScenarios.length}
               </div>
-              <div style={{ fontSize: 14.5, fontWeight: 800, color: scoreBand.color }}>
+              <div style={{ fontSize: 16, fontWeight: 800, color: scoreBand.color }}>
                 {scoreBand.icon} {scoreBand.msg}
               </div>
               {isT && (
@@ -738,7 +738,7 @@ export default function EmotionDetective({ sessionId, role, isLocked }: EmotionD
                     <button
                       onClick={() => startLevel(nextLevel)}
                       style={{
-                        width: '100%', padding: '8px 20px', borderRadius: 50, cursor: 'pointer', fontSize: 14.5,
+                        width: '100%', padding: '8px 20px', borderRadius: 50, cursor: 'pointer', fontSize: 16,
                         fontWeight: 700, fontFamily: NUNITO,
                         background: 'rgba(74,124,111,0.22)', border: '1px solid rgba(74,124,111,0.45)', color: '#b8d4ce',
                       }}
@@ -786,10 +786,10 @@ export default function EmotionDetective({ sessionId, role, isLocked }: EmotionD
                   }}
                 >
                   <div style={{ position: 'absolute', top: 10, right: 12, display: 'flex', alignItems: 'center', gap: 6, zIndex: 8 }}>
-                    <span style={{ fontSize: 12, fontWeight: 700, color: '#5a4632', background: 'rgba(255,255,255,0.72)', borderRadius: 999, padding: '1px 8px' }}>
+                    <span style={{ fontSize: 13, fontWeight: 700, color: '#5a4632', background: 'rgba(255,255,255,0.72)', borderRadius: 999, padding: '1px 8px' }}>
                       Scenario {idx + 1}
                     </span>
-                    <span style={{ fontSize: 17, display: 'inline-block', animation: 'edDetectiveBounce 1.8s ease-in-out infinite' }}>🔍</span>
+                    <span style={{ fontSize: 18.5, display: 'inline-block', animation: 'edDetectiveBounce 1.8s ease-in-out infinite' }}>🔍</span>
                   </div>
 
                   <AnimatedScene meta={sceneMeta} />
@@ -817,12 +817,12 @@ export default function EmotionDetective({ sessionId, role, isLocked }: EmotionD
               {/* Prompt label — kept, moved below the scene */}
               <div style={{ textAlign: 'center' }}>
                 {showEn && (
-                  <div style={{ fontSize: 14.5, fontWeight: 700, color: 'rgba(255,255,255,0.5)' }}>
+                  <div style={{ fontSize: 16, fontWeight: 700, color: 'rgba(255,255,255,0.5)' }}>
                     What is this child feeling?
                   </div>
                 )}
                 {showHi && (
-                  <div style={{ fontSize: 14.5, fontWeight: 600, color: 'rgba(255,255,255,0.5)', fontFamily: DEVANAGARI }}>
+                  <div style={{ fontSize: 16, fontWeight: 600, color: 'rgba(255,255,255,0.5)', fontFamily: DEVANAGARI }}>
                     यह बच्चा कैसा महसूस कर रहा है?
                   </div>
                 )}
@@ -885,12 +885,12 @@ export default function EmotionDetective({ sessionId, role, isLocked }: EmotionD
                           e.currentTarget.style.borderColor = 'rgba(255,255,255,0.12)'
                         }}
                       >
-                        <span style={{ fontSize: 34, lineHeight: 1 }}>{emotion.emoji}</span>
+                        <span style={{ fontSize: 35, lineHeight: 1 }}>{emotion.emoji}</span>
                         {showEn && (
-                          <span style={{ fontSize: 15, fontWeight: 700, lineHeight: 1.2, textAlign: 'center' }}>{emotion.en}</span>
+                          <span style={{ fontSize: 16.5, fontWeight: 700, lineHeight: 1.2, textAlign: 'center' }}>{emotion.en}</span>
                         )}
                         {showHi && (
-                          <span style={{ fontSize: 13, fontWeight: 600, fontFamily: DEVANAGARI, color: 'rgba(255,255,255,0.55)', lineHeight: 1.2, textAlign: 'center' }}>
+                          <span style={{ fontSize: 14, fontWeight: 600, fontFamily: DEVANAGARI, color: 'rgba(255,255,255,0.55)', lineHeight: 1.2, textAlign: 'center' }}>
                             {emotion.hi}
                           </span>
                         )}
@@ -903,7 +903,7 @@ export default function EmotionDetective({ sessionId, role, isLocked }: EmotionD
                             position: 'absolute', top: -6, right: -6, width: 18, height: 18, borderRadius: '50%',
                             display: 'flex', alignItems: 'center', justifyContent: 'center',
                             background: isTheAnswer ? '#4caf86' : '#c8602a',
-                            color: '#fff', fontSize: 12, fontWeight: 900, lineHeight: 1,
+                            color: '#fff', fontSize: 13, fontWeight: 900, lineHeight: 1,
                           }}
                         >
                           {isTheAnswer ? '✓' : '✗'}
@@ -934,7 +934,7 @@ export default function EmotionDetective({ sessionId, role, isLocked }: EmotionD
 
               {/* Locked notice */}
               {!canInteract && (
-                <div style={{ fontSize: 11.5, fontWeight: 700, color: 'rgba(255,255,255,0.4)', textAlign: 'center' }}>
+                <div style={{ fontSize: 13, fontWeight: 700, color: 'rgba(255,255,255,0.4)', textAlign: 'center' }}>
                   Therapist is controlling
                 </div>
               )}
@@ -959,9 +959,9 @@ export default function EmotionDetective({ sessionId, role, isLocked }: EmotionD
                     >
                       {isCorrectPick ? (
                         <>
-                          {showEn && <div style={{ fontSize: 14.5, fontWeight: 800, color: '#4caf86' }}>That&apos;s right!</div>}
-                          {showHi && <div style={{ fontSize: 14.5, fontWeight: 700, color: '#4caf86', fontFamily: DEVANAGARI }}>बिल्कुल सही!</div>}
-                          <div style={{ fontSize: 16, fontWeight: 800, marginTop: 3 }}>
+                          {showEn && <div style={{ fontSize: 16, fontWeight: 800, color: '#4caf86' }}>That&apos;s right!</div>}
+                          {showHi && <div style={{ fontSize: 16, fontWeight: 700, color: '#4caf86', fontFamily: DEVANAGARI }}>बिल्कुल सही!</div>}
+                          <div style={{ fontSize: 17.5, fontWeight: 800, marginTop: 3 }}>
                             {scenario.correctEmotion.emoji}{' '}
                             {showEn && scenario.correctEmotion.en}
                             {language === 'both' && ' · '}
@@ -970,18 +970,18 @@ export default function EmotionDetective({ sessionId, role, isLocked }: EmotionD
                         </>
                       ) : (
                         <>
-                          {showEn && <div style={{ fontSize: 13, fontWeight: 700, color: 'rgba(255,255,255,0.45)' }}>The feeling is...</div>}
-                          {showHi && <div style={{ fontSize: 13, fontWeight: 600, color: 'rgba(255,255,255,0.45)', fontFamily: DEVANAGARI }}>भावना है...</div>}
-                          <div style={{ fontSize: 16, fontWeight: 800, marginTop: 3 }}>
+                          {showEn && <div style={{ fontSize: 14, fontWeight: 700, color: 'rgba(255,255,255,0.45)' }}>The feeling is...</div>}
+                          {showHi && <div style={{ fontSize: 14, fontWeight: 600, color: 'rgba(255,255,255,0.45)', fontFamily: DEVANAGARI }}>भावना है...</div>}
+                          <div style={{ fontSize: 17.5, fontWeight: 800, marginTop: 3 }}>
                             {scenario.correctEmotion.emoji}{' '}
                             {showEn && scenario.correctEmotion.en}
                             {language === 'both' && ' · '}
                             {showHi && <span style={{ fontFamily: DEVANAGARI }}>{scenario.correctEmotion.hi}</span>}
                           </div>
-                          {showEn && <div style={{ fontSize: 13, fontWeight: 700, color: 'rgba(255,255,255,0.45)', marginTop: 6 }}>Because...</div>}
-                          {showHi && <div style={{ fontSize: 13, fontWeight: 600, color: 'rgba(255,255,255,0.45)', fontFamily: DEVANAGARI, marginTop: showEn ? 0 : 6 }}>क्योंकि...</div>}
-                          {showEn && <div style={{ fontSize: 13, fontWeight: 600, color: 'rgba(255,255,255,0.8)', lineHeight: 1.45, marginTop: 2 }}>{scenario.explanation_en}</div>}
-                          {showHi && <div style={{ fontSize: 13, fontWeight: 600, fontFamily: DEVANAGARI, color: showEn ? 'rgba(255,255,255,0.6)' : 'rgba(255,255,255,0.8)', lineHeight: 1.5, marginTop: 2 }}>{scenario.explanation_hi}</div>}
+                          {showEn && <div style={{ fontSize: 14, fontWeight: 700, color: 'rgba(255,255,255,0.45)', marginTop: 6 }}>Because...</div>}
+                          {showHi && <div style={{ fontSize: 14, fontWeight: 600, color: 'rgba(255,255,255,0.45)', fontFamily: DEVANAGARI, marginTop: showEn ? 0 : 6 }}>क्योंकि...</div>}
+                          {showEn && <div style={{ fontSize: 14, fontWeight: 600, color: 'rgba(255,255,255,0.8)', lineHeight: 1.45, marginTop: 2 }}>{scenario.explanation_en}</div>}
+                          {showHi && <div style={{ fontSize: 14, fontWeight: 600, fontFamily: DEVANAGARI, color: showEn ? 'rgba(255,255,255,0.6)' : 'rgba(255,255,255,0.8)', lineHeight: 1.5, marginTop: 2 }}>{scenario.explanation_hi}</div>}
                         </>
                       )}
                     </div>
@@ -994,7 +994,7 @@ export default function EmotionDetective({ sessionId, role, isLocked }: EmotionD
                 <button
                   onClick={handleNext}
                   style={{
-                    width: '100%', padding: '8px 20px', borderRadius: 50, cursor: 'pointer', fontSize: 14.5,
+                    width: '100%', padding: '8px 20px', borderRadius: 50, cursor: 'pointer', fontSize: 16,
                     fontWeight: 700, fontFamily: NUNITO, marginTop: 8,
                     background: 'rgba(74,124,111,0.22)', border: '1px solid rgba(74,124,111,0.45)', color: '#b8d4ce',
                     transition: 'all 0.15s',
@@ -1026,10 +1026,10 @@ export default function EmotionDetective({ sessionId, role, isLocked }: EmotionD
                   zIndex: 49, boxShadow: '0 12px 32px rgba(0,0,0,0.4)',
                 }}
               >
-                <div style={{ fontSize: 13, fontWeight: 800, color: '#a99cf0', marginBottom: 6 }}>💬 Ask the child</div>
+                <div style={{ fontSize: 14, fontWeight: 800, color: '#a99cf0', marginBottom: 6 }}>💬 Ask the child</div>
                 <ol style={{ margin: 0, paddingLeft: 16, display: 'flex', flexDirection: 'column', gap: 5 }}>
                   {FACILITATOR_QS.map((q, i) => (
-                    <li key={i} style={{ fontSize: 13, fontWeight: 600, color: 'rgba(255,255,255,0.75)', lineHeight: 1.4 }}>
+                    <li key={i} style={{ fontSize: 14, fontWeight: 600, color: 'rgba(255,255,255,0.75)', lineHeight: 1.4 }}>
                       <span style={{ display: 'block' }}>{q.en}</span>
                       <span style={{ display: 'block', fontFamily: DEVANAGARI, color: 'rgba(255,255,255,0.5)' }}>{q.hi}</span>
                     </li>
@@ -1044,7 +1044,7 @@ export default function EmotionDetective({ sessionId, role, isLocked }: EmotionD
             style={{
               position: 'fixed', bottom: 20, right: 20, width: 44, height: 44, borderRadius: '50%',
               background: 'rgba(107,92,231,0.9)', display: 'flex', alignItems: 'center', justifyContent: 'center',
-              fontSize: 20, cursor: 'pointer', zIndex: 50, boxShadow: '0 6px 20px rgba(107,92,231,0.4)', border: 'none',
+              fontSize: 21, cursor: 'pointer', zIndex: 50, boxShadow: '0 6px 20px rgba(107,92,231,0.4)', border: 'none',
             }}
           >
             💬

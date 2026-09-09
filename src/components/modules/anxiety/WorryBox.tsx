@@ -229,7 +229,7 @@ export default function WorryBox({ sessionId, role, isLocked }: WorryBoxProps) {
 
       {/* Therapist controls strip */}
       {isT && (
-        <div style={{ flexShrink: 0, padding: '6px 12px', borderBottom: '1px solid var(--glass-border)', display: 'flex', gap: 6, alignItems: 'center', fontSize: 12, flexWrap: 'wrap' }}>
+        <div style={{ flexShrink: 0, padding: '6px 12px', borderBottom: '1px solid var(--glass-border)', display: 'flex', gap: 6, alignItems: 'center', fontSize: 13, flexWrap: 'wrap' }}>
           <label style={{ display: 'flex', alignItems: 'center', gap: 4, color: 'rgba(255,255,255,0.5)', cursor: 'pointer' }}>
             <input type="checkbox" checked={guidedMode} onChange={e => write({ 'moduleState.wbGuidedMode': e.target.checked })} style={{ accentColor: '#4a7c6f' }} />
             Guided
@@ -239,7 +239,7 @@ export default function WorryBox({ sessionId, role, isLocked }: WorryBoxProps) {
             Anonymous
           </label>
           <button onClick={clearAll}
-            style={{ marginLeft: 'auto', padding: '3px 8px', borderRadius: 4, border: '1px solid rgba(200,60,60,0.3)', background: 'transparent', color: 'rgba(200,80,80,0.7)', cursor: 'pointer', fontSize: 12 }}
+            style={{ marginLeft: 'auto', padding: '3px 8px', borderRadius: 4, border: '1px solid rgba(200,60,60,0.3)', background: 'transparent', color: 'rgba(200,80,80,0.7)', cursor: 'pointer', fontSize: 13 }}
           >Clear all</button>
         </div>
       )}
@@ -250,7 +250,7 @@ export default function WorryBox({ sessionId, role, isLocked }: WorryBoxProps) {
         {/* VIEW A — Input */}
         {showViewA && (
           <div style={{ display: 'flex', flexDirection: 'column', flex: 1, gap: 12 }}>
-            <div style={{ fontSize: 18.5, fontFamily: '"DM Serif Display", serif', fontStyle: 'italic', color: 'rgba(255,255,255,0.85)', textAlign: 'center', marginBottom: 4 }}>
+            <div style={{ fontSize: 19.5, fontFamily: '"DM Serif Display", serif', fontStyle: 'italic', color: 'rgba(255,255,255,0.85)', textAlign: 'center', marginBottom: 4 }}>
               {guidedMode && isT ? 'What is your child worried about?' : "What's worrying you right now?"}
             </div>
             {inputVisible && (
@@ -262,20 +262,20 @@ export default function WorryBox({ sessionId, role, isLocked }: WorryBoxProps) {
                     style={{
                       width: '100%', minHeight: 80, background: 'rgba(255,255,240,0.07)',
                       border: '1.5px solid rgba(255,255,200,0.2)', borderRadius: 10,
-                      padding: '12px 14px', fontFamily: '"DM Sans", sans-serif', fontSize: 15,
+                      padding: '12px 14px', fontFamily: '"DM Sans", sans-serif', fontSize: 16.5,
                       color: 'rgba(255,255,255,0.85)', resize: 'none', outline: 'none',
                     }}
                     onFocus={e => { e.target.style.borderColor = 'rgba(255,255,200,0.4)' }}
                     onBlur={e => { e.target.style.borderColor = 'rgba(255,255,200,0.2)' }}
                   />
-                  <div style={{ position: 'absolute', bottom: 6, right: 8, fontSize: 11.5, color: 'rgba(255,255,255,0.25)' }}>
+                  <div style={{ position: 'absolute', bottom: 6, right: 8, fontSize: 13, color: 'rgba(255,255,255,0.25)' }}>
                     {text.length}/{MAX_CHARS}
                   </div>
                 </div>
                 <button onClick={addWorry}
                   disabled={!canAdd}
                   style={{
-                    padding: '10px 0', borderRadius: 8, width: '100%', fontSize: 15, cursor: canAdd ? 'pointer' : 'default',
+                    padding: '10px 0', borderRadius: 8, width: '100%', fontSize: 16.5, cursor: canAdd ? 'pointer' : 'default',
                     background: canAdd ? 'rgba(74,124,111,0.3)' : 'rgba(255,255,255,0.04)',
                     border: canAdd ? '1px solid rgba(74,124,111,0.4)' : '1px solid rgba(255,255,255,0.08)',
                     color: canAdd ? '#b8d4ce' : 'rgba(255,255,255,0.25)',
@@ -285,7 +285,7 @@ export default function WorryBox({ sessionId, role, isLocked }: WorryBoxProps) {
               </>
             )}
             {!inputVisible && (
-              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', flex: 1, color: 'rgba(255,255,255,0.3)', fontSize: 15 }}>
+              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', flex: 1, color: 'rgba(255,255,255,0.3)', fontSize: 16.5 }}>
                 {isT ? 'Waiting for client input...' : 'Waiting for therapist...'}
               </div>
             )}
@@ -304,13 +304,13 @@ export default function WorryBox({ sessionId, role, isLocked }: WorryBoxProps) {
                     transition: 'transform 0.3s ease',
                     transform: lidAnim ? 'rotateX(-60deg)' : 'rotateX(0deg)',
                   }} />
-                  <div style={{ position: 'absolute', inset: 0, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 18.5 }}>
+                  <div style={{ position: 'absolute', inset: 0, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 19.5 }}>
                     {worries.length > 0 ? '🔒' : '🗃️'}
                   </div>
                   {worries.length > 0 && (
                     <div style={{
                       position: 'absolute', top: -8, right: -8,
-                      background: '#c8602a', color: '#fff', fontSize: 12, fontWeight: 700,
+                      background: '#c8602a', color: '#fff', fontSize: 13, fontWeight: 700,
                       minWidth: 18, height: 18, borderRadius: 9, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '0 4px',
                     }}>
                       {worries.length}
@@ -318,7 +318,7 @@ export default function WorryBox({ sessionId, role, isLocked }: WorryBoxProps) {
                   )}
                 </div>
               </div>
-              <div style={{ fontSize: 13, color: 'rgba(255,255,255,0.4)' }}>Worry Box</div>
+              <div style={{ fontSize: 14, color: 'rgba(255,255,255,0.4)' }}>Worry Box</div>
             </div>
           </div>
         )}
@@ -338,25 +338,25 @@ export default function WorryBox({ sessionId, role, isLocked }: WorryBoxProps) {
                   transition: 'transform 0.3s ease',
                   transform: lidOpen ? 'rotateX(-60deg)' : 'rotateX(0deg)',
                 }} />
-                <div style={{ position: 'absolute', inset: 0, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 26.5 }}>🔒</div>
+                <div style={{ position: 'absolute', inset: 0, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 28 }}>🔒</div>
                 <div style={{
                   position: 'absolute', top: -10, right: -10,
-                  background: '#c8602a', color: '#fff', fontSize: 15, fontWeight: 700,
+                  background: '#c8602a', color: '#fff', fontSize: 16.5, fontWeight: 700,
                   minWidth: 24, height: 24, borderRadius: 12, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '0 6px',
                 }}>
                   {worries.length}
                 </div>
               </div>
             </div>
-            <div style={{ fontStyle: 'italic', fontSize: 15, color: 'rgba(255,255,255,0.5)', textAlign: 'center' }}>
+            <div style={{ fontStyle: 'italic', fontSize: 16.5, color: 'rgba(255,255,255,0.5)', textAlign: 'center' }}>
               Your worries are safely locked away
             </div>
             <button onClick={goAddWorry}
-              style={{ padding: '8px 24px', borderRadius: 8, border: '1px solid rgba(255,255,255,0.12)', background: 'rgba(255,255,255,0.07)', color: 'rgba(255,255,255,0.7)', cursor: 'pointer', fontSize: 14.5 }}
+              style={{ padding: '8px 24px', borderRadius: 8, border: '1px solid rgba(255,255,255,0.12)', background: 'rgba(255,255,255,0.07)', color: 'rgba(255,255,255,0.7)', cursor: 'pointer', fontSize: 16 }}
             >Add another worry</button>
             {isT && (
               <button onClick={openBox}
-                style={{ padding: '8px 24px', borderRadius: 8, border: '1px solid rgba(74,124,111,0.3)', background: 'rgba(74,124,111,0.2)', color: '#b8d4ce', cursor: 'pointer', fontSize: 14.5 }}
+                style={{ padding: '8px 24px', borderRadius: 8, border: '1px solid rgba(74,124,111,0.3)', background: 'rgba(74,124,111,0.2)', color: '#b8d4ce', cursor: 'pointer', fontSize: 16 }}
               >Open box</button>
             )}
           </div>
@@ -365,7 +365,7 @@ export default function WorryBox({ sessionId, role, isLocked }: WorryBoxProps) {
         {/* VIEW C — Review */}
         {showViewC && (
           <div style={{ display: 'flex', flexDirection: 'column', flex: 1, gap: 8, overflow: 'hidden' }}>
-            <div style={{ fontSize: 17, fontFamily: '"DM Serif Display", serif', color: 'rgba(255,255,255,0.85)', textAlign: 'center' }}>
+            <div style={{ fontSize: 18.5, fontFamily: '"DM Serif Display", serif', color: 'rgba(255,255,255,0.85)', textAlign: 'center' }}>
               📬 Opening the Worry Box together
             </div>
 
@@ -382,7 +382,7 @@ export default function WorryBox({ sessionId, role, isLocked }: WorryBoxProps) {
                     transition: 'transform 0.3s ease',
                     transform: lidOpen ? 'rotateX(-60deg)' : 'rotateX(0deg)',
                   }} />
-                  <div style={{ position: 'absolute', inset: 0, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 18.5 }}>📬</div>
+                  <div style={{ position: 'absolute', inset: 0, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 19.5 }}>📬</div>
                 </div>
               </div>
             </div>
@@ -391,9 +391,9 @@ export default function WorryBox({ sessionId, role, isLocked }: WorryBoxProps) {
             <div style={{ flex: 1, overflowY: 'auto', minHeight: 0, paddingRight: 4 }}>
               {worries.length === 0 && (
                 <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', height: '100%', gap: 8 }}>
-                  <div style={{ fontSize: 18.5, fontFamily: '"DM Serif Display", serif', color: 'rgba(255,255,255,0.8)' }}>✨ All worries released!</div>
+                  <div style={{ fontSize: 19.5, fontFamily: '"DM Serif Display", serif', color: 'rgba(255,255,255,0.8)' }}>✨ All worries released!</div>
                   <div style={{ width: 60, height: 60, borderRadius: '50%', border: '2px solid rgba(74,124,111,0.4)', animation: 'breathing 4s ease-in-out infinite' }} />
-                  <div style={{ fontSize: 14.5, color: 'rgba(255,255,255,0.4)', textAlign: 'center' }}>Well done for facing your worries today</div>
+                  <div style={{ fontSize: 16, color: 'rgba(255,255,255,0.4)', textAlign: 'center' }}>Well done for facing your worries today</div>
                 </div>
               )}
               {worries.map((w, i) => {
@@ -402,7 +402,7 @@ export default function WorryBox({ sessionId, role, isLocked }: WorryBoxProps) {
                   <div key={w.id}
                     style={{
                       background: w.color, border: '1px solid rgba(255,255,200,0.15)', borderRadius: 8,
-                      padding: '10px 14px', marginBottom: 8, fontSize: 14.5, color: 'rgba(255,255,255,0.8)',
+                      padding: '10px 14px', marginBottom: 8, fontSize: 16, color: 'rgba(255,255,255,0.8)',
                       position: 'relative',
                       animation: enteringReview ? `nr 0.3s ease forwards ${i * REVEAL_INTERVAL}ms` : 'none',
                       opacity: enteringReview ? 0 : 1,
@@ -420,13 +420,13 @@ export default function WorryBox({ sessionId, role, isLocked }: WorryBoxProps) {
                         <div style={{ display: 'flex', gap: 4, flexShrink: 0 }}>
                           <button onClick={() => toggleKept(w.id)}
                             style={{
-                              padding: '4px 8px', borderRadius: 4, fontSize: 12, cursor: 'pointer',
+                              padding: '4px 8px', borderRadius: 4, fontSize: 13, cursor: 'pointer',
                               background: 'rgba(74,124,111,0.2)', border: '1px solid rgba(74,124,111,0.3)', color: '#b8d4ce',
                             }}
                           >{w.kept ? '📌 Kept' : 'Keep 📌'}</button>
                           <button onClick={() => tearUp(w.id, w.text)}
                             style={{
-                              padding: '4px 8px', borderRadius: 4, fontSize: 12, cursor: 'pointer',
+                              padding: '4px 8px', borderRadius: 4, fontSize: 13, cursor: 'pointer',
                               background: 'rgba(200,60,60,0.15)', border: '1px solid rgba(200,60,60,0.25)', color: 'rgba(200,80,80,0.8)',
                             }}
                           >Let go 🌬️</button>
@@ -443,10 +443,10 @@ export default function WorryBox({ sessionId, role, isLocked }: WorryBoxProps) {
               {isT && (
                 <>
                   <button onClick={closeBox}
-                    style={{ flex: 1, padding: '6px 0', borderRadius: 6, border: '1px solid rgba(255,255,255,0.1)', background: 'transparent', color: 'rgba(255,255,255,0.5)', cursor: 'pointer', fontSize: 13 }}
+                    style={{ flex: 1, padding: '6px 0', borderRadius: 6, border: '1px solid rgba(255,255,255,0.1)', background: 'transparent', color: 'rgba(255,255,255,0.5)', cursor: 'pointer', fontSize: 14 }}
                   >Close box</button>
                   <button onClick={saveSessionNotes}
-                    style={{ flex: 1, padding: '6px 0', borderRadius: 6, border: '1px solid rgba(74,124,111,0.3)', background: 'rgba(74,124,111,0.15)', color: '#b8d4ce', cursor: 'pointer', fontSize: 13 }}
+                    style={{ flex: 1, padding: '6px 0', borderRadius: 6, border: '1px solid rgba(74,124,111,0.3)', background: 'rgba(74,124,111,0.15)', color: '#b8d4ce', cursor: 'pointer', fontSize: 14 }}
                   >End session summary</button>
                 </>
               )}
@@ -459,7 +459,7 @@ export default function WorryBox({ sessionId, role, isLocked }: WorryBoxProps) {
           <div style={{
             position: 'absolute', top: flyingNote.top, left: flyingNote.left, width: flyingNote.width,
             background: flyingNote.color, border: '1px solid rgba(255,255,200,0.25)', borderRadius: 8,
-            padding: '10px 12px', fontSize: 14.5, color: 'rgba(255,255,255,0.8)',
+            padding: '10px 12px', fontSize: 16, color: 'rgba(255,255,255,0.8)',
             boxShadow: '0 4px 12px rgba(0,0,0,0.2)', zIndex: 30, pointerEvents: 'none',
             animation: 'ntb 0.7s ease-in forwards',
           }}>
@@ -473,7 +473,7 @@ export default function WorryBox({ sessionId, role, isLocked }: WorryBoxProps) {
         <div style={{
           position: 'absolute', top: '50%', left: '50%', transform: 'translate(-50%,-50%)',
           background: 'rgba(0,0,0,0.6)', backdropFilter: 'blur(8px)', borderRadius: 10,
-          padding: '8px 16px', color: '#fff', fontSize: 15, zIndex: 100, pointerEvents: 'none',
+          padding: '8px 16px', color: '#fff', fontSize: 16.5, zIndex: 100, pointerEvents: 'none',
         }}>
           {toast.msg}
         </div>

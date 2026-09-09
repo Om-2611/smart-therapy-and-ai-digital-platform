@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useEffect, useCallback, useRef } from 'react'
+import { useState, useEffect, useCallback, useMemo, useRef } from 'react'
 import type { CSSProperties } from 'react'
 import { doc, onSnapshot, setDoc } from 'firebase/firestore'
 import {
@@ -241,6 +241,16 @@ export default function MicroQuestBoard({ sessionId, role, isLocked }: MicroQues
     touchMoved.current = false
   }
 
+  /* Quests still open per difficulty. Derived straight from `quests`, so it
+     re-counts on every add, delete, completion and drag-to-re-label without any
+     bookkeeping of its own. Completed quests are excluded: they are no longer
+     available to pick up. */
+  const availableByEffort = useMemo(() => {
+    const acc: Record<Effort, number> = { Easy: 0, Medium: 0, Hard: 0 }
+    for (const q of quests) if (!q.completed) acc[q.effort] += 1
+    return acc
+  }, [quests])
+
   const completedCount = quests.filter(q => q.completed).length
   const momentum = quests.length ? Math.round((completedCount / quests.length) * 100) : 0
   const dragQuest = dragId ? quests.find(q => q.id === dragId) : undefined
@@ -309,7 +319,7 @@ export default function MicroQuestBoard({ sessionId, role, isLocked }: MicroQues
           {!clientId && (
             <div style={{
               padding: '10px 16px 12px', borderTop: `1px solid ${LINE}`,
-              fontSize: 14.5, fontWeight: 600, color: INK_FAINT,
+              fontSize: 16, fontWeight: 600, color: INK_FAINT,
             }}>
               Waiting for the client to join…
             </div>
@@ -326,7 +336,7 @@ export default function MicroQuestBoard({ sessionId, role, isLocked }: MicroQues
             <span style={{
               padding: '4px 12px', borderRadius: 999,
               background: '#EEF4FF', border: '1px solid #DBE6FB',
-              color: '#2563EB', fontSize: 15, fontWeight: 800,
+              color: '#2563EB', fontSize: 16.5, fontWeight: 800,
               fontVariantNumeric: 'tabular-nums', whiteSpace: 'nowrap',
             }}>
               {completedCount}/{quests.length}
@@ -340,7 +350,7 @@ export default function MicroQuestBoard({ sessionId, role, isLocked }: MicroQues
                 style={{
                   width: '100%', padding: '13px 16px', borderRadius: 12, border: 'none',
                   background: GREEN_SOLID, color: '#ffffff',
-                  fontSize: 16.5, fontWeight: 700, fontFamily: '"DM Sans", sans-serif',
+                  fontSize: 18, fontWeight: 700, fontFamily: '"DM Sans", sans-serif',
                   display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 9,
                   cursor: 'pointer', boxShadow: '0 5px 14px rgba(31,122,68,0.22)',
                 }}
@@ -370,7 +380,7 @@ export default function MicroQuestBoard({ sessionId, role, isLocked }: MicroQues
           <div style={{ display: 'flex', gap: 14 }}>
             {EFFORTS.map(key => {
               const spec = EFFORT_SPEC[key]
-              const count = quests.filter(q => q.effort === key).length
+              const count = availableByEffort[key]
               const over = dragOver === key
               const selected = isT && effort === key && !dragOver
               const active = over || selected
@@ -403,7 +413,7 @@ export default function MicroQuestBoard({ sessionId, role, isLocked }: MicroQues
                       position: 'absolute', top: 10, right: 10,
                       minWidth: 22, padding: '2px 7px', borderRadius: 999,
                       background: '#ffffff', border: `1px solid ${spec.accent}`,
-                      color: spec.accent, fontSize: 13, fontWeight: 800, lineHeight: 1.5,
+                      color: spec.accent, fontSize: 14, fontWeight: 800, lineHeight: 1.5,
                       fontVariantNumeric: 'tabular-nums',
                     }}>{count}</span>
                   )}
@@ -415,11 +425,19 @@ export default function MicroQuestBoard({ sessionId, role, isLocked }: MicroQues
                   }}>
                     <Icon size={21} color={spec.accent} strokeWidth={2.1} />
                   </span>
-                  <div style={{ fontSize: 21, fontWeight: 800, letterSpacing: -0.3, color: spec.accent, lineHeight: 1.2 }}>
+                  <div style={{ fontSize: 22.5, fontWeight: 800, letterSpacing: -0.3, color: spec.accent, lineHeight: 1.2 }}>
                     {key}
                   </div>
-                  <div style={{ fontSize: 14, fontWeight: 500, color: INK_MUTED, textAlign: 'center' }}>
+                  <div style={{ fontSize: 15.5, fontWeight: 500, color: INK_MUTED, textAlign: 'center' }}>
                     {spec.sub}
+                  </div>
+                  {/* The corner badge is a bare number with nothing saying what
+                      it counts, so the same figure is spelled out here. */}
+                  <div style={{
+                    fontSize: 15, fontWeight: 700, color: spec.accent, textAlign: 'center',
+                    fontVariantNumeric: 'tabular-nums',
+                  }}>
+                    {count} Quest{count === 1 ? '' : 's'} Available
                   </div>
 
                   <div style={{
@@ -432,7 +450,7 @@ export default function MicroQuestBoard({ sessionId, role, isLocked }: MicroQues
                   }}>
                     <Pointer size={17} color={over ? spec.accent : INK_FAINT} strokeWidth={2} />
                     <span style={{
-                      fontSize: 14, fontWeight: over ? 700 : 500,
+                      fontSize: 15.5, fontWeight: over ? 700 : 500,
                       color: over ? spec.accent : INK_MUTED, textAlign: 'center',
                     }}>
                       {over ? `Drop to make it ${key}` : 'Drag & drop quests here'}
@@ -470,7 +488,7 @@ export default function MicroQuestBoard({ sessionId, role, isLocked }: MicroQues
           {quests.length === 0 && (
             <div style={{
               gridColumn: '1 / -1', padding: '26px 0', textAlign: 'center',
-              fontSize: 15, fontWeight: 500, color: INK_FAINT,
+              fontSize: 16.5, fontWeight: 500, color: INK_FAINT,
             }}>
               {isT ? 'No quests yet — add one above to start the board.' : 'No quests yet — your therapist will add one.'}
             </div>
@@ -517,14 +535,14 @@ export default function MicroQuestBoard({ sessionId, role, isLocked }: MicroQues
 
                   <div style={{ flex: 1, minWidth: 0 }}>
                     <div style={{
-                      fontSize: 15, fontWeight: 600, lineHeight: 1.35,
+                      fontSize: 16.5, fontWeight: 600, lineHeight: 1.35,
                       color: q.completed ? INK_FAINT : INK_BODY,
                       textDecoration: q.completed ? 'line-through' : 'none',
                       wordBreak: 'break-word',
                     }}>
                       {q.text}
                     </div>
-                    <div style={{ marginTop: 4, fontSize: 13, fontWeight: 800, color: spec.accent, letterSpacing: 0.1 }}>
+                    <div style={{ marginTop: 4, fontSize: 14, fontWeight: 800, color: spec.accent, letterSpacing: 0.1 }}>
                       {q.effort}
                     </div>
                   </div>
@@ -583,7 +601,7 @@ export default function MicroQuestBoard({ sessionId, role, isLocked }: MicroQues
                     value={q.therapistNote}
                     onChange={e => setNote(q.id, e.target.value)}
                     onBlur={() => persist(quests)}
-                    style={{ ...inputStyle, fontSize: 14, padding: '8px 10px' }}
+                    style={{ ...inputStyle, fontSize: 15.5, padding: '8px 10px' }}
                   />
                 )}
               </div>
@@ -600,7 +618,7 @@ export default function MicroQuestBoard({ sessionId, role, isLocked }: MicroQues
           maxWidth: 200, padding: '9px 12px', borderRadius: 12,
           background: '#ffffff', border: `1.5px solid ${GREEN_ACCENT}`,
           boxShadow: '0 10px 24px rgba(20,30,45,0.18)',
-          fontSize: 14.5, fontWeight: 600, color: INK_BODY,
+          fontSize: 16, fontWeight: 600, color: INK_BODY,
           whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis',
         }}>
           {dragQuest.text}
@@ -621,11 +639,11 @@ const badgeSquare = (bg: string, border: string): CSSProperties => ({
 })
 
 const rowTitle: CSSProperties = {
-  fontSize: 16.5, fontWeight: 800, letterSpacing: -0.2, lineHeight: 1.25, color: INK,
+  fontSize: 18, fontWeight: 800, letterSpacing: -0.2, lineHeight: 1.25, color: INK,
 }
 
 const rowSub: CSSProperties = {
-  fontSize: 15, fontWeight: 500, lineHeight: 1.35, color: INK_MUTED, marginTop: 3,
+  fontSize: 16.5, fontWeight: 500, lineHeight: 1.35, color: INK_MUTED, marginTop: 3,
 }
 
 const accentBar: CSSProperties = {
@@ -633,31 +651,31 @@ const accentBar: CSSProperties = {
 }
 
 const sectionTitle: CSSProperties = {
-  fontSize: 18.5, fontWeight: 800, letterSpacing: -0.3, color: INK, whiteSpace: 'nowrap',
+  fontSize: 19.5, fontWeight: 800, letterSpacing: -0.3, color: INK, whiteSpace: 'nowrap',
 }
 
 const inputStyle: CSSProperties = {
   flex: 1, minWidth: 0, width: '100%', boxSizing: 'border-box',
   background: '#ffffff', border: `1px solid ${LINE}`, borderRadius: 10,
-  padding: '10px 12px', fontSize: 15, color: INK_BODY, outline: 'none',
+  padding: '10px 12px', fontSize: 16.5, color: INK_BODY, outline: 'none',
   fontFamily: '"DM Sans", sans-serif', transition: 'border-color .15s, box-shadow .15s',
 }
 
 const chipBtn: CSSProperties = {
   padding: '10px 18px', borderRadius: 10, border: 'none', flexShrink: 0,
-  background: GREEN_SOLID, color: '#ffffff', fontSize: 15, fontWeight: 700,
+  background: GREEN_SOLID, color: '#ffffff', fontSize: 16.5, fontWeight: 700,
   fontFamily: '"DM Sans", sans-serif', cursor: 'pointer', whiteSpace: 'nowrap',
 }
 
 const ghostBtn: CSSProperties = {
   padding: '7px 13px', borderRadius: 999, border: `1px solid ${LINE}`,
-  background: '#ffffff', fontSize: 14.5, fontWeight: 700,
+  background: '#ffffff', fontSize: 16, fontWeight: 700,
   fontFamily: '"DM Sans", sans-serif', cursor: 'pointer', whiteSpace: 'nowrap', flexShrink: 0,
 }
 
 const menuBtn: CSSProperties = {
   display: 'inline-flex', alignItems: 'center', gap: 6,
   padding: '6px 11px', borderRadius: 999, border: `1px solid ${LINE}`,
-  background: '#ffffff', fontSize: 14, fontWeight: 700,
+  background: '#ffffff', fontSize: 15.5, fontWeight: 700,
   fontFamily: '"DM Sans", sans-serif', cursor: 'pointer', whiteSpace: 'nowrap',
 }

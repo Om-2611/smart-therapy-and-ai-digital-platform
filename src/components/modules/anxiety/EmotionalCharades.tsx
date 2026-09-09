@@ -548,7 +548,7 @@ export default function EmotionalCharades({ sessionId, role, isLocked }: Emotion
     border: `1px solid ${active ? GREEN_LINE : LINE}`,
     background: active ? GREEN_SOFT : '#ffffff',
     color: active ? GREEN : INK,
-    fontSize: 15,
+    fontSize: 16.5,
     fontWeight: 700,
     lineHeight: 1.1,
     cursor: 'pointer',
@@ -564,7 +564,7 @@ export default function EmotionalCharades({ sessionId, role, isLocked }: Emotion
     border: `1px solid ${active ? GREEN : GREEN_LINE}`,
     background: active ? GREEN : '#ffffff',
     color: active ? '#ffffff' : GREEN,
-    fontSize: 14.5,
+    fontSize: 16,
     fontWeight: 700,
     lineHeight: 1.1,
     cursor: 'pointer',
@@ -583,7 +583,7 @@ export default function EmotionalCharades({ sessionId, role, isLocked }: Emotion
     border: `1px solid ${LINE}`,
     background: '#ffffff',
     color: INK,
-    fontSize: 15.5,
+    fontSize: 17,
     fontWeight: 700,
     cursor: 'pointer',
     boxShadow: '0 1px 3px rgba(20,30,40,0.06)',
@@ -642,7 +642,7 @@ export default function EmotionalCharades({ sessionId, role, isLocked }: Emotion
               setFeedback(null)
               writeToFirestore({ 'moduleState.ecMode': 'identify', 'moduleState.ecExpressPool': [], 'moduleState.ecCurrentCard': '', 'moduleState.ecExpressGuess': '' })
             }} style={segPill(mode === 'identify')}>
-              <span style={{ fontSize: 16 }}>🔍</span> Identify
+              <span style={{ fontSize: 17.5 }}>🔍</span> Identify
             </button>
             <button onClick={() => {
               setMode('express')
@@ -653,7 +653,7 @@ export default function EmotionalCharades({ sessionId, role, isLocked }: Emotion
               setFeedback(null)
               writeToFirestore({ 'moduleState.ecMode': 'express', 'moduleState.ecExpressPool': [], 'moduleState.ecCurrentCard': '', 'moduleState.ecExpressGuess': '' })
             }} style={segPill(mode === 'express')}>
-              <span style={{ fontSize: 16 }}>🎭</span> Express
+              <span style={{ fontSize: 17.5 }}>🎭</span> Express
             </button>
             <span style={{ width: 1, height: 20, background: 'var(--glass-border)', margin: '0 4px' }} />
             {(['simple', 'standard', 'advanced'] as const).map(d => (
@@ -670,7 +670,7 @@ export default function EmotionalCharades({ sessionId, role, isLocked }: Emotion
 
           {/* Categories */}
           <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', alignItems: 'center' }}>
-            <span style={{ fontSize: 14.5, fontWeight: 700, color: 'var(--ink-muted)', marginRight: 2 }}>Categories:</span>
+            <span style={{ fontSize: 16, fontWeight: 700, color: 'var(--ink-muted)', marginRight: 2 }}>Categories:</span>
             <button onClick={() => {
               const all = categories.length === 4
               const next = all ? [] : ['basic', 'complex', 'therapy', 'scenario']
@@ -722,10 +722,10 @@ export default function EmotionalCharades({ sessionId, role, isLocked }: Emotion
             display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center',
             padding: 20, borderRadius: 24,
           }}>
-            <div style={{ fontSize: 22, fontWeight: 800, color: INK, marginBottom: 4, letterSpacing: -0.3 }}>
+            <div style={{ fontSize: 23.5, fontWeight: 800, color: INK, marginBottom: 4, letterSpacing: -0.3 }}>
               How are you feeling right now?
             </div>
-            <div style={{ fontSize: 15, color: 'var(--ink-muted)', marginBottom: 16 }}>
+            <div style={{ fontSize: 16.5, color: 'var(--ink-muted)', marginBottom: 16 }}>
               Tap the face that fits best.
             </div>
             <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 10 }}>
@@ -738,7 +738,7 @@ export default function EmotionalCharades({ sessionId, role, isLocked }: Emotion
                   background: '#ffffff',
                   boxShadow: '0 2px 8px rgba(20,30,40,0.06)',
                   cursor: 'pointer',
-                  fontSize: 29.5,
+                  fontSize: 31.5,
                   display: 'flex',
                   alignItems: 'center',
                   justifyContent: 'center',
@@ -749,7 +749,7 @@ export default function EmotionalCharades({ sessionId, role, isLocked }: Emotion
               ))}
             </div>
             {isTherapist && (
-              <button onClick={() => setShowCheckIn(false)} style={{ ...ghostBtn, marginTop: 16, padding: '8px 20px', fontSize: 15 }}>
+              <button onClick={() => setShowCheckIn(false)} style={{ ...ghostBtn, marginTop: 16, padding: '8px 20px', fontSize: 16.5 }}>
                 Cancel
               </button>
             )}
@@ -771,23 +771,23 @@ export default function EmotionalCharades({ sessionId, role, isLocked }: Emotion
               }}
             >
               <CardStackIcon s={54} fill={GREEN} ink={CARD_CREAM} />
-              <span style={{ fontSize: 17, fontWeight: 800, color: INK, letterSpacing: -0.2 }}>
+              <span style={{ fontSize: 18.5, fontWeight: 800, color: INK, letterSpacing: -0.2 }}>
                 {isTherapist ? 'Draw card' : 'Card deck'}
               </span>
             </button>
-            <div style={{ textAlign: 'center', fontSize: 15, color: 'var(--ink-muted)', marginTop: 2 }}>
+            <div style={{ textAlign: 'center', fontSize: 16.5, color: 'var(--ink-muted)', marginTop: 2 }}>
               {deckLeft} / {deckTotal} cards
             </div>
 
             {isTherapist && (
-              <button onClick={() => setShowCheckIn(true)} className="ec-hover" style={{ ...ghostBtn, width: '100%', marginTop: 12, padding: '9px 10px', fontSize: 15 }}>
+              <button onClick={() => setShowCheckIn(true)} className="ec-hover" style={{ ...ghostBtn, width: '100%', marginTop: 12, padding: '9px 10px', fontSize: 16.5 }}>
                 <MessageCircle size={15} strokeWidth={2.2} color={GREEN} /> Check in
               </button>
             )}
 
             <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginTop: 12, flexWrap: 'wrap', justifyContent: 'center' }}>
-              <span style={{ fontSize: 14.5, fontWeight: 700, color: GREEN }}>✓ {score} correct</span>
-              <span style={{ fontSize: 14.5, color: 'var(--ink-muted)' }}>📋 {cardsPlayed} cards</span>
+              <span style={{ fontSize: 16, fontWeight: 700, color: GREEN }}>✓ {score} correct</span>
+              <span style={{ fontSize: 16, color: 'var(--ink-muted)' }}>📋 {cardsPlayed} cards</span>
             </div>
 
             {answerHistory.length > 0 && (
@@ -804,7 +804,7 @@ export default function EmotionalCharades({ sessionId, role, isLocked }: Emotion
                       display: 'flex',
                       alignItems: 'center',
                       justifyContent: 'center',
-                      fontSize: 14.5,
+                      fontSize: 16,
                       background: '#ffffff',
                       position: 'relative',
                     }}>
@@ -813,7 +813,7 @@ export default function EmotionalCharades({ sessionId, role, isLocked }: Emotion
                         position: 'absolute',
                         top: -5,
                         right: -4,
-                        fontSize: 10.5,
+                        fontSize: 12,
                         color: a.correct ? GREEN : '#DB5A55',
                         fontWeight: 800,
                       }}>
@@ -849,7 +849,7 @@ export default function EmotionalCharades({ sessionId, role, isLocked }: Emotion
           {!currentCardId && (
             <>
               <TheatreMasks w={136} />
-              <div style={{ fontSize: 36, fontWeight: 800, color: INK, letterSpacing: -1, lineHeight: 1.1 }}>
+              <div style={{ fontSize: 37, fontWeight: 800, color: INK, letterSpacing: -1, lineHeight: 1.1 }}>
                 Ready to Play?
               </div>
               {mode === 'express' && expressPool.length > 0 ? (
@@ -858,7 +858,7 @@ export default function EmotionalCharades({ sessionId, role, isLocked }: Emotion
                    grid, same emoji, as the answer row below. */
                 isExpressChooser ? (
                   <>
-                    <div style={{ fontSize: 18, color: INK_SOFT, lineHeight: 1.5, textAlign: 'center', maxWidth: 460 }}>
+                    <div style={{ fontSize: 19, color: INK_SOFT, lineHeight: 1.5, textAlign: 'center', maxWidth: 460 }}>
                       Pick how you are feeling.<br />
                       Keep it to yourself and act it out — no words!
                     </div>
@@ -885,7 +885,7 @@ export default function EmotionalCharades({ sessionId, role, isLocked }: Emotion
                             boxShadow: '0 2px 8px rgba(20,30,40,0.06)',
                             cursor: canInteract ? 'pointer' : 'not-allowed',
                             opacity: canInteract ? 1 : 0.55,
-                            fontSize: 29.5,
+                            fontSize: 31.5,
                             display: 'flex',
                             alignItems: 'center',
                             justifyContent: 'center',
@@ -898,13 +898,13 @@ export default function EmotionalCharades({ sessionId, role, isLocked }: Emotion
                     </div>
                   </>
                 ) : (
-                  <div style={{ fontSize: 17, color: INK_SOFT, lineHeight: 1.5, textAlign: 'center', maxWidth: 420 }}>
+                  <div style={{ fontSize: 18.5, color: INK_SOFT, lineHeight: 1.5, textAlign: 'center', maxWidth: 420 }}>
                     Waiting for {expressSubMode === 'child-acts' ? 'the client' : 'the therapist'} to choose an emotion…
                   </div>
                 )
               ) : isTherapist ? (
                 <>
-                  <div style={{ fontSize: 18, color: INK_SOFT, lineHeight: 1.5, textAlign: 'center', maxWidth: 460 }}>
+                  <div style={{ fontSize: 19, color: INK_SOFT, lineHeight: 1.5, textAlign: 'center', maxWidth: 460 }}>
                     {mode === 'express'
                       ? <>Click “Start Round” to lay out the emotions.<br />The other person picks how they feel and acts it out!</>
                       : <>Click “Draw Card” to get a new emotion.<br />Act it out and let the other person guess!</>}
@@ -917,7 +917,7 @@ export default function EmotionalCharades({ sessionId, role, isLocked }: Emotion
                     border: 'none',
                     background: GREEN,
                     color: '#ffffff',
-                    fontSize: 23,
+                    fontSize: 24.5,
                     fontWeight: 800,
                     letterSpacing: -0.3,
                     cursor: 'pointer',
@@ -936,7 +936,7 @@ export default function EmotionalCharades({ sessionId, role, isLocked }: Emotion
                   </div>
                 </>
               ) : (
-                <div style={{ fontSize: 17, color: INK_SOFT, lineHeight: 1.5, textAlign: 'center', maxWidth: 420 }}>
+                <div style={{ fontSize: 18.5, color: INK_SOFT, lineHeight: 1.5, textAlign: 'center', maxWidth: 420 }}>
                   Waiting for your therapist to {mode === 'express' ? 'start a round' : 'draw a card'}…
                 </div>
               )}
@@ -958,14 +958,14 @@ export default function EmotionalCharades({ sessionId, role, isLocked }: Emotion
                   textAlign: 'center',
                   animation: 'ecCardFlip 0.35s ease',
                 }}>
-                  <div style={{ fontSize: 49, marginBottom: 6, lineHeight: 1 }}>❓</div>
-                  <div style={{ fontSize: 16, color: INK_SOFT, fontStyle: 'italic' }}>
+                  <div style={{ fontSize: 50.5, marginBottom: 6, lineHeight: 1 }}>❓</div>
+                  <div style={{ fontSize: 17.5, color: INK_SOFT, fontStyle: 'italic' }}>
                     {expressSubMode === 'child-acts'
                       ? 'Watch the webcam — what emotion is it?'
                       : 'Watch the therapist — what feeling is it?'}
                   </div>
                   {!expressAnswered && (
-                    <div style={{ fontSize: 15, color: 'var(--ink-muted)', marginTop: 7 }}>
+                    <div style={{ fontSize: 16.5, color: 'var(--ink-muted)', marginTop: 7 }}>
                       Pick an emotion below
                     </div>
                   )}
@@ -982,7 +982,7 @@ export default function EmotionalCharades({ sessionId, role, isLocked }: Emotion
                   animation: cardFlip ? 'none' : 'ecCardFlip 0.35s ease',
                 }}>
                   {promptShowsEmoji && (
-                    <div style={{ fontSize: 57, marginBottom: 4, lineHeight: 1 }}>{currentCard.emoji}</div>
+                    <div style={{ fontSize: 58.5, marginBottom: 4, lineHeight: 1 }}>{currentCard.emoji}</div>
                   )}
                   {promptShowsLabel && (
                     <div style={{
@@ -1009,7 +1009,7 @@ export default function EmotionalCharades({ sessionId, role, isLocked }: Emotion
                     </div>
                   )}
                   {identifyQuestionOpen && (
-                    <div style={{ fontSize: 15, color: 'var(--ink-muted)', marginTop: 8 }}>
+                    <div style={{ fontSize: 16.5, color: 'var(--ink-muted)', marginTop: 8 }}>
                       Which face matches this feeling?
                     </div>
                   )}
@@ -1018,7 +1018,7 @@ export default function EmotionalCharades({ sessionId, role, isLocked }: Emotion
 
               {/* Express mode instructions */}
               {actorSeesFullCard && (
-                <div style={{ fontSize: 15.5, color: INK_SOFT, fontStyle: 'italic', textAlign: 'center' }}>
+                <div style={{ fontSize: 17, color: INK_SOFT, fontStyle: 'italic', textAlign: 'center' }}>
                   {isTherapist
                     ? 'Act this out on camera!'
                     : 'Act out this feeling without words!'}
@@ -1029,7 +1029,7 @@ export default function EmotionalCharades({ sessionId, role, isLocked }: Emotion
               {mode === 'identify' && !guesserSeesCardBack && (
                 <div style={{ width: '100%' }}>
                   {!answered && (
-                    <div style={{ fontSize: 15, fontWeight: 600, color: 'var(--ink-muted)', marginBottom: 9, textAlign: 'center' }}>
+                    <div style={{ fontSize: 16.5, fontWeight: 600, color: 'var(--ink-muted)', marginBottom: 9, textAlign: 'center' }}>
                       How does this person feel?
                     </div>
                   )}
@@ -1042,13 +1042,13 @@ export default function EmotionalCharades({ sessionId, role, isLocked }: Emotion
                           padding: '9px 22px', borderRadius: 999,
                           background: GREEN_SOFT,
                           border: `1px solid ${GREEN_LINE}`,
-                          color: GREEN, fontSize: 17, fontWeight: 800,
+                          color: GREEN, fontSize: 18.5, fontWeight: 800,
                           animation: 'ecPulse 0.5s ease 2',
                         }}>
                           ✓ That&apos;s right!
                         </div>
                       ) : (
-                        <div style={{ fontSize: 16, color: INK_SOFT }}>
+                        <div style={{ fontSize: 17.5, color: INK_SOFT }}>
                           The feeling is <strong style={{ color: INK }}>{currentCard.label}</strong> {currentCard.emoji}
                         </div>
                       )}
@@ -1080,7 +1080,7 @@ export default function EmotionalCharades({ sessionId, role, isLocked }: Emotion
                             boxShadow: '0 2px 8px rgba(20,30,40,0.06)',
                             cursor: canInteract ? 'pointer' : 'not-allowed',
                             opacity: canInteract ? 1 : 0.55,
-                            fontSize: 29.5,
+                            fontSize: 31.5,
                             display: 'flex',
                             alignItems: 'center',
                             justifyContent: 'center',
@@ -1094,7 +1094,7 @@ export default function EmotionalCharades({ sessionId, role, isLocked }: Emotion
                   )}
 
                   {answered && !feedback && (
-                    <div style={{ fontSize: 15, color: 'var(--ink-muted)', textAlign: 'center', marginTop: 8 }}>
+                    <div style={{ fontSize: 16.5, color: 'var(--ink-muted)', textAlign: 'center', marginTop: 8 }}>
                       Waiting for next card…
                     </div>
                   )}
@@ -1105,7 +1105,7 @@ export default function EmotionalCharades({ sessionId, role, isLocked }: Emotion
               {mode === 'express' && guesserSeesCardBack && (
                 <div style={{ width: '100%' }}>
                   {!expressAnswered && (
-                    <div style={{ fontSize: 15, fontWeight: 600, color: 'var(--ink-muted)', marginBottom: 9, textAlign: 'center' }}>
+                    <div style={{ fontSize: 16.5, fontWeight: 600, color: 'var(--ink-muted)', marginBottom: 9, textAlign: 'center' }}>
                       What emotion is it?
                     </div>
                   )}
@@ -1117,12 +1117,12 @@ export default function EmotionalCharades({ sessionId, role, isLocked }: Emotion
                           padding: '9px 22px', borderRadius: 999,
                           background: GREEN_SOFT,
                           border: `1px solid ${GREEN_LINE}`,
-                          color: GREEN, fontSize: 17, fontWeight: 800,
+                          color: GREEN, fontSize: 18.5, fontWeight: 800,
                         }}>
                           ✓ That&apos;s right!
                         </div>
                       ) : (
-                        <div style={{ fontSize: 16, color: INK_SOFT }}>
+                        <div style={{ fontSize: 17.5, color: INK_SOFT }}>
                           It was <strong style={{ color: INK }}>{currentCard.label}</strong> {currentCard.emoji}
                         </div>
                       )}
@@ -1151,7 +1151,7 @@ export default function EmotionalCharades({ sessionId, role, isLocked }: Emotion
                             boxShadow: '0 2px 8px rgba(20,30,40,0.06)',
                             cursor: canInteract ? 'pointer' : 'not-allowed',
                             opacity: canInteract ? 1 : 0.55,
-                            fontSize: 29.5,
+                            fontSize: 31.5,
                             display: 'flex',
                             alignItems: 'center',
                             justifyContent: 'center',
@@ -1169,7 +1169,7 @@ export default function EmotionalCharades({ sessionId, role, isLocked }: Emotion
               {/* Express: the chooser waits for the guess, then sees the result.
                   There is no reveal step — the round is decided by the guess. */}
               {mode === 'express' && actorSeesFullCard && (
-                <div style={{ fontSize: 15, color: 'var(--ink-muted)', textAlign: 'center' }}>
+                <div style={{ fontSize: 16.5, color: 'var(--ink-muted)', textAlign: 'center' }}>
                   {expressAnswered ? (
                     expressFeedback === 'correct'
                       ? <span style={{ color: GREEN, fontWeight: 800 }}>✓ They guessed it!</span>
@@ -1186,13 +1186,13 @@ export default function EmotionalCharades({ sessionId, role, isLocked }: Emotion
                   <button onClick={handleDrawCard} className="ec-primary" style={{
                     display: 'inline-flex', alignItems: 'center', gap: 9,
                     padding: '11px 26px', borderRadius: 12, border: 'none',
-                    background: GREEN, color: '#ffffff', fontSize: 16.5, fontWeight: 800,
+                    background: GREEN, color: '#ffffff', fontSize: 18, fontWeight: 800,
                     cursor: 'pointer', boxShadow: '0 6px 16px rgba(31,122,68,0.26)',
                     transition: 'background 0.15s',
                   }}>
                     <CardStackIcon s={19} fill="#ffffff" ink={GREEN} /> {mode === 'express' ? 'New Round' : 'Next Card'}
                   </button>
-                  <button onClick={handleShuffleDeck} className="ec-hover" style={{ ...ghostBtn, padding: '10px 18px', fontSize: 15 }}>
+                  <button onClick={handleShuffleDeck} className="ec-hover" style={{ ...ghostBtn, padding: '10px 18px', fontSize: 16.5 }}>
                     <Shuffle size={15} strokeWidth={2.2} color={INK} /> Shuffle
                   </button>
                   {mode === 'express' && (
@@ -1230,10 +1230,10 @@ export default function EmotionalCharades({ sessionId, role, isLocked }: Emotion
               <Lightbulb size={22} strokeWidth={2.1} color="#E0A82E" fill="#FBE7B2" />
             </span>
             <div style={{ minWidth: 0 }}>
-              <div style={{ fontSize: 16.5, fontWeight: 800, color: INK, letterSpacing: -0.2, marginBottom: 3 }}>Tip</div>
-              <div style={{ fontSize: 15, lineHeight: 1.45, color: INK_SOFT }}>{tipText}</div>
+              <div style={{ fontSize: 18, fontWeight: 800, color: INK, letterSpacing: -0.2, marginBottom: 3 }}>Tip</div>
+              <div style={{ fontSize: 16.5, lineHeight: 1.45, color: INK_SOFT }}>{tipText}</div>
               {checkIns.length > 0 && (
-                <div style={{ fontSize: 14, color: 'var(--ink-muted)', marginTop: 8 }}>
+                <div style={{ fontSize: 15.5, color: 'var(--ink-muted)', marginTop: 8 }}>
                   {checkIns.length} check-in{checkIns.length === 1 ? '' : 's'} logged
                 </div>
               )}
