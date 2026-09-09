@@ -30,8 +30,10 @@ const BP_SCENE = BP_BG('worry balloon popping.png')
    Bubble wrap is played by dragging across the sheet, so pops fire in rapid
    overlapping bursts. One shared <audio> element cannot do that: restarting it
    cuts the previous pop off mid-tail and a fast drag turns into a stutter. The
-   delivered pop is therefore decoded ONCE into an AudioBuffer and every pop gets
-   its own source node, so they layer the way real bubble wrap does.
+   pop is therefore decoded ONCE into an AudioBuffer and every pop gets its own
+   source node, so they layer the way real bubble wrap does.
+
+   The sample is this module's own delivered asset, alongside the balloon art.
 
    No burst sound was delivered for the balloons, so it is synthesised rather
    than faked with the bubble pop: filtered noise with a fast decay, which is
@@ -40,7 +42,7 @@ const BP_SCENE = BP_BG('worry balloon popping.png')
    All of it is decorative. Every call is wrapped so a blocked, unsupported or
    suspended AudioContext can never stop a bubble from popping.
 --------------------------------------------------------------------------- */
-const POP_SFX = `/assets/modules/SLD/${encodeURIComponent('Bubble Splash assets')}/bubble_pop.wav`
+const POP_SFX = `/assets/modules/${encodeURIComponent('Anxiety and depression')}/${encodeURIComponent('Balloon popping and bubble pop')}/bubble_pop.wav`
 
 let bpCtx: AudioContext | null = null
 let popBuf: AudioBuffer | null = null
