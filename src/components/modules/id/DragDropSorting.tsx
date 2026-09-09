@@ -24,6 +24,13 @@ const INK = '#1F2A24'
 const INK_SOFT = '#48544D'
 const LINE = '#e7eaef'
 const DANGER = '#B4432C'
+/* Hover on a drop target is deliberately NEUTRAL slate, not the module's green.
+   Green means "correct" everywhere else here — the ✓ badge, the sorted tile, the
+   name pop — so a green highlight under the dragged item read as the app saying
+   yes, and the child could find the answer by sweeping the bins and watching for
+   it. Slate says only "you are over this bin". */
+const HOVER_TINT = 'rgba(51,65,85,0.13)'
+const HOVER_LINE = '#475569'
 
 const segBtn = (active: boolean): React.CSSProperties => ({
   padding: '6px 13px', borderRadius: 999, cursor: 'pointer',
@@ -66,6 +73,17 @@ function notoUrl(emoji: string): string {
     cannot load, so the activity still works offline or behind a proxy. */
 function ItemArt({ emoji, size, alt }: { emoji: string; size: number; alt?: string }) {
   const [failed, setFailed] = useState(false)
+  /* Numbers and letters are plain characters with no emoji image. Drawing them
+     as type avoids a request that would always 404 before falling back. */
+  const isPictorial = Array.from(emoji).some(c => (c.codePointAt(0) || 0) > 0x2000)
+  if (!isPictorial) {
+    return (
+      <span style={{
+        fontSize: size * 0.82, lineHeight: 1, fontWeight: 800, color: INK,
+        fontFamily: '"DM Sans", sans-serif', display: 'block',
+      }}>{emoji}</span>
+    )
+  }
   if (failed) {
     return <span aria-hidden style={{ fontSize: size, lineHeight: 1 }}>{emoji}</span>
   }
@@ -107,86 +125,192 @@ function buildPool(set: CategorySet, bins: BinDef[], difficulty: string, round: 
   return items.slice(0, total)
 }
 
+/* Items are written as explicit [emoji, label] pairs.
+
+   They used to be a run-on emoji string put through .split(''), which splits on
+   UTF-16 code units — any emoji built from more than one unit was torn into
+   pieces. Pairs cannot break that way, and they are far easier to extend. */
+type ItemPair = [string, string]
+function mk(prefix: string, binId: string, pairs: ItemPair[]): ItemDef[] {
+  return pairs.map(([emoji, label], i) => ({ id: `${prefix}${i}`, emoji, label, binId }))
+}
+
 const SETS: CategorySet[] = [
   {
     id: 'fruits-vs-veggies', name: 'Fruits vs Vegetables',
     bins: [{ id: 'fruits', emoji: '🍎', label: 'Fruits' }, { id: 'veggies', emoji: '🥦', label: 'Vegetables' }],
     items: [
-      ...'🍎🍊🍋🍇🍓🍌🍑🍒🥭🍍'.split('').map((e, i) => ({ id: `f${i}`, emoji: e, label: ['Apple','Orange','Lemon','Grapes','Strawberry','Banana','Peach','Cherry','Mango','Pineapple'][i], binId: 'fruits' })),
-      ...'🥦🥕🧅🥔🌽🍆🥒🧄🥬🫑'.split('').map((e, i) => ({ id: `v${i}`, emoji: e, label: ['Broccoli','Carrot','Onion','Potato','Corn','Eggplant','Cucumber','Garlic','Lettuce','Pepper'][i], binId: 'veggies' })),
+      ...mk('f', 'fruits', [
+        ['🍎', 'Apple'], ['🍊', 'Orange'], ['🍋', 'Lemon'], ['🍇', 'Grapes'], ['🍓', 'Strawberry'], ['🍌', 'Banana'],
+        ['🍑', 'Peach'], ['🍒', 'Cherry'], ['🥭', 'Mango'], ['🍍', 'Pineapple'], ['🍉', 'Watermelon'], ['🍐', 'Pear'],
+        ['🥝', 'Kiwi'], ['🥥', 'Coconut'], ['🫐', 'Blueberries'], ['🍈', 'Melon'], ['🍏', 'Green Apple'],
+        ['🍅', 'Tomato'], ['🫒', 'Olive'], ['🥑', 'Avocado'],
+      ]),
+      ...mk('v', 'veggies', [
+        ['🥦', 'Broccoli'], ['🥕', 'Carrot'], ['🧅', 'Onion'], ['🥔', 'Potato'], ['🌽', 'Corn'], ['🍆', 'Eggplant'],
+        ['🥒', 'Cucumber'], ['🧄', 'Garlic'], ['🥬', 'Lettuce'], ['🫑', 'Pepper'], ['🍄', 'Mushroom'], ['🫛', 'Peas'],
+        ['🌶️', 'Chilli'], ['🫚', 'Ginger'], ['🍠', 'Sweet Potato'], ['🥗', 'Salad'],
+      ]),
     ],
   },
   {
     id: 'animals', name: 'Animals: Land·Water·Sky',
     bins: [{ id: 'land', emoji: '🦁', label: 'Land' }, { id: 'water', emoji: '🐠', label: 'Water' }, { id: 'sky', emoji: '🦅', label: 'Sky' }],
     items: [
-      ...'🦁🐘🐶🐱🐸🐢🦊🐺'.split('').map((e, i) => ({ id: `l${i}`, emoji: e, label: ['Lion','Elephant','Dog','Cat','Frog','Turtle','Fox','Wolf'][i], binId: 'land' })),
-      ...'🐠🐳🦈🐙🦑🐡🦭🐬'.split('').map((e, i) => ({ id: `w${i}`, emoji: e, label: ['Fish','Whale','Shark','Octopus','Squid','Pufferfish','Seal','Dolphin'][i], binId: 'water' })),
-      ...'🦅🦋🐦🦜🦆🦉🐧🦚'.split('').map((e, i) => ({ id: `s${i}`, emoji: e, label: ['Eagle','Butterfly','Bird','Parrot','Duck','Owl','Penguin','Peacock'][i], binId: 'sky' })),
+      ...mk('l', 'land', [
+        ['🦁', 'Lion'], ['🐘', 'Elephant'], ['🐶', 'Dog'], ['🐱', 'Cat'], ['🐸', 'Frog'], ['🐢', 'Turtle'], ['🦊', 'Fox'],
+        ['🐺', 'Wolf'], ['🐴', 'Horse'], ['🐮', 'Cow'], ['🐷', 'Pig'], ['🐰', 'Rabbit'], ['🐻', 'Bear'], ['🐼', 'Panda'],
+        ['🐯', 'Tiger'], ['🦓', 'Zebra'], ['🦌', 'Deer'], ['🐨', 'Koala'],
+      ]),
+      ...mk('w', 'water', [
+        ['🐠', 'Fish'], ['🐳', 'Whale'], ['🦈', 'Shark'], ['🐙', 'Octopus'], ['🦑', 'Squid'], ['🐡', 'Pufferfish'],
+        ['🦭', 'Seal'], ['🐬', 'Dolphin'], ['🦀', 'Crab'], ['🦞', 'Lobster'], ['🦐', 'Shrimp'], ['🐚', 'Shell'],
+        ['🐋', 'Blue Whale'], ['🦦', 'Otter'], ['🐊', 'Crocodile'], ['🪼', 'Jellyfish'], ['🐟', 'Blue Fish'],
+        ['🪸', 'Coral'],
+      ]),
+      ...mk('s', 'sky', [
+        ['🦅', 'Eagle'], ['🦋', 'Butterfly'], ['🐦', 'Bird'], ['🦜', 'Parrot'], ['🦆', 'Duck'], ['🦉', 'Owl'],
+        ['🐧', 'Penguin'], ['🦚', 'Peacock'], ['🕊️', 'Dove'], ['🦢', 'Swan'], ['🦇', 'Bat'], ['🐝', 'Bee'],
+        ['🪰', 'Fly'], ['🦟', 'Mosquito'], ['🦩', 'Flamingo'], ['🐓', 'Rooster'],
+      ]),
     ],
   },
   {
     id: 'big-vs-small', name: 'Big vs Small',
     bins: [{ id: 'big', emoji: '🐘', label: 'Big' }, { id: 'small', emoji: '🐭', label: 'Small' }],
     items: [
-      ...'🐘🦒🦛🐋🦏🦬🐊🦍'.split('').map((e, i) => ({ id: `bg${i}`, emoji: e, label: ['Elephant','Giraffe','Hippo','Whale','Rhino','Buffalo','Crocodile','Gorilla'][i], binId: 'big' })),
-      ...'🐭🐜🐝🐛🦎🐞🐜🐿️'.split('').map((e, i) => ({ id: `sm${i}`, emoji: e, label: ['Mouse','Ant','Bee','Caterpillar','Lizard','Ladybug','Bug','Squirrel'][i], binId: 'small' })),
+      ...mk('bg', 'big', [
+        ['🐘', 'Elephant'], ['🦒', 'Giraffe'], ['🦛', 'Hippo'], ['🐋', 'Whale'], ['🦏', 'Rhino'], ['🦬', 'Buffalo'],
+        ['🐊', 'Crocodile'], ['🦍', 'Gorilla'], ['🐻', 'Bear'], ['🐫', 'Camel'], ['🫎', 'Moose'], ['🦣', 'Mammoth'],
+        ['🦈', 'Shark'], ['🐴', 'Horse'], ['🦌', 'Deer'], ['🐄', 'Cow'], ['🦧', 'Orangutan'], ['🐉', 'Dragon'],
+      ]),
+      ...mk('sm', 'small', [
+        ['🐭', 'Mouse'], ['🐜', 'Ant'], ['🐝', 'Bee'], ['🐛', 'Caterpillar'], ['🦎', 'Lizard'], ['🐞', 'Ladybug'],
+        ['🕷️', 'Spider'], ['🐿️', 'Squirrel'], ['🦗', 'Cricket'], ['🐌', 'Snail'], ['🦋', 'Butterfly'],
+        ['🐹', 'Hamster'], ['🐣', 'Chick'], ['🪲', 'Beetle'], ['🦂', 'Scorpion'], ['🐸', 'Frog'], ['🪳', 'Cockroach'],
+        ['🦠', 'Germ'],
+      ]),
     ],
   },
   {
     id: 'clean-vs-dirty', name: 'Clean vs Dirty',
     bins: [{ id: 'clean', emoji: '✨', label: 'Clean' }, { id: 'dirty', emoji: '🧹', label: 'Needs Cleaning' }],
     items: [
-      ...'🛁🧼🪥🧴🚿🪒🧽✨'.split('').map((e, i) => ({ id: `cl${i}`, emoji: e, label: ['Bathtub','Soap','Toothbrush','Lotion','Shower','Razor','Sponge','Sparkle'][i], binId: 'clean' })),
-      ...'🦷🧺👟🍽️🗑️🧹🪣💧'.split('').map((e, i) => ({ id: `di${i}`, emoji: e, label: ['Dirty Teeth','Laundry','Dirty Shoes','Dirty Dishes','Trash','Broom','Bucket','Dirty Water'][i], binId: 'dirty' })),
+      ...mk('cl', 'clean', [
+        ['🛁', 'Bathtub'], ['🧼', 'Soap'], ['🪥', 'Toothbrush'], ['🧴', 'Lotion'], ['🚿', 'Shower'], ['🪒', 'Razor'],
+        ['🧽', 'Sponge'], ['✨', 'Sparkle'], ['🧻', 'Tissue'], ['🚰', 'Clean Water'], ['🫧', 'Bubbles'],
+        ['🪞', 'Mirror'], ['👕', 'Clean Shirt'], ['🪟', 'Window'],
+      ]),
+      ...mk('di', 'dirty', [
+        ['🦷', 'Dirty Teeth'], ['🧺', 'Laundry'], ['👟', 'Dirty Shoes'], ['🍽️', 'Dirty Dishes'], ['🗑️', 'Trash'],
+        ['🧹', 'Broom'], ['🪣', 'Bucket'], ['💧', 'Dirty Water'], ['🪰', 'Flies'], ['🧦', 'Dirty Socks'],
+        ['🕸️', 'Cobweb'], ['🚮', 'Litter'], ['💩', 'Mess'], ['🧫', 'Germs'],
+      ]),
     ],
   },
   {
     id: 'happy-vs-sad', name: 'Happy vs Sad',
     bins: [{ id: 'happy', emoji: '😊', label: 'Happy Things' }, { id: 'sad', emoji: '😢', label: 'Sad Things' }],
     items: [
-      ...'🎂🎁🎠🌈🎉🌸🎶🏆'.split('').map((e, i) => ({ id: `h${i}`, emoji: e, label: ['Cake','Gift','Carousel','Rainbow','Party','Flowers','Music','Trophy'][i], binId: 'happy' })),
-      ...'💔🌧️😢🤒🥀⛈️😞🚫'.split('').map((e, i) => ({ id: `sd${i}`, emoji: e, label: ['Broken Heart','Rain','Sadness','Sick','Wilted Flower','Storm','Disappointed','No Entry'][i], binId: 'sad' })),
+      ...mk('h', 'happy', [
+        ['🎂', 'Cake'], ['🎁', 'Gift'], ['🎠', 'Carousel'], ['🌈', 'Rainbow'], ['🎉', 'Party'], ['🌸', 'Flowers'],
+        ['🎶', 'Music'], ['🏆', 'Trophy'], ['⭐', 'Star'], ['🎈', 'Balloon'], ['🍦', 'Ice Cream'],
+        ['🎡', 'Ferris Wheel'], ['🥳', 'Celebrate'], ['😄', 'Smile'], ['☀️', 'Sunshine'], ['🤗', 'Hug'],
+      ]),
+      ...mk('sd', 'sad', [
+        ['💔', 'Broken Heart'], ['🌧️', 'Rain'], ['😢', 'Sadness'], ['🤒', 'Sick'], ['🥀', 'Wilted Flower'],
+        ['⛈️', 'Storm'], ['😞', 'Disappointed'], ['🚫', 'No Entry'], ['😭', 'Crying'], ['🩹', 'Hurt'], ['🌫️', 'Fog'],
+        ['😔', 'Down'], ['🥺', 'Upset'], ['😟', 'Worried'], ['🌩️', 'Thunder'], ['💧', 'Tear'],
+      ]),
     ],
   },
   {
     id: 'day-vs-night', name: 'Day vs Night',
     bins: [{ id: 'day', emoji: '☀️', label: 'Daytime' }, { id: 'night', emoji: '🌙', label: 'Nighttime' }],
     items: [
-      ...'☀️🌻🐓🏫🌤️🍳🚌🏃'.split('').map((e, i) => ({ id: `d${i}`, emoji: e, label: ['Sun','Sunflower','Rooster','School','Sunny','Eggs','School Bus','Running'][i], binId: 'day' })),
-      ...'🌙⭐🦉🛌🌃🌠🦇🔦'.split('').map((e, i) => ({ id: `n${i}`, emoji: e, label: ['Moon','Stars','Owl','Bed','Night Sky','Shooting Star','Bat','Flashlight'][i], binId: 'night' })),
+      ...mk('d', 'day', [
+        ['☀️', 'Sun'], ['🌻', 'Sunflower'], ['🐓', 'Rooster'], ['🏫', 'School'], ['🌤️', 'Sunny'], ['🍳', 'Eggs'],
+        ['🚌', 'School Bus'], ['🏃', 'Running'], ['🌅', 'Sunrise'], ['🪁', 'Kite'], ['⛱️', 'Parasol'],
+        ['🚲', 'Cycling'], ['🌞', 'Bright Sun'], ['🥪', 'Lunch'], ['🏖️', 'Beach Day'], ['🧺', 'Picnic'],
+      ]),
+      ...mk('n', 'night', [
+        ['🌙', 'Moon'], ['⭐', 'Stars'], ['🦉', 'Owl'], ['🛌', 'Bed'], ['🌃', 'Night Sky'], ['🌠', 'Shooting Star'],
+        ['🦇', 'Bat'], ['🔦', 'Flashlight'], ['🌜', 'Crescent'], ['😴', 'Sleeping'], ['🕯️', 'Candle'],
+        ['🛏️', 'Bedroom'], ['🌌', 'Milky Way'], ['🧸', 'Teddy'], ['🌛', 'Moon Face'], ['🦗', 'Cricket'],
+      ]),
     ],
   },
   {
     id: 'hot-vs-cold', name: 'Hot vs Cold',
     bins: [{ id: 'hot', emoji: '🔥', label: 'Hot' }, { id: 'cold', emoji: '❄️', label: 'Cold' }],
     items: [
-      ...'🔥☀️🍵🌋🏜️🌡️♨️🫖'.split('').map((e, i) => ({ id: `ho${i}`, emoji: e, label: ['Fire','Sun','Tea','Volcano','Desert','Thermometer','Steam','Teapot'][i], binId: 'hot' })),
-      ...'❄️🌨️🧊🏔️🥶🍦⛄🌬️'.split('').map((e, i) => ({ id: `co${i}`, emoji: e, label: ['Snowflake','Snow','Ice','Mountain','Cold','Ice Cream','Snowman','Wind'][i], binId: 'cold' })),
+      ...mk('ho', 'hot', [
+        ['🔥', 'Fire'], ['☀️', 'Sun'], ['🍵', 'Tea'], ['🌋', 'Volcano'], ['🏜️', 'Desert'], ['🌡️', 'Thermometer'],
+        ['♨️', 'Steam'], ['🫖', 'Teapot'], ['🥵', 'Hot Face'], ['☕', 'Coffee'], ['🍲', 'Soup'], ['🕯️', 'Candle'],
+        ['🌶️', 'Chilli'], ['🔆', 'Bright'],
+      ]),
+      ...mk('co', 'cold', [
+        ['❄️', 'Snowflake'], ['🌨️', 'Snow'], ['🧊', 'Ice'], ['🏔️', 'Mountain'], ['🥶', 'Cold'], ['🍦', 'Ice Cream'],
+        ['⛄', 'Snowman'], ['🌬️', 'Wind'], ['🧣', 'Scarf'], ['🧤', 'Gloves'], ['🐧', 'Penguin'], ['🎿', 'Skiing'],
+        ['🍧', 'Shaved Ice'], ['☃️', 'Snow Person'],
+      ]),
     ],
   },
   {
     id: 'school-vs-home', name: 'School vs Home',
     bins: [{ id: 'school', emoji: '🏫', label: 'School' }, { id: 'home', emoji: '🏠', label: 'Home' }],
     items: [
-      ...'📚✏️📐🎒🖊️📏🔬🗂️'.split('').map((e, i) => ({ id: `sc${i}`, emoji: e, label: ['Books','Pencil','Ruler','Backpack','Pen','Triangle','Microscope','Folder'][i], binId: 'school' })),
-      ...'🛋️🍳🛁🛏️📺🪴🧹🔑'.split('').map((e, i) => ({ id: `hm${i}`, emoji: e, label: ['Couch','Cooking','Bathtub','Bed','TV','Plant','Broom','Keys'][i], binId: 'home' })),
-    ],
-  },
-  {
-    id: 'numbers-vs-letters', name: 'Numbers vs Letters',
-    bins: [{ id: 'numbers', emoji: '🔢', label: 'Numbers' }, { id: 'letters', emoji: '🔤', label: 'Letters' }],
-    items: [
-      ...'1️⃣2️⃣3️⃣4️⃣5️⃣6️⃣7️⃣8️⃣'.split('').map((e, i) => ({ id: `n${i}`, emoji: e, label: ['One','Two','Three','Four','Five','Six','Seven','Eight'][i], binId: 'numbers' })),
-      ...'🅰️🅱️©️🆒🆓🆔🅾️🆘'.split('').map((e, i) => ({ id: `lt${i}`, emoji: e, label: ['A','B','C','D','E','F','O','SOS'][i], binId: 'letters' })),
+      ...mk('sc', 'school', [
+        ['📚', 'Books'], ['✏️', 'Pencil'], ['📐', 'Set Square'], ['🎒', 'Backpack'], ['🖊️', 'Pen'], ['📏', 'Ruler'],
+        ['🔬', 'Microscope'], ['🗂️', 'Folder'], ['🖍️', 'Crayon'], ['📝', 'Notebook'], ['🧮', 'Abacus'],
+        ['🖇️', 'Paperclip'], ['🏫', 'School'], ['📔', 'Journal'], ['✂️', 'Scissors'], ['🗒️', 'Notepad'],
+      ]),
+      ...mk('hm', 'home', [
+        ['🛋️', 'Couch'], ['🍳', 'Cooking'], ['🛁', 'Bathtub'], ['🛏️', 'Bed'], ['📺', 'TV'], ['🪴', 'Plant'],
+        ['🧹', 'Broom'], ['🔑', 'Keys'], ['🚪', 'Door'], ['🪑', 'Chair'], ['🧺', 'Laundry'], ['🍽️', 'Dishes'],
+        ['🪟', 'Window'], ['🧸', 'Toys'], ['🚿', 'Shower'], ['🕰️', 'Clock'],
+      ]),
     ],
   },
   {
     id: 'healthy-vs-unhealthy', name: 'Healthy vs Unhealthy',
     bins: [{ id: 'healthy', emoji: '💚', label: 'Healthy' }, { id: 'unhealthy', emoji: '🚫', label: 'Unhealthy' }],
     items: [
-      ...'🥦🍎🥕🥗🫐🥑🥚🐟'.split('').map((e, i) => ({ id: `he${i}`, emoji: e, label: ['Broccoli','Apple','Carrot','Salad','Blueberries','Avocado','Egg','Fish'][i], binId: 'healthy' })),
-      ...'🍔🍟🍕🧁🍭🥤🍿🍩'.split('').map((e, i) => ({ id: `un${i}`, emoji: e, label: ['Burger','Fries','Pizza','Cupcake','Candy','Soda','Popcorn','Donut'][i], binId: 'unhealthy' })),
+      ...mk('hl', 'healthy', [
+        ['🥦', 'Broccoli'], ['🍎', 'Apple'], ['🥕', 'Carrot'], ['🥗', 'Salad'], ['🫐', 'Blueberries'], ['🥑', 'Avocado'],
+        ['🥚', 'Egg'], ['🐟', 'Fish'], ['🍌', 'Banana'], ['🥛', 'Milk'], ['🌽', 'Corn'], ['🍊', 'Orange'], ['🥜', 'Nuts'],
+        ['🍠', 'Sweet Potato'], ['💧', 'Water'], ['🥒', 'Cucumber'],
+      ]),
+      ...mk('un', 'unhealthy', [
+        ['🍔', 'Burger'], ['🍟', 'Fries'], ['🍕', 'Pizza'], ['🧁', 'Cupcake'], ['🍭', 'Candy'], ['🥤', 'Soda'],
+        ['🍿', 'Popcorn'], ['🍩', 'Donut'], ['🍫', 'Chocolate'], ['🌭', 'Hot Dog'], ['🍪', 'Cookie'], ['🍰', 'Cake'],
+        ['🥓', 'Bacon'], ['🍬', 'Sweets'], ['🧋', 'Bubble Tea'], ['🍦', 'Ice Cream'],
+      ]),
+    ],
+  },
+  {
+    /* Rebuilt. The numbers were written as one run-on string of keycap emoji
+       and split with .split(''), which splits on UTF-16 code units — '1️⃣' is
+       three of them, so eight keycaps became twenty-four fragments and six of
+       the eight numbers rendered as invisible combining marks. The letters were
+       worse: ©️, 🆒, 🆓, 🆔 and 🆘 were labelled C, D, E, F and SOS, so the
+       activity taught the wrong symbols.
+
+       Both bins now carry plain characters. ItemArt draws non-emoji as text, so
+       these render as clean glyphs — this category is symbol recognition, and
+       there is no emoji for most letters anyway. */
+    id: 'numbers-vs-letters', name: 'Numbers vs Letters',
+    bins: [{ id: 'numbers', emoji: '🔢', label: 'Numbers' }, { id: 'letters', emoji: '🔤', label: 'Letters' }],
+    items: [
+      ...mk('num', 'numbers', [
+        ['1', 'One'], ['2', 'Two'], ['3', 'Three'], ['4', 'Four'], ['5', 'Five'],
+        ['6', 'Six'], ['7', 'Seven'], ['8', 'Eight'], ['9', 'Nine'], ['10', 'Ten'],
+        ['11', 'Eleven'], ['12', 'Twelve'],
+      ]),
+      ...mk('let', 'letters', [
+        ['A', 'A'], ['B', 'B'], ['C', 'C'], ['D', 'D'], ['E', 'E'], ['F', 'F'],
+        ['G', 'G'], ['H', 'H'], ['I', 'I'], ['J', 'J'], ['K', 'K'], ['L', 'L'],
+      ]),
     ],
   },
 ]
@@ -432,7 +556,13 @@ export default function DragDropSorting({ sessionId, role, isLocked }: DragDropS
     setHoverBin(binId)
   }, [])
 
-  const onDragLeave = useCallback(() => {
+  const onDragLeave = useCallback((e: React.DragEvent) => {
+    /* dragleave also fires when the pointer crosses onto a child of the bin —
+       its icon, its label, a tile already sorted into it — which switched the
+       highlight off and straight back on, so it strobed while hovering. Ignore
+       a leave that is really a move deeper inside the same bin. */
+    const next = e.relatedTarget as Node | null
+    if (next && e.currentTarget.contains(next)) return
     setHoverBin(null)
   }, [])
 
@@ -577,7 +707,15 @@ export default function DragDropSorting({ sessionId, role, isLocked }: DragDropS
         <div style={{
           background: 'rgba(255,255,255,0.78)', borderRadius: 14, padding: 16,
           minHeight: 104, border: '1px dashed rgba(0,0,0,0.14)',
-          display: 'flex', flexWrap: 'wrap', gap: 12, alignContent: 'flex-start',
+          display: 'flex', flexWrap: 'wrap', gap: 12,
+          /* Centred on both axes. With the default flex-start the tiles packed
+             hard against the left edge, so the drag from pool to bin was long
+             and lopsided — and as items were taken the rest stayed pinned left,
+             leaving a growing empty gap. Centring means the remaining tiles
+             close up around the middle after every pick, keeping the next drag
+             short and the travel even to whichever bin. */
+          justifyContent: 'center',
+          alignContent: 'center',
           boxShadow: '0 4px 14px rgba(20,30,40,0.06)',
         }}>
           {unsortedItems.map(id => {
@@ -634,6 +772,9 @@ export default function DragDropSorting({ sessionId, role, isLocked }: DragDropS
           {usedBins.map(bin => {
             const isHover = hoverBin === bin.id
             const isFlash = flashWrong.has(bin.id)
+            // While anything is in hand, EVERY bin firms up equally, so no
+            // single bin stands out until the item is actually over it.
+            const isArmed = !!dragItem && !isHover && !isFlash
             const binItems = sortedEntries.filter(([, b]) => b === bin.id)
             return (
               <div key={bin.id} data-bin={bin.id}
@@ -646,9 +787,15 @@ export default function DragDropSorting({ sessionId, role, isLocked }: DragDropS
                   display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 10,
                   transition: 'all 0.2s', overflowY: 'auto',
                   boxShadow: '0 4px 14px rgba(20,30,40,0.06)',
-                  background: isFlash ? 'rgba(200,96,42,0.2)' : isHover ? 'rgba(74,124,111,0.16)' : 'rgba(255,255,255,0.78)',
-                  border: isFlash ? '1.5px solid rgba(200,96,42,0.5)' : isHover ? '1.5px solid rgba(74,124,111,0.5)' : '1.5px dashed rgba(0,0,0,0.18)',
-                  borderStyle: isHover ? 'solid' : 'dashed',
+                  background: isFlash ? 'rgba(200,96,42,0.2)'
+                    : isHover ? HOVER_TINT
+                    : isArmed ? 'rgba(255,255,255,0.92)'
+                    : 'rgba(255,255,255,0.78)',
+                  border: isFlash ? '1.5px solid rgba(200,96,42,0.5)'
+                    : isHover ? `2px solid ${HOVER_LINE}`
+                    : isArmed ? '1.5px dashed rgba(0,0,0,0.30)'
+                    : '1.5px dashed rgba(0,0,0,0.18)',
+                  borderStyle: isHover || isFlash ? 'solid' : 'dashed',
                   transform: isHover ? 'scale(1.02)' : 'scale(1)',
                   position: 'relative',
                 }}
