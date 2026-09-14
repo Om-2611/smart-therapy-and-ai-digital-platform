@@ -86,6 +86,10 @@ model ProfileTherapist {
   usageEvents  UsageEvent[]
   subscriptions        Subscription[]
   subscriptionRequests SubscriptionRequest[]
+
+  progressMetrics ProgressMetric[]
+  progressReports ProgressReport[]
+  progressNotes   ProgressNote[]
 }
 
 model ProfileClient {
@@ -102,6 +106,10 @@ model ProfileClient {
   updatedAt   DateTime  @updatedAt
   bookings    Booking[]
   sessions    Session[]
+
+  progressMetrics ProgressMetric[]
+  progressReports ProgressReport[]
+  progressNotes   ProgressNote[]
 }
 
 model DocumentChunk {
@@ -269,6 +277,73 @@ model SubscriptionRequest {
   @@index([status])
 }
 
+// A single quantitative data point tracked for a client over time
+// (e.g. mood score, anxiety level, focus score, engagement %). Can
+// optionally be tied to the session it was recorded during.
+model ProgressMetric {
+  id          String           @id @default(uuid())
+  clientId    String
+  client      ProfileClient    @relation(fields: [clientId], references: [id], onDelete: Cascade)
+  therapistId String
+  therapist   ProfileTherapist @relation(fields: [therapistId], references: [id], onDelete: Cascade)
+  sessionId   String? // optional link to the Session this was recorded in (no FK, mirrors UsageEvent)
+  metricType  String // e.g. MOOD_SCORE, ANXIETY_LEVEL, FOCUS_SCORE, ENGAGEMENT
+  value       Float
+  unit        String? // e.g. "scale_1_10", "%"
+  notes       String?
+  recordedAt  DateTime         @default(now())
+  createdAt   DateTime         @default(now())
+  updatedAt   DateTime         @updatedAt
+
+  @@index([clientId])
+  @@index([therapistId])
+  @@index([metricType])
+}
+
+// A periodic, therapist-authored progress report for a client, built from
+// a summary plus a snapshot of the metrics over the reporting period.
+model ProgressReport {
+  id              String           @id @default(uuid())
+  clientId        String
+  client          ProfileClient    @relation(fields: [clientId], references: [id], onDelete: Cascade)
+  therapistId     String
+  therapist       ProfileTherapist @relation(fields: [therapistId], references: [id], onDelete: Cascade)
+  title           String           @default("Progress Report")
+  periodStart     DateTime
+  periodEnd       DateTime
+  summary         String // narrative summary written/edited by the therapist
+  metricsSnapshot Json             @default("{}") // aggregated metric values captured at generation time
+  status          String           @default("DRAFT") // DRAFT | FINAL
+  createdAt       DateTime         @default(now())
+  updatedAt       DateTime         @updatedAt
+
+  progressNotes ProgressNote[]
+
+  @@index([clientId])
+  @@index([therapistId])
+}
+
+// Free-text therapist notes about a client's progress. Independent of
+// TherapistNote (which is scoped to a single session) — these are scoped to
+// the client's overall progress tracking and can optionally attach to a
+// specific ProgressReport.
+model ProgressNote {
+  id          String          @id @default(uuid())
+  reportId    String?
+  report      ProgressReport? @relation(fields: [reportId], references: [id], onDelete: Cascade)
+  clientId    String
+  client      ProfileClient    @relation(fields: [clientId], references: [id], onDelete: Cascade)
+  therapistId String
+  therapist   ProfileTherapist @relation(fields: [therapistId], references: [id], onDelete: Cascade)
+  content     String
+  isPrivate   Boolean          @default(true)
+  createdAt   DateTime         @default(now())
+  updatedAt   DateTime         @updatedAt
+
+  @@index([clientId])
+  @@index([reportId])
+}
+
 model TherapistNote {
   id          String           @id @default(uuid())
   sessionId   String
@@ -280,3 +355,4 @@ model TherapistNote {
   createdAt   DateTime         @default(now())
   updatedAt   DateTime         @updatedAt
 }
+

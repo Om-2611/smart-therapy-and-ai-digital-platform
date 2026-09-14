@@ -101,8 +101,6 @@ export default function EmotionWheel({ sessionId, role, isLocked }: EmotionWheel
   const [path, setPath] = useState<string[]>([])
   const [selected, setSelected] = useState('')
   const [highlighted, setHighlighted] = useState<string[]>([])
-  const [comparePrompt, setComparePrompt] = useState<string[]>([])
-
   const write = useCallback(async (d: Record<string, unknown>) => {
     try { await updateDoc(doc(db, 'liveSessions', sessionId), { ...d, 'timestamps.updatedAt': new Date().toISOString() }) } catch {}
   }, [sessionId])
@@ -172,8 +170,6 @@ export default function EmotionWheel({ sessionId, role, isLocked }: EmotionWheel
         .ew-scroll { scrollbar-width: thin; scrollbar-color: #cbd5e1 transparent; }
         .ew-scroll::-webkit-scrollbar { width: 7px; }
         .ew-scroll::-webkit-scrollbar-thumb { background: #cbd5e1; border-radius: 8px; }
-        .ew-input::placeholder { color: #94a3b8; }
-        .ew-input:focus { border-color: #94a3b8; box-shadow: 0 0 0 3px rgba(100,116,139,0.12); }
       `}</style>
 
       {/* ---- Identity mark + subtitle. The module TITLE is deliberately absent:
@@ -191,7 +187,7 @@ export default function EmotionWheel({ sessionId, role, isLocked }: EmotionWheel
             boxShadow: 'inset 0 0 0 1.5px rgba(255,255,255,0.75)',
           }} />
         </div>
-        <div style={{ fontSize: 15, fontWeight: 500, color: INK_MUTED, textAlign: 'center' }}>
+        <div style={{ fontSize: 18.5, fontWeight: 500, color: INK_MUTED, textAlign: 'center' }}>
           Choose an emotion to explore deeper.
         </div>
       </div>
@@ -207,7 +203,7 @@ export default function EmotionWheel({ sessionId, role, isLocked }: EmotionWheel
             display: 'inline-flex', alignItems: 'center', gap: 4,
             padding: '6px 12px 6px 8px', borderRadius: 999,
             border: `1px solid ${LINE}`, background: '#ffffff',
-            fontSize: 12.5, fontWeight: 600, color: INK_MUTED,
+            fontSize: 16.5, fontWeight: 600, color: INK_MUTED,
             fontFamily: '"DM Sans", sans-serif', cursor: 'pointer',
             boxShadow: '0 1px 4px rgba(20,30,45,0.05)',
           }}>
@@ -219,7 +215,7 @@ export default function EmotionWheel({ sessionId, role, isLocked }: EmotionWheel
           padding: '6px 14px', borderRadius: 999,
           background: level > 1 ? rootPalette.tint : '#F8FAFC',
           border: `1px solid ${level > 1 ? rootPalette.accent : LINE}`,
-          fontSize: 12.5, fontWeight: 700, letterSpacing: 0.1,
+          fontSize: 16.5, fontWeight: 700, letterSpacing: 0.1,
           color: level > 1 ? rootPalette.accent : INK_FAINT,
           textTransform: 'capitalize',
         }}>
@@ -281,7 +277,7 @@ export default function EmotionWheel({ sessionId, role, isLocked }: EmotionWheel
                       width: 20, height: 20, borderRadius: '50%',
                       display: 'flex', alignItems: 'center', justifyContent: 'center',
                       background: '#FEF3C7', border: `1px solid ${AMBER}`,
-                      fontSize: 10, color: '#92400E', lineHeight: 1,
+                      fontSize: 13, color: '#92400E', lineHeight: 1,
                     }}>★</span>
                   )}
 
@@ -308,7 +304,7 @@ export default function EmotionWheel({ sessionId, role, isLocked }: EmotionWheel
                       padding: '2px 9px', borderRadius: 999, cursor: 'pointer',
                       border: `1px solid ${isHi ? AMBER : LINE}`,
                       background: isHi ? '#FFFBEB' : '#ffffff',
-                      fontSize: 10.5, fontWeight: 700,
+                      fontSize: 13.5, fontWeight: 700,
                       color: isHi ? '#92400E' : INK_FAINT,
                       fontFamily: '"DM Sans", sans-serif',
                     }}>
@@ -321,7 +317,7 @@ export default function EmotionWheel({ sessionId, role, isLocked }: EmotionWheel
           })}
 
           {ordered.length === 0 && (
-            <span style={{ fontSize: 13, color: INK_FAINT, padding: '20px 0' }}>
+            <span style={{ fontSize: 16.5, color: INK_FAINT, padding: '20px 0' }}>
               No further shades here — this is as specific as the wheel goes.
             </span>
           )}
@@ -338,16 +334,16 @@ export default function EmotionWheel({ sessionId, role, isLocked }: EmotionWheel
           background: rootPalette.tint, border: `1.5px solid ${rootPalette.accent}`,
           boxShadow: '0 4px 14px rgba(20,30,45,0.06)',
         }}>
-          <span aria-hidden style={{ fontSize: 30, lineHeight: 1 }}>{rootPalette.emoji}</span>
+          <span aria-hidden style={{ fontSize: 33, lineHeight: 1 }}>{rootPalette.emoji}</span>
           <span>
             <span style={{
-              display: 'block', fontSize: 10.5, fontWeight: 800, letterSpacing: 1.3,
+              display: 'block', fontSize: 13.5, fontWeight: 800, letterSpacing: 1.3,
               textTransform: 'uppercase', color: INK_FAINT,
             }}>
               You named it
             </span>
             <span style={{
-              display: 'block', marginTop: 2, fontSize: 24, fontWeight: 800,
+              display: 'block', marginTop: 2, fontSize: 28, fontWeight: 800,
               letterSpacing: -0.3, textTransform: 'capitalize', color: rootPalette.accent,
             }}>
               {selected}
@@ -369,56 +365,13 @@ export default function EmotionWheel({ sessionId, role, isLocked }: EmotionWheel
           }}>
             <Lightbulb size={18} color={AMBER} fill="#FCD34D" />
           </span>
-          <span style={{ fontSize: 14.5, fontWeight: 500, lineHeight: 1.45, color: INK_BODY }}>
+          <span style={{ fontSize: 18, fontWeight: 500, lineHeight: 1.45, color: INK_BODY }}>
             There are many shades to every emotion.<br />
             Let&apos;s explore them together, one layer at a time.
           </span>
-        </div>
-      )}
-
-      {/* ---- Therapist compare tool (local-only prompt, unchanged) ---- */}
-      {isT && (
-        <div style={{
-          flexShrink: 0, display: 'flex', flexDirection: 'column', gap: 8,
-          padding: '10px 14px 12px', borderRadius: 16,
-          background: '#ffffff', border: `1px solid ${LINE}`,
-          boxShadow: '0 2px 10px rgba(20,30,45,0.05)',
-        }}>
-          <div style={{
-            fontSize: 10.5, fontWeight: 800, letterSpacing: 1.3,
-            textTransform: 'uppercase', color: INK_FAINT,
-          }}>
-            Compare two emotions (body sensation)
-          </div>
-          <div style={{ display: 'flex', gap: 8 }}>
-            <input className="ew-input" placeholder="Emotion A" value={comparePrompt[0] || ''}
-              onChange={e => setComparePrompt([e.target.value, comparePrompt[1] || ''])} style={inputStyle} />
-            <input className="ew-input" placeholder="Emotion B" value={comparePrompt[1] || ''}
-              onChange={e => setComparePrompt([comparePrompt[0] || '', e.target.value])} style={inputStyle} />
-          </div>
-          {comparePrompt[0] && comparePrompt[1] && (
-            <div style={{ display: 'flex', gap: 8 }}>
-              {comparePrompt.map((em, i) => (
-                <div key={i} style={{
-                  flex: 1, padding: '9px 12px', borderRadius: 12,
-                  background: '#F8FAFC', border: `1px solid ${LINE}`,
-                  fontSize: 12.5, lineHeight: 1.4, color: INK_BODY, textAlign: 'center',
-                }}>
-                  Where do you feel <strong style={{ textTransform: 'capitalize', color: INK }}>{em}</strong> in your body?
-                </div>
-              ))}
-            </div>
-          )}
         </div>
       )}
     </div>
   )
 }
 
-const inputStyle: React.CSSProperties = {
-  flex: 1, minWidth: 0, boxSizing: 'border-box', outline: 'none',
-  background: '#ffffff', border: `1px solid ${LINE}`, borderRadius: 12,
-  padding: '9px 12px', fontSize: 13, color: INK_BODY,
-  fontFamily: '"DM Sans", sans-serif',
-  transition: 'border-color .15s, box-shadow .15s',
-}

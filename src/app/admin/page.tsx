@@ -160,7 +160,12 @@ export default function AdminOverviewPage() {
                 </thead>
                 <tbody>
                   {rows.map((t) => (
-                    <tr key={t.id} style={{ borderBottom: '1px solid var(--glass-border)', color: 'var(--ink)' }}>
+                    <tr
+                      key={t.id}
+                      onClick={() => router.push(`/admin/professionals/${t.id}`)}
+                      className="cursor-pointer hover-lift"
+                      style={{ borderBottom: '1px solid var(--glass-border)', color: 'var(--ink)' }}
+                    >
                       <td className="px-4 py-3">
                         <div className="font-semibold">{t.name || 'Unnamed'}</div>
                         <div className="text-xs" style={{ color: 'var(--ink-muted)' }}>{t.email}</div>
@@ -193,7 +198,7 @@ export default function AdminOverviewPage() {
                       <td className="px-4 py-3 whitespace-nowrap text-xs" style={{ color: 'var(--ink-muted)' }}>{fmtDate(t.lastActive)}</td>
                       <td className="px-4 py-3">
                         <button
-                          onClick={() => openAccess(t)}
+                          onClick={(e) => { e.stopPropagation(); openAccess(t); }}
                           className="btn-press flex items-center gap-1.5 rounded-lg px-3 py-1.5 text-xs font-semibold whitespace-nowrap"
                           style={{ background: 'var(--glass-bg)', border: '1px solid var(--glass-border)', color: 'var(--ink)' }}
                         >

@@ -23,6 +23,13 @@ export interface SpeakOptions {
   text: string
   language: VoiceLanguage
   type: SpeechType
+  /**
+   * Fired once when this line stops being spoken — whether it finished, errored
+   * or was cut short by staadCancel(). Lets a module chain utterances to the
+   * real speech duration instead of guessing with a timer. Never fires if the
+   * browser has no speech support, so callers still need their own fallback.
+   */
+  onEnd?: () => void
 }
 
 /** Shared praise bank so every module uses the same encouraging language. */
@@ -188,9 +195,46 @@ function watchForVoices() {
   }, 1200)
 }
 
-function enqueue({ text, language, type }: SpeakOptions) {
+/* Chrome and Safari can garbage-collect an utterance that is still being spoken,
+   which truncates the line mid-word. Holding a reference until it reports back is
+   the standard workaround. */
+const inFlight = new Set<SpeechSynthesisUtterance>()
+
+/* Chrome also silently pauses synthesis after roughly 15 seconds of speaking.
+   resume() is a no-op when nothing is paused, so poking it on a timer while
+   speech is in progress costs nothing and keeps long read-backs going. */
+let keepAlive: ReturnType<typeof setInterval> | null = null
+
+function startKeepAlive() {
+  if (keepAlive || !supported()) return
+  keepAlive = setInterval(() => {
+    const synth = window.speechSynthesis
+    if (!synth.speaking && !synth.pending) { stopKeepAlive(); return }
+    synth.resume()
+  }, 5000)
+}
+
+function stopKeepAlive() {
+  if (!keepAlive) return
+  clearInterval(keepAlive)
+  keepAlive = null
+}
+
+function enqueue({ text, language, type, onEnd }: SpeakOptions) {
   if (!supported() || !text) return
   const utterance = new SpeechSynthesisUtterance(text)
+  let fired = false
+  const done = () => {
+    if (fired) return
+    fired = true
+    inFlight.delete(utterance)
+    if (!inFlight.size) stopKeepAlive()
+    onEnd?.()
+  }
+  // `error` covers the cancel path: browsers differ on whether an interrupted
+  // utterance ends or errors, so listen for both and de-duplicate.
+  utterance.onend = done
+  utterance.onerror = done
   const { rate, pitch } = PROSODY[type] ?? PROSODY.instruction
   utterance.rate = rate
   utterance.pitch = pitch
@@ -200,7 +244,9 @@ function enqueue({ text, language, type }: SpeakOptions) {
 
   const resolved = resolveVoice(language)
   if (resolved.voice) utterance.voice = resolved.voice
+  inFlight.add(utterance)
   window.speechSynthesis.speak(utterance)
+  startKeepAlive()
 }
 
 /**
@@ -223,7 +269,11 @@ export function staadSpeak(options: SpeakOptions): void {
 /** Stop anything currently being spoken (and drop anything queued here). */
 export function staadCancel(): void {
   pending = []
-  if (supported()) window.speechSynthesis.cancel()
+  if (!supported()) return
+  // cancel() fires end/error on the live utterances, which clears inFlight and
+  // stops the keep-alive through the normal path.
+  window.speechSynthesis.cancel()
+  stopKeepAlive()
 }
 
 /**
