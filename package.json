@@ -20,7 +20,7 @@
     "test:e2e": "tsx scripts/test-e2e-rag.ts",
     "seed:admin": "node --env-file=.env scripts/seed-admin.cjs",
     "seed:plans": "node --env-file=.env scripts/seed-plans.cjs",
-    "prebuild": "node scripts/fetch-mediapipe-assets.mjs",
+    "prebuild": "prisma generate && node scripts/fetch-mediapipe-assets.mjs",
     "setup:mediapipe": "node scripts/fetch-mediapipe-assets.mjs",
     "test:rules": "firebase emulators:exec --only firestore --project staad-rules-test \"vitest run --config vitest.rules.config.ts\"",
     "emulators": "firebase emulators:start --only firestore --project staad-rules-test",
