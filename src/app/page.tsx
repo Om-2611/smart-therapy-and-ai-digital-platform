@@ -503,6 +503,21 @@ export default function Home() {
                             style={{ background: 'var(--sage)', color: '#fff', border: 'none' }}
                           >
                             Launch Direct Session
+                            
+                          </Button>
+                                                    <Button
+                            onClick={() => router.push(`/clients/${client.id}/progress`)}
+                            className="btn-press mt-2 w-full rounded-lg text-xs font-semibold"
+                            style={{ background: 'var(--glass-bg)', color: 'var(--ink-muted)', border: '1px solid var(--glass-border)' }}
+                          >
+                            View Progress
+                          </Button>
+                          <Button
+                            onClick={() => router.push(`/clients/${client.id}/progress`)}
+                            className="btn-press mt-2 w-full rounded-lg text-xs font-semibold"
+                            style={{ background: 'var(--glass-bg)', color: 'var(--ink-muted)', border: '1px solid var(--glass-border)' }}
+                          >
+                            View Progress
                           </Button>
                         </div>
                       ))
