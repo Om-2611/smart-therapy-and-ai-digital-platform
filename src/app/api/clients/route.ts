@@ -22,7 +22,8 @@ export async function GET(request: Request) {
         include: { user: true },
       });
 
-      // Attach session count and last session per client
+      // Attach session count, last held session and next scheduled session per client
+      const now = new Date();
       const clientsWithMeta = await Promise.all(
         clients.map(async (client) => {
           const clientSessions = await prisma.session.findMany({
@@ -30,10 +31,17 @@ export async function GET(request: Request) {
             orderBy: { scheduledAt: 'desc' },
             select: { id: true, scheduledAt: true, status: true },
           });
+          const held = clientSessions.filter(
+            (s) => s.status !== 'CANCELLED' && (s.status !== 'SCHEDULED' || s.scheduledAt <= now)
+          );
+          const next = clientSessions
+            .filter((s) => s.status === 'SCHEDULED' && s.scheduledAt > now)
+            .at(-1);
           return {
             ...client,
             sessionCount: clientSessions.length,
-            lastSession: clientSessions[0]?.scheduledAt || null,
+            lastSession: held[0]?.scheduledAt || null,
+            nextSession: next ? { id: next.id, scheduledAt: next.scheduledAt } : null,
           };
         })
       );

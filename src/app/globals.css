@@ -249,6 +249,253 @@ h1, h2, h3, h4, h5, h6 {
   box-shadow: 0 10px 24px rgba(139, 99, 64, 0.14);
 }
 
+/* ── Practice design system (therapist dashboard pages) ─────────────
+   Tokens + a handful of component classes shared by the redesigned
+   Dashboard / Clients / Sessions / Schedule / Modules / Plans / Profile /
+   Help pages. Light values first; `.dark` swaps them. */
+:root {
+  --ds-bg: #F6F2EA;
+  --ds-surface: #FFFFFF;
+  --ds-surface-2: #FAF7F1;
+  --ds-border: #EAE2D5;
+  --ds-border-strong: #DCD0BD;
+  --ds-ink: #1C2A25;
+  --ds-muted: #66706B;
+  --ds-faint: #9AA19D;
+  --ds-forest: #1F4136;
+  --ds-forest-hover: #16332A;
+  --ds-forest-soft: #E4EEE8;
+  --ds-side: #1D3B31;
+  --ds-side-ink: #E8EFEA;
+  --ds-side-muted: rgba(232, 239, 234, 0.74);
+  --ds-side-active: rgba(255, 255, 255, 0.11);
+  --ds-side-border: rgba(255, 255, 255, 0.09);
+  --ds-clay: #B07B4F;
+  --ds-clay-hover: #986640;
+  --ds-clay-soft: #F5E9DD;
+  --ds-clay-ink: #8A5A33;
+  --ds-green: #2E7D57;
+  --ds-green-soft: #E3F1E8;
+  --ds-amber: #B9800F;
+  --ds-amber-soft: #FBF0DA;
+  --ds-red: #C8473A;
+  --ds-red-soft: #FBE8E4;
+  --ds-blue: #3B6BA5;
+  --ds-blue-soft: #E7EEF8;
+  --ds-violet: #6E55A8;
+  --ds-violet-soft: #EFEAF8;
+  --ds-shadow: 0 1px 2px rgba(60, 40, 20, 0.04), 0 6px 18px rgba(60, 40, 20, 0.05);
+  --ds-shadow-lg: 0 14px 34px rgba(60, 40, 20, 0.14);
+}
+
+.dark {
+  --ds-bg: #101916;
+  --ds-surface: #17231F;
+  --ds-surface-2: #1C2A25;
+  --ds-border: #26352F;
+  --ds-border-strong: #34473F;
+  --ds-ink: #EEF2EF;
+  --ds-muted: #A3AFA9;
+  --ds-faint: #6F7C76;
+  --ds-forest: #3D7A63;
+  --ds-forest-hover: #4A8B73;
+  --ds-forest-soft: rgba(61, 122, 99, 0.2);
+  --ds-side: #0C1512;
+  --ds-clay: #C08A5C;
+  --ds-clay-hover: #CF9B6D;
+  --ds-clay-soft: rgba(192, 138, 92, 0.16);
+  --ds-clay-ink: #E2B68E;
+  --ds-green: #62C08F;
+  --ds-green-soft: rgba(98, 192, 143, 0.14);
+  --ds-amber: #E6B455;
+  --ds-amber-soft: rgba(230, 180, 85, 0.14);
+  --ds-red: #F08272;
+  --ds-red-soft: rgba(240, 130, 114, 0.14);
+  --ds-blue: #8DB2E6;
+  --ds-blue-soft: rgba(141, 178, 230, 0.14);
+  --ds-violet: #B9A2EC;
+  --ds-violet-soft: rgba(185, 162, 236, 0.14);
+  --ds-shadow: 0 1px 2px rgba(0, 0, 0, 0.3), 0 6px 18px rgba(0, 0, 0, 0.22);
+  --ds-shadow-lg: 0 14px 34px rgba(0, 0, 0, 0.45);
+}
+
+.ds-page { background: var(--ds-bg); color: var(--ds-ink); }
+.ds-title { font-family: 'DM Serif Display', serif; color: var(--ds-ink); letter-spacing: -0.01em; }
+.ds-muted { color: var(--ds-muted); }
+.ds-faint { color: var(--ds-faint); }
+
+.ds-card {
+  background: var(--ds-surface);
+  border: 1px solid var(--ds-border);
+  border-radius: 18px;
+  box-shadow: var(--ds-shadow);
+}
+.ds-card-hover { transition: box-shadow 0.2s ease, border-color 0.2s ease, transform 0.2s ease; }
+.ds-card-hover:hover { box-shadow: var(--ds-shadow-lg); border-color: var(--ds-border-strong); }
+
+.ds-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.5rem;
+  border-radius: 12px;
+  border: 1px solid transparent;
+  padding: 0.62rem 1.05rem;
+  font-size: 13.5px;
+  font-weight: 600;
+  line-height: 1.15;
+  white-space: nowrap;
+  cursor: pointer;
+  transition: background 0.15s, border-color 0.15s, color 0.15s, transform 0.15s, box-shadow 0.15s;
+}
+.ds-btn:active:not(:disabled) { transform: scale(0.98); }
+.ds-btn:disabled { opacity: 0.55; cursor: not-allowed; }
+.ds-btn svg { width: 16px; height: 16px; flex-shrink: 0; }
+.ds-btn-sm { padding: 0.45rem 0.8rem; font-size: 12.5px; border-radius: 10px; }
+.ds-btn-lg { padding: 0.8rem 1.3rem; font-size: 14.5px; }
+.ds-btn-primary { background: var(--ds-forest); color: #fff; }
+.ds-btn-primary:hover:not(:disabled) { background: var(--ds-forest-hover); }
+.ds-btn-clay { background: var(--ds-clay); color: #fff; box-shadow: 0 4px 12px rgba(176, 123, 79, 0.22); }
+.ds-btn-clay:hover:not(:disabled) { background: var(--ds-clay-hover); }
+.ds-btn-outline { background: var(--ds-surface); color: var(--ds-ink); border-color: var(--ds-border-strong); }
+.ds-btn-outline:hover:not(:disabled) { background: var(--ds-surface-2); border-color: var(--ds-clay); }
+.ds-btn-clay-outline { background: var(--ds-surface); color: var(--ds-ink); border-color: var(--ds-clay); }
+.ds-btn-clay-outline:hover:not(:disabled) { background: var(--ds-clay-soft); }
+.ds-btn-ghost { background: transparent; color: var(--ds-muted); }
+.ds-btn-ghost:hover:not(:disabled) { background: var(--ds-surface-2); color: var(--ds-ink); }
+.ds-btn-danger { background: var(--ds-red); color: #fff; }
+.ds-btn-danger:hover:not(:disabled) { filter: brightness(0.93); }
+
+.ds-icon-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 34px;
+  height: 34px;
+  border-radius: 10px;
+  color: var(--ds-muted);
+  transition: background 0.15s, color 0.15s;
+}
+.ds-icon-btn:hover:not(:disabled) { background: var(--ds-surface-2); color: var(--ds-ink); }
+.ds-icon-btn:disabled { opacity: 0.4; cursor: not-allowed; }
+
+.ds-input {
+  width: 100%;
+  background: var(--ds-surface);
+  border: 1px solid var(--ds-border-strong);
+  color: var(--ds-ink);
+  border-radius: 12px;
+  padding: 0.66rem 0.9rem;
+  font-size: 14px;
+  transition: border-color 0.15s, box-shadow 0.15s;
+}
+.ds-input::placeholder { color: var(--ds-faint); }
+.ds-input:focus { outline: none; border-color: var(--ds-clay); box-shadow: 0 0 0 3px var(--ds-clay-soft); }
+.ds-input:disabled, .ds-input[readonly] { background: var(--ds-surface-2); color: var(--ds-muted); }
+select.ds-input {
+  appearance: none;
+  padding-right: 2.4rem;
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='16' height='16' fill='none' stroke='%238B918E' stroke-width='2' stroke-linecap='round' stroke-linejoin='round' viewBox='0 0 24 24'%3E%3Cpath d='m6 9 6 6 6-6'/%3E%3C/svg%3E");
+  background-repeat: no-repeat;
+  background-position: right 0.85rem center;
+  cursor: pointer;
+}
+.dark input[type='date'].ds-input, .dark input[type='time'].ds-input { color-scheme: dark; }
+.ds-label { display: block; margin-bottom: 0.4rem; font-size: 13px; font-weight: 600; color: var(--ds-ink); }
+
+.ds-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
+  border-radius: 999px;
+  padding: 0.18rem 0.62rem;
+  font-size: 11.5px;
+  font-weight: 600;
+  line-height: 1.45;
+  white-space: nowrap;
+}
+
+.ds-pill-tab {
+  border-radius: 999px;
+  border: 1px solid var(--ds-border-strong);
+  background: var(--ds-surface);
+  color: var(--ds-ink);
+  padding: 0.5rem 1.1rem;
+  font-size: 13.5px;
+  font-weight: 500;
+  white-space: nowrap;
+  transition: background 0.15s, color 0.15s, border-color 0.15s;
+}
+.ds-pill-tab:hover { border-color: var(--ds-clay); }
+.ds-pill-tab.is-active { background: var(--ds-clay); border-color: var(--ds-clay); color: #fff; }
+
+.ds-underline-tab {
+  position: relative;
+  padding: 0.5rem 0.1rem 0.7rem;
+  font-size: 14.5px;
+  color: var(--ds-muted);
+  white-space: nowrap;
+  transition: color 0.15s;
+}
+.ds-underline-tab:hover { color: var(--ds-ink); }
+.ds-underline-tab.is-active { color: var(--ds-ink); font-weight: 600; }
+.ds-underline-tab.is-active::after {
+  content: '';
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  height: 2.5px;
+  border-radius: 2px;
+  background: var(--ds-clay);
+}
+
+.ds-menu-item {
+  display: flex;
+  width: 100%;
+  align-items: center;
+  gap: 0.6rem;
+  border-radius: 9px;
+  padding: 0.55rem 0.7rem;
+  font-size: 13.5px;
+  color: var(--ds-ink);
+  text-align: left;
+}
+.ds-menu-item:hover:not(:disabled) { background: var(--ds-surface-2); }
+.ds-menu-item:disabled { opacity: 0.45; cursor: not-allowed; }
+
+.ds-side-link {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  border-radius: 12px;
+  padding: 10px 14px;
+  font-size: 14.5px;
+  color: var(--ds-side-muted);
+  text-decoration: none;
+  transition: background 0.15s, color 0.15s;
+}
+.ds-side-link:hover { background: rgba(255, 255, 255, 0.06); color: #fff; }
+.ds-side-link.is-active { background: var(--ds-side-active); color: #fff; font-weight: 600; }
+
+.ds-dialog {
+  background: var(--ds-surface) !important;
+  color: var(--ds-ink) !important;
+  border: 1px solid var(--ds-border);
+  border-radius: 20px !important;
+  box-shadow: var(--ds-shadow-lg);
+}
+
+.ds-btn:focus-visible,
+.ds-icon-btn:focus-visible,
+.ds-pill-tab:focus-visible,
+.ds-underline-tab:focus-visible,
+.ds-menu-item:focus-visible,
+.ds-side-link:focus-visible {
+  outline: 2px solid var(--ds-clay);
+  outline-offset: 2px;
+}
+
 /* Pulsing dot for live session times */
 @keyframes livePulse {
   0%, 100% { opacity: 1; transform: scale(1); }

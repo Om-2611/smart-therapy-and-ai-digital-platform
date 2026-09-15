@@ -32,7 +32,7 @@ export async function PATCH(
   { params }: { params: { sessionId: string } }
 ) {
   try {
-    const { action } = await request.json();
+    const { action, scheduledAt } = await request.json();
 
     const existing = await prisma.session.findUnique({
       where: { id: params.sessionId },
@@ -43,6 +43,33 @@ export async function PATCH(
 
     const now = new Date();
     let data: Record<string, unknown> | null = null;
+
+    // Scheduling actions only touch Postgres — the live room isn't involved, so
+    // they return before Firestore provisioning.
+    //   - 'cancel':     SCHEDULED -> CANCELLED
+    //   - 'reschedule': SCHEDULED/CANCELLED -> SCHEDULED at the new `scheduledAt`
+    if (action === 'cancel' || action === 'reschedule') {
+      if (action === 'cancel' && existing.status !== 'SCHEDULED') {
+        return NextResponse.json({ error: 'Only scheduled sessions can be cancelled' }, { status: 409 });
+      }
+      if (action === 'reschedule') {
+        if (existing.status !== 'SCHEDULED' && existing.status !== 'CANCELLED') {
+          return NextResponse.json({ error: 'Only scheduled or cancelled sessions can be rescheduled' }, { status: 409 });
+        }
+        if (!scheduledAt || Number.isNaN(new Date(scheduledAt).getTime())) {
+          return NextResponse.json({ error: 'A valid scheduledAt is required' }, { status: 400 });
+        }
+      }
+      const session = await prisma.session.update({
+        where: { id: params.sessionId },
+        data:
+          action === 'cancel'
+            ? { status: 'CANCELLED' }
+            : { status: 'SCHEDULED', scheduledAt: new Date(scheduledAt) },
+        include: { client: true, therapist: true },
+      });
+      return NextResponse.json({ session });
+    }
 
     // Mirror session entitlement into Firestore before anything else. The
     // security rules authorise every session-scoped read/write against

@@ -21,7 +21,7 @@ import LocalVideoPip from '@/components/LocalVideoPip';
 import GlassModulePanel, { SkillModuleView } from '@/components/GlassModulePanel';
 import SkillDevLayout from '@/components/session/SkillDevLayout';
 import ReactionOverlay from '@/components/ReactionOverlay';
-import { resolveAllowedModuleIds, isSkillModule } from '@/lib/modules';
+import { resolveAllowedModuleIds, isSkillModule, moduleName as moduleDisplayName } from '@/lib/modules';
 import { RC, SIDEBAR_WIDTH } from '@/components/session/roomTheme';
 import type { SidebarPanel } from '@/components/session/sessionPanels';
 import SessionTopBar from '@/components/session/SessionTopBar';
@@ -303,6 +303,22 @@ export default function SessionRoomPage({ params }: { params: { sessionId: strin
   useEffect(() => {
     setIsModuleActive(activeModule !== null);
   }, [activeModule]);
+
+  // Deep link from the Therapy Modules page: /session/{id}?module={moduleId}
+  // launches that module once the room document exists. Therapist-only, once.
+  const autoLaunchedRef = useRef(false);
+  useEffect(() => {
+    if (!isTherapist || !sessionState || autoLaunchedRef.current) return;
+    const requested = new URLSearchParams(window.location.search).get('module');
+    if (!requested) return;
+    autoLaunchedRef.current = true;
+    if (!resolveAllowedModuleIds(profile).includes(requested)) {
+      showToast('That module is not included in your plan');
+      return;
+    }
+    handleModuleLaunch(requested, moduleDisplayName(requested));
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [isTherapist, sessionState, profile]);
 
   useEffect(() => {
     if (!uid) return;
