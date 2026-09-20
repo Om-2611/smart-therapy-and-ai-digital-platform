@@ -1,18 +1,14 @@
 'use client';
 
-import React, { useState, useEffect } from 'react';
-import { useAuthStore } from '@/store/useAuthStore';
-import { useRouter } from 'next/navigation';
-import { Button } from '@/components/ui/button';
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from '@/components/ui/dialog';
-import { Check, Loader2, Clock, CreditCard, Infinity as InfinityIcon, Sparkles } from 'lucide-react';
+import React, { useCallback, useEffect, useState } from 'react';
+import Link from 'next/link';
+import { ArrowRight, Check, Clock, Crown, Headset, Loader2, Mail, Sparkles, Sprout, User, Users } from 'lucide-react';
 import DashboardLayout from '@/components/layout/DashboardLayout';
-import { MODULE_CATEGORIES } from '@/lib/modules';
-
-const CARD_BASE =
-  'rounded-[14px] border-[0.5px] border-[var(--glass-border)] shadow-[var(--glass-shadow)] bg-[var(--glass-bg)] dark:bg-[#16221e] animate-fade-up';
-const GLASS_CARD = `${CARD_BASE} hover-lift`;
-const inputStyle = { background: 'var(--glass-bg)', border: '1px solid var(--glass-border)', color: 'var(--ink)' } as const;
+import { useAuthStore } from '@/store/useAuthStore';
+import { useTherapistGuard } from '@/hooks/usePracticeData';
+import { Card, DsDialog, ErrorBanner, IconBubble, LoadingBlock, PageHeader, Pill, cx, toast } from '@/components/practice/ui';
+import { ALL_MODULE_IDS, MODULE_CATEGORIES, resolveAllowedModuleIds } from '@/lib/modules';
+import { fmtDate } from '@/lib/practice';
 
 interface Plan {
   id: string;
@@ -42,15 +38,39 @@ interface Pending {
 }
 
 const MONTH_OPTIONS = [1, 3, 6, 12];
+const PLAN_ICONS = [User, Crown, Users];
+
+const STEPS = [
+  { title: 'Select a plan', body: 'Choose the plan that fits your needs.' },
+  { title: 'Send request', body: 'Submit a request for the selected plan.' },
+  { title: 'Admin approval', body: 'Our team reviews and approves your request.' },
+];
+
+const quotaLabel = (q: number | null) => (q == null ? 'All therapy tools' : `${q} therapy tools`);
+
+const planFeatures = (p: Plan) => [
+  p.toolQuota == null ? 'Every therapy tool, including new ones' : `Any ${p.toolQuota} therapy tools you choose`,
+  'Unlimited clients & sessions',
+  'Session notes & AI session reports',
+  'Progress tracking with PDF/CSV export',
+  p.durationMonths > 1 ? `${p.durationMonths}-month default term` : 'Flexible terms from 1 to 12 months',
+];
+
+const CheckDot = () => (
+  <span className="mt-px flex h-5 w-5 shrink-0 items-center justify-center rounded-full" style={{ background: 'var(--ds-green-soft)', color: 'var(--ds-green)' }}>
+    <Check className="h-3 w-3" strokeWidth={3} />
+  </span>
+);
 
 export default function PlansPage() {
-  const { uid, role, profile } = useAuthStore();
-  const router = useRouter();
+  useTherapistGuard();
+  const { role, profile } = useAuthStore();
 
   const [plans, setPlans] = useState<Plan[]>([]);
   const [current, setCurrent] = useState<Current | null>(null);
   const [pending, setPending] = useState<Pending | null>(null);
   const [loading, setLoading] = useState(true);
+  const [loadError, setLoadError] = useState('');
 
   // Request modal
   const [reqPlan, setReqPlan] = useState<Plan | null>(null);
@@ -59,37 +79,36 @@ export default function PlansPage() {
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState('');
 
-  useEffect(() => {
-    if (!uid) { router.push('/auth'); return; }
-    if (role && role !== 'THERAPIST') { router.push('/'); return; }
-    if (role === 'THERAPIST' && profile?.id) load();
-  }, [uid, role, profile?.id]);
-
-  const load = async () => {
+  const load = useCallback(async () => {
+    if (!profile?.id) return;
     setLoading(true);
     try {
-      const [pRes, sRes] = await Promise.all([
-        fetch('/api/plans'),
-        fetch(`/api/subscriptions?therapistId=${profile.id}`),
-      ]);
+      const [pRes, sRes] = await Promise.all([fetch('/api/plans'), fetch(`/api/subscriptions?therapistId=${profile.id}`)]);
       if (pRes.ok) setPlans((await pRes.json()).plans || []);
       if (sRes.ok) {
         const d = await sRes.json();
         setCurrent(d.current);
         setPending(d.pendingRequest);
       }
-    } catch (err) { console.error(err); }
+      setLoadError(pRes.ok && sRes.ok ? '' : 'Some plan details could not be loaded.');
+    } catch {
+      setLoadError('Could not reach the server. Please try again.');
+    }
     setLoading(false);
-  };
+  }, [profile?.id]);
+
+  useEffect(() => {
+    if (role === 'THERAPIST') load();
+  }, [role, load]);
 
   const openRequest = (p: Plan) => {
     setReqPlan(p);
     setMonths(p.durationMonths || 1);
-    setSelected(new Set());
+    setSelected(new Set(current?.moduleAccess?.slice(0, p.toolQuota ?? undefined) ?? []));
     setError('');
   };
 
-  const toggle = (id: string) => {
+  const toggleTool = (id: string) => {
     if (!reqPlan) return;
     setSelected((prev) => {
       const next = new Set(prev);
@@ -111,89 +130,103 @@ export default function PlansPage() {
       const res = await fetch('/api/subscriptions/request', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          therapistId: profile.id,
-          planId: reqPlan.id,
-          months,
-          modules: Array.from(selected),
-        }),
+        body: JSON.stringify({ therapistId: profile.id, planId: reqPlan.id, months, modules: Array.from(selected) }),
       });
-      const data = await res.json();
-      if (!res.ok) { setError(data.error || 'Could not submit request.'); }
-      else { setReqPlan(null); load(); }
-    } catch (err) { setError('Network error. Please try again.'); }
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) {
+        setError(data.error || 'Could not submit request.');
+      } else {
+        toast(`Request for ${reqPlan.name} sent — an admin will review it.`);
+        setReqPlan(null);
+        load();
+      }
+    } catch {
+      setError('Network error. Please try again.');
+    }
     setSubmitting(false);
   };
 
-  const fmtDate = (d: string) => new Date(d).toLocaleDateString();
-  const price = (n: number) => (n > 0 ? `₹${n.toLocaleString('en-IN')}/mo` : 'Free');
-  const quotaLabel = (q: number | null) => (q == null ? 'All tools' : `${q} tools`);
+  const toolsAvailable = resolveAllowedModuleIds(profile).length;
+  const toolPct = Math.round((toolsAvailable / ALL_MODULE_IDS.length) * 100);
+
+  const included = current
+    ? [quotaLabel(current.toolQuota), `${current.months}-month term`, `Started ${fmtDate(current.startedAt)}`, 'Session notes & AI reports']
+    : ['Scheduling & live session rooms', 'Session notes & AI reports', 'Client invites & progress tracking', 'Email support'];
 
   return (
     <DashboardLayout role={role} profile={profile}>
-      <div className="relative z-10 space-y-6">
-        <div>
-          <h1 className="font-heading text-[28px]" style={{ color: 'var(--ink)' }}>Plans & Subscription</h1>
-          <p className="text-sm font-medium mt-1" style={{ color: 'var(--ink-muted)' }}>
-            View your current plan and request a subscription. An admin reviews every request.
-          </p>
-        </div>
+      <div className="space-y-6">
+        <PageHeader title="Plans & Subscription" subtitle="View your current plan and request a subscription. An admin reviews every request." />
+
+        {loadError && <ErrorBanner message={loadError} onRetry={load} />}
 
         {loading ? (
-          <div className="flex justify-center py-20">
-            <div className="h-10 w-10 animate-spin rounded-full border-2 border-[var(--sage)] border-t-transparent"></div>
-          </div>
+          <LoadingBlock label="Loading plans…" />
         ) : (
           <>
-            {/* Current plan / free tier */}
-            <div className={`${GLASS_CARD} p-6`}>
-              <div className="flex items-start justify-between gap-4 flex-wrap">
-                <div className="flex items-center gap-3">
-                  <div className="flex h-12 w-12 items-center justify-center rounded-xl" style={{ background: 'var(--sage-light)', color: 'var(--sage)' }}>
-                    {current ? <CreditCard className="h-6 w-6" /> : <Sparkles className="h-6 w-6" />}
-                  </div>
-                  <div>
-                    <p className="text-xs font-semibold uppercase tracking-wide" style={{ color: 'var(--ink-muted)' }}>Current plan</p>
-                    <p className="font-heading text-2xl" style={{ color: 'var(--ink)' }}>
-                      {current ? current.planName : 'Free tier'}
-                    </p>
-                  </div>
+            {/* Current plan */}
+            <Card className="grid grid-cols-1 gap-6 p-6 lg:grid-cols-[minmax(0,1.5fr)_minmax(0,1fr)_minmax(0,1fr)]">
+              <div className="flex items-start gap-4">
+                <div
+                  className="flex h-[76px] w-[76px] shrink-0 items-center justify-center rounded-2xl"
+                  style={{ background: 'var(--ds-clay-soft)', color: 'var(--ds-clay-ink)' }}
+                >
+                  <Sprout className="h-9 w-9" />
                 </div>
-                {current && (
-                  <div className="text-right">
-                    <span className="rounded-full px-3 py-1 text-xs font-semibold" style={{ background: 'var(--sage-light)', color: 'var(--sage)' }}>
-                      {current.renewed ? `Renewed ×${current.renewalCount}` : 'Active'}
-                    </span>
+                <div className="min-w-0">
+                  <p className="ds-muted text-[12px] font-semibold uppercase tracking-[0.12em]">Current plan</p>
+                  <div className="mt-1 flex flex-wrap items-center gap-2">
+                    <p className="ds-title text-[32px] leading-none">{current ? current.planName : 'Free tier'}</p>
+                    <Pill tone="green">{current?.renewed ? `Renewed ×${current.renewalCount}` : 'Current'}</Pill>
                   </div>
-                )}
+                  <p className="ds-muted mt-2 text-[13.5px]">
+                    {current
+                      ? `Renews or ends on ${fmtDate(current.currentPeriodEnd)}.`
+                      : "You haven't taken a plan yet. Choose one below and send a request to unlock more tools."}
+                  </p>
+                </div>
               </div>
-
-              {current ? (
-                <div className="mt-5 grid grid-cols-2 gap-4 sm:grid-cols-4">
-                  {[
-                    { label: 'Tools', value: quotaLabel(current.toolQuota) },
-                    { label: 'Term', value: `${current.months} mo` },
-                    { label: 'Started', value: fmtDate(current.startedAt) },
-                    { label: 'Renews / ends', value: fmtDate(current.currentPeriodEnd) },
-                  ].map((s) => (
-                    <div key={s.label}>
-                      <p className="text-xs font-medium" style={{ color: 'var(--ink-muted)' }}>{s.label}</p>
-                      <p className="text-sm font-semibold mt-0.5" style={{ color: 'var(--ink)' }}>{s.value}</p>
-                    </div>
+              <div className="lg:border-l lg:pl-6" style={{ borderColor: 'var(--ds-border)' }}>
+                <p className="text-[14px] font-semibold">What&apos;s included</p>
+                <ul className="mt-2.5 space-y-2">
+                  {included.map((item) => (
+                    <li key={item} className="flex items-start gap-2 text-[13.5px]">
+                      <CheckDot /> {item}
+                    </li>
                   ))}
+                </ul>
+              </div>
+              <div className="lg:border-l lg:pl-6" style={{ borderColor: 'var(--ds-border)' }}>
+                <div className="flex items-center justify-between">
+                  <p className="ds-muted text-[12px] font-semibold uppercase tracking-[0.12em]">Tool access</p>
+                  <p className="text-[15px] font-semibold">
+                    {toolsAvailable} / {ALL_MODULE_IDS.length}
+                  </p>
                 </div>
-              ) : (
-                <p className="mt-4 text-sm font-medium" style={{ color: 'var(--ink-muted)' }}>
-                  You haven&apos;t taken a plan yet. Choose one below and send a request to unlock more tools.
+                <div
+                  className="mt-3 h-2.5 overflow-hidden rounded-full"
+                  style={{ background: 'var(--ds-border)' }}
+                  role="progressbar"
+                  aria-valuenow={toolsAvailable}
+                  aria-valuemin={0}
+                  aria-valuemax={ALL_MODULE_IDS.length}
+                  aria-label="Therapy tools available"
+                >
+                  <div className="h-full rounded-full" style={{ width: `${Math.max(toolPct, 3)}%`, background: 'var(--ds-green)' }} />
+                </div>
+                <p className="ds-muted mt-2 text-[12.5px]">
+                  You can use {toolsAvailable} of {ALL_MODULE_IDS.length} therapy tools.
                 </p>
-              )}
-            </div>
+                <Link href="/modules" className="mt-3 inline-flex items-center gap-1 text-[13px] font-semibold" style={{ color: 'var(--ds-clay-ink)' }}>
+                  Browse modules <ArrowRight className="h-3.5 w-3.5" />
+                </Link>
+              </div>
+            </Card>
 
-            {/* Pending request banner */}
             {pending && (
-              <div className={`${CARD_BASE} p-4 flex items-center gap-3`} style={{ borderColor: 'var(--c-accent)' }}>
-                <Clock className="h-5 w-5 shrink-0" style={{ color: 'var(--c-accent)' }} />
-                <p className="text-sm font-medium" style={{ color: 'var(--ink)' }}>
+              <div className="flex items-center gap-3 rounded-2xl px-4 py-3 text-[13.5px]" style={{ background: 'var(--ds-amber-soft)' }} role="status">
+                <Clock className="h-5 w-5 shrink-0" style={{ color: 'var(--ds-amber)' }} />
+                <p>
                   Your request for the <strong>{pending.planName}</strong> plan ({pending.months} mo
                   {pending.modules.length ? `, ${pending.modules.length} tools` : ''}) is awaiting admin approval.
                 </p>
@@ -202,119 +235,191 @@ export default function PlansPage() {
 
             {/* Available plans */}
             <div>
-              <h2 className="font-heading text-xl mb-3" style={{ color: 'var(--ink)' }}>Available plans</h2>
-              <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                {plans.map((p, i) => (
-                  <div key={p.id} className={`${CARD_BASE} stagger-${Math.min(i + 1, 4)} p-6 flex flex-col`}>
-                    <div className="flex items-center gap-2">
-                      <p className="font-heading text-xl" style={{ color: 'var(--ink)' }}>{p.name}</p>
-                      {p.toolQuota == null && <InfinityIcon className="h-4 w-4" style={{ color: 'var(--sage)' }} />}
-                    </div>
-                    <p className="font-heading text-3xl mt-2" style={{ color: 'var(--ink)' }}>{price(p.priceMonthly)}</p>
-                    <p className="text-sm font-medium mt-2" style={{ color: 'var(--ink-muted)' }}>{p.description}</p>
-                    <div className="mt-3 inline-flex w-fit items-center gap-1.5 rounded-full px-3 py-1 text-xs font-semibold" style={{ background: 'var(--sage-light)', color: 'var(--sage)' }}>
-                      <Check className="h-3.5 w-3.5" /> {quotaLabel(p.toolQuota)}
-                    </div>
-                    <div className="flex-1" />
-                    <Button
-                      onClick={() => openRequest(p)}
-                      disabled={!!pending}
-                      className="btn-press mt-5 rounded-xl font-semibold w-full"
-                      style={{ background: 'var(--sage)', color: '#fff', border: 'none', opacity: pending ? 0.5 : 1 }}
+              <h2 className="ds-title text-[28px]">Available plans</h2>
+              <p className="ds-muted text-[14px]">Choose a plan that fits your practice and send a request. An admin will review and approve it.</p>
+              <div className="mt-6 grid grid-cols-1 gap-5 lg:grid-cols-3">
+                {plans.map((p, i) => {
+                  const popular = plans.length >= 3 && i === 1;
+                  const Icon = PLAN_ICONS[i % PLAN_ICONS.length];
+                  const isCurrent = current?.planName === p.name;
+                  return (
+                    <div
+                      key={p.id}
+                      className="ds-card relative flex flex-col p-6"
+                      style={popular ? { borderColor: 'var(--ds-green)', boxShadow: '0 0 0 1px var(--ds-green), var(--ds-shadow)' } : undefined}
                     >
-                      {current?.planName === p.name ? 'Request again' : 'Request plan'}
-                    </Button>
-                  </div>
-                ))}
+                      {popular && (
+                        <span className="ds-chip absolute -top-3 right-6" style={{ background: 'var(--ds-green-soft)', color: 'var(--ds-green)' }}>
+                          <Sparkles className="h-3.5 w-3.5" /> Most Popular
+                        </span>
+                      )}
+                      <div className="flex items-center gap-4">
+                        <IconBubble tone={popular ? 'green' : 'clay'} size={60}>
+                          <Icon className="h-7 w-7" />
+                        </IconBubble>
+                        <div>
+                          <p className="ds-title text-[24px] leading-tight">{p.name}</p>
+                          {isCurrent && <Pill tone="green">Your plan</Pill>}
+                        </div>
+                      </div>
+                      <p className="mt-5">
+                        <span className="ds-title text-[36px]">{p.priceMonthly > 0 ? `₹${p.priceMonthly.toLocaleString('en-IN')}` : 'Free'}</span>
+                        {p.priceMonthly > 0 && <span className="ds-muted text-[15px]"> / month</span>}
+                      </p>
+                      {p.description && <p className="ds-muted mt-1 text-[13.5px]">{p.description}</p>}
+                      <div className="my-4 h-px" style={{ background: 'var(--ds-border)' }} />
+                      <ul className="space-y-2">
+                        {planFeatures(p).map((f) => (
+                          <li key={f} className="flex items-start gap-2 text-[13.5px]">
+                            <CheckDot /> {f}
+                          </li>
+                        ))}
+                      </ul>
+                      <div className="flex-1" />
+                      <button
+                        className={cx('ds-btn ds-btn-lg mt-6 w-full', popular ? 'ds-btn-clay' : 'ds-btn-clay-outline')}
+                        disabled={!!pending}
+                        onClick={() => openRequest(p)}
+                      >
+                        {pending ? 'Request pending' : isCurrent ? 'Renew plan' : 'Request Plan'}
+                      </button>
+                    </div>
+                  );
+                })}
                 {plans.length === 0 && (
-                  <div className={`${CARD_BASE} p-6 col-span-full text-sm font-medium`} style={{ color: 'var(--ink-muted)' }}>
-                    No plans are available yet. Please check back later.
-                  </div>
+                  <Card className="col-span-full p-6 text-[14px]">
+                    <span className="ds-muted">No plans are available yet. Please check back later or contact support.</span>
+                  </Card>
                 )}
               </div>
+            </div>
+
+            <div className="grid grid-cols-1 gap-5 lg:grid-cols-[minmax(0,1.6fr)_minmax(0,1fr)]">
+              <Card className="p-6">
+                <h2 className="ds-title text-[22px]">How subscriptions work</h2>
+                <p className="ds-muted text-[13.5px]">Getting access is simple and secure.</p>
+                <ol className="mt-5 flex flex-col gap-4 md:flex-row md:items-center">
+                  {STEPS.map((s, i) => (
+                    <React.Fragment key={s.title}>
+                      <li className="flex flex-1 items-center gap-3">
+                        <span
+                          className="flex h-11 w-11 shrink-0 items-center justify-center rounded-full text-[18px]"
+                          style={{
+                            fontFamily: "'DM Serif Display', serif",
+                            background: i === 0 ? 'var(--ds-green-soft)' : 'var(--ds-clay-soft)',
+                            color: i === 0 ? 'var(--ds-green)' : 'var(--ds-clay-ink)',
+                          }}
+                        >
+                          {i + 1}
+                        </span>
+                        <div>
+                          <p className="text-[14px] font-semibold">{s.title}</p>
+                          <p className="ds-muted text-[12.5px]">{s.body}</p>
+                        </div>
+                      </li>
+                      {i < STEPS.length - 1 && <ArrowRight className="hidden h-5 w-5 shrink-0 md:block" style={{ color: 'var(--ds-faint)' }} aria-hidden />}
+                    </React.Fragment>
+                  ))}
+                </ol>
+              </Card>
+              <Card className="flex items-start gap-4 p-6">
+                <IconBubble tone="green" size={56}>
+                  <Headset className="h-6 w-6" />
+                </IconBubble>
+                <div>
+                  <h2 className="ds-title text-[20px]">Need help choosing?</h2>
+                  <p className="ds-muted mt-1 text-[13.5px]">Our team is here to help you find the right plan for your practice.</p>
+                  <Link href="/help?category=Billing" className="ds-btn ds-btn-clay-outline mt-3">
+                    <Mail /> Contact Support
+                  </Link>
+                </div>
+              </Card>
             </div>
           </>
         )}
       </div>
 
-      {/* Request modal */}
-      <Dialog open={!!reqPlan} onOpenChange={(o) => { if (!o) setReqPlan(null); }}>
-        <DialogContent className="rounded-2xl max-w-lg" style={{ background: 'var(--glass-strong)', backdropFilter: 'blur(24px)', border: '1px solid var(--glass-border)' }}>
-          <DialogHeader>
-            <DialogTitle className="text-2xl font-heading" style={{ color: 'var(--ink)' }}>Request {reqPlan?.name}</DialogTitle>
-            <DialogDescription className="font-medium" style={{ color: 'var(--ink-muted)' }}>
-              {reqPlan?.toolQuota == null
-                ? 'This plan unlocks every tool. Choose a term and send your request.'
-                : `Pick up to ${reqPlan?.toolQuota} tools you want, then send your request for admin approval.`}
-            </DialogDescription>
-          </DialogHeader>
+      <DsDialog
+        open={!!reqPlan}
+        onOpenChange={(o) => !o && setReqPlan(null)}
+        wide
+        title={`Request ${reqPlan?.name ?? ''}`}
+        description={
+          reqPlan?.toolQuota == null
+            ? 'This plan unlocks every tool. Choose a term and send your request.'
+            : `Pick up to ${reqPlan?.toolQuota} tools, choose a term, then send your request for admin approval.`
+        }
+        footer={
+          <>
+            <button className="ds-btn ds-btn-ghost" onClick={() => setReqPlan(null)}>
+              Cancel
+            </button>
+            <button className="ds-btn ds-btn-clay" onClick={submit} disabled={submitting}>
+              {submitting && <Loader2 className="animate-spin" />} Send request
+            </button>
+          </>
+        }
+      >
+        <div className="space-y-5">
+          <div>
+            <p className="ds-label">Term</p>
+            <div className="flex flex-wrap gap-2">
+              {MONTH_OPTIONS.map((m) => (
+                <button key={m} className={cx('ds-pill-tab', months === m && 'is-active')} aria-pressed={months === m} onClick={() => setMonths(m)}>
+                  {m} month{m === 1 ? '' : 's'}
+                </button>
+              ))}
+            </div>
+          </div>
 
-          <div className="space-y-4 py-2 max-h-[55vh] overflow-y-auto">
-            {/* Term */}
+          {reqPlan?.toolQuota != null && (
             <div>
-              <label className="text-xs font-bold uppercase tracking-wide" style={{ color: 'var(--ink-muted)' }}>Term (months)</label>
-              <div className="mt-2 flex gap-2">
-                {MONTH_OPTIONS.map((m) => (
-                  <button
-                    key={m}
-                    onClick={() => setMonths(m)}
-                    className="btn-press rounded-lg px-4 py-2 text-sm font-semibold"
-                    style={months === m
-                      ? { background: 'var(--sage)', color: '#fff', border: '1px solid var(--sage)' }
-                      : { ...inputStyle }}
-                  >
-                    {m}
-                  </button>
+              <div className="flex items-center justify-between">
+                <p className="ds-label">Tools</p>
+                <span className="text-[12.5px] font-semibold" style={{ color: selected.size >= reqPlan.toolQuota ? 'var(--ds-clay-ink)' : 'var(--ds-muted)' }}>
+                  {selected.size} / {reqPlan.toolQuota} selected
+                </span>
+              </div>
+              <div className="mt-2 space-y-4">
+                {MODULE_CATEGORIES.map((cat) => (
+                  <div key={cat.id}>
+                    <p className="ds-muted mb-2 text-[12px] font-semibold uppercase tracking-wide">
+                      {cat.emoji} {cat.name}
+                    </p>
+                    <div className="grid grid-cols-1 gap-2 sm:grid-cols-2">
+                      {cat.modules.map((m) => {
+                        const checked = selected.has(m.id);
+                        const full = !checked && selected.size >= (reqPlan.toolQuota ?? Infinity);
+                        return (
+                          <label
+                            key={m.id}
+                            className="flex items-center gap-2 rounded-xl p-2.5 text-[13.5px]"
+                            style={{
+                              background: checked ? 'var(--ds-clay-soft)' : 'var(--ds-surface-2)',
+                              border: '1px solid var(--ds-border)',
+                              cursor: full ? 'not-allowed' : 'pointer',
+                              opacity: full ? 0.45 : 1,
+                            }}
+                          >
+                            <input type="checkbox" checked={checked} disabled={full} onChange={() => toggleTool(m.id)} style={{ accentColor: 'var(--ds-clay)' }} />
+                            {m.emoji} {m.name}
+                          </label>
+                        );
+                      })}
+                    </div>
+                  </div>
                 ))}
               </div>
             </div>
+          )}
 
-            {/* Tool selection (quota'd plans only) */}
-            {reqPlan?.toolQuota != null && (
-              <div>
-                <div className="flex items-center justify-between">
-                  <label className="text-xs font-bold uppercase tracking-wide" style={{ color: 'var(--ink-muted)' }}>Tools</label>
-                  <span className="text-xs font-semibold" style={{ color: selected.size >= (reqPlan.toolQuota ?? 0) ? 'var(--c-accent)' : 'var(--ink-muted)' }}>
-                    {selected.size} / {reqPlan.toolQuota} selected
-                  </span>
-                </div>
-                <div className="mt-2 space-y-4">
-                  {MODULE_CATEGORIES.map((cat) => (
-                    <div key={cat.id}>
-                      <p className="text-xs font-bold uppercase tracking-wide mb-2" style={{ color: 'var(--ink-muted)' }}>{cat.emoji} {cat.name}</p>
-                      <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
-                        {cat.modules.map((m) => {
-                          const checked = selected.has(m.id);
-                          const full = !checked && reqPlan.toolQuota != null && selected.size >= reqPlan.toolQuota;
-                          return (
-                            <label
-                              key={m.id}
-                              className="flex items-center gap-2 rounded-lg p-2"
-                              style={{ background: 'var(--glass-bg)', border: '1px solid var(--glass-border)', cursor: full ? 'not-allowed' : 'pointer', opacity: full ? 0.45 : 1 }}
-                            >
-                              <input type="checkbox" checked={checked} disabled={full} onChange={() => toggle(m.id)} style={{ accentColor: 'var(--sage)', width: 15, height: 15 }} />
-                              <span className="text-sm" style={{ color: 'var(--ink)' }}>{m.emoji} {m.name}</span>
-                            </label>
-                          );
-                        })}
-                      </div>
-                    </div>
-                  ))}
-                </div>
-              </div>
-            )}
-
-            {error && <p className="text-sm font-medium" style={{ color: '#ef4444' }}>{error}</p>}
-          </div>
-
-          <DialogFooter>
-            <Button variant="ghost" onClick={() => setReqPlan(null)} className="btn-press rounded-xl font-medium" style={{ color: 'var(--ink-muted)' }}>Cancel</Button>
-            <Button onClick={submit} disabled={submitting} className="btn-press rounded-xl font-semibold px-5 flex items-center gap-2" style={{ background: 'var(--sage)', color: '#fff', border: 'none' }}>
-              {submitting && <Loader2 className="h-4 w-4 animate-spin" />} Send request
-            </Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
+          {error && (
+            <p className="text-[13px] font-medium" style={{ color: 'var(--ds-red)' }} role="alert">
+              {error}
+            </p>
+          )}
+        </div>
+      </DsDialog>
     </DashboardLayout>
   );
 }

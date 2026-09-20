@@ -1,295 +1,544 @@
 'use client';
 
-import React, { useState, useEffect } from 'react';
-import { useAuthStore } from '@/store/useAuthStore';
-import { useSessionStore } from '@/store/useSessionStore';
+import React, { useMemo, useState } from 'react';
 import { useRouter } from 'next/navigation';
-import { Button } from '@/components/ui/button';
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from '@/components/ui/dialog';
-import { Select, SelectTrigger, SelectValue, SelectContent, SelectItem } from '@/components/ui/select';
-import { ChevronLeft, ChevronRight, Play, ArrowRight, Plus, Calendar as CalendarIcon } from 'lucide-react';
+import {
+  ArrowRight,
+  CalendarCheck,
+  CalendarDays,
+  CalendarPlus,
+  ChevronLeft,
+  ChevronRight,
+  ClipboardList,
+  Clock,
+  Lightbulb,
+  List,
+  ListFilter,
+  Play,
+  Plus,
+  Zap,
+} from 'lucide-react';
 import DashboardLayout from '@/components/layout/DashboardLayout';
+import { useNow, usePracticeData, useTherapistGuard } from '@/hooks/usePracticeData';
+import { useSessionActions } from '@/components/practice/useSessionActions';
+import { Avatar, Card, Dropdown, ErrorBanner, LoadingBlock, Menu, PageHeader, StatusPill, Tag, cx, toast } from '@/components/practice/ui';
+import { AddClientDialog, AvailabilityDialog, BookSessionDialog } from '@/components/practice/dialogs';
+import {
+  SESSION_KIND,
+  STATE_META,
+  TONES,
+  addDays,
+  byStartAsc,
+  downloadFile,
+  fmtSessionNo,
+  fmtTime,
+  fullName,
+  isSameDay,
+  sessionDuration,
+  sessionIcs,
+  sessionNumbers,
+  sessionState,
+  startOfDay,
+  startOfWeek,
+  toDateInput,
+  type PracticeSession,
+  type SessionState,
+} from '@/lib/practice';
 
-interface SessionData {
-  id: string;
-  scheduledAt: string;
-  status: string;
-  confirmedByPatient?: boolean;
-  client?: { id: string; firstName: string; lastName: string; diagnosis?: string[] };
+const FILTERABLE: SessionState[] = ['upcoming', 'live', 'completed', 'notes-pending', 'missed'];
+const WEEKDAYS = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'];
+
+const longDay = (d: Date) => d.toLocaleDateString(undefined, { weekday: 'long', month: 'long', day: 'numeric' });
+
+function MiniMonth({
+  month,
+  onMonth,
+  selected,
+  onSelect,
+  marks,
+  now,
+}: {
+  month: Date;
+  onMonth: (d: Date) => void;
+  selected: Date;
+  onSelect: (d: Date) => void;
+  marks: Set<string>;
+  now: Date;
+}) {
+  const gridStart = startOfWeek(month);
+  let cells = Array.from({ length: 42 }, (_, i) => addDays(gridStart, i));
+  if (cells[35].getMonth() !== month.getMonth()) cells = cells.slice(0, 35);
+  const shift = (n: number) => onMonth(new Date(month.getFullYear(), month.getMonth() + n, 1));
+
+  return (
+    <Card className="p-5">
+      <div className="flex items-center justify-between gap-2">
+        <h2 className="ds-title text-[22px]">{month.toLocaleDateString(undefined, { month: 'long', year: 'numeric' })}</h2>
+        <div className="flex gap-1">
+          <button className="ds-icon-btn" style={{ border: '1px solid var(--ds-border)' }} onClick={() => shift(-1)} aria-label="Previous month">
+            <ChevronLeft className="h-4 w-4" />
+          </button>
+          <button className="ds-icon-btn" style={{ border: '1px solid var(--ds-border)' }} onClick={() => shift(1)} aria-label="Next month">
+            <ChevronRight className="h-4 w-4" />
+          </button>
+        </div>
+      </div>
+      <div className="mt-4 grid grid-cols-7 gap-y-1 text-center">
+        {WEEKDAYS.map((d) => (
+          <span key={d} className="ds-muted pb-1 text-[12px]">
+            {d}
+          </span>
+        ))}
+        {cells.map((d) => {
+          const inMonth = d.getMonth() === month.getMonth();
+          const sel = isSameDay(d, selected);
+          const today = isSameDay(d, now);
+          const has = marks.has(toDateInput(d));
+          return (
+            <button
+              key={d.toISOString()}
+              onClick={() => onSelect(d)}
+              aria-pressed={sel}
+              aria-label={`${longDay(d)}${has ? ', has sessions' : ''}`}
+              className="relative mx-auto flex h-9 w-9 items-center justify-center rounded-full text-[13.5px] transition-colors hover:bg-[var(--ds-surface-2)]"
+              style={
+                sel
+                  ? { background: 'var(--ds-forest)', color: '#fff', fontWeight: 600 }
+                  : { color: inMonth ? 'var(--ds-ink)' : 'var(--ds-faint)', boxShadow: today ? 'inset 0 0 0 1.5px var(--ds-clay)' : undefined }
+              }
+            >
+              {d.getDate()}
+              {has && !sel && <span className="absolute bottom-1 h-1 w-1 rounded-full" style={{ background: 'var(--ds-clay)' }} />}
+            </button>
+          );
+        })}
+      </div>
+    </Card>
+  );
 }
-
-interface ClientBasic {
-  id: string;
-  userId: string;
-  firstName: string;
-  lastName: string;
-}
-
-const CARD_BASE =
-  'rounded-[14px] border-[0.5px] border-[var(--glass-border)] shadow-[var(--glass-shadow)] bg-[var(--glass-bg)] dark:bg-[#16221e] animate-fade-up';
-const GLASS_CARD = `${CARD_BASE} hover-lift`;
 
 export default function SchedulePage() {
-  const { uid, role, profile } = useAuthStore();
-  const { setActiveSessionId } = useSessionStore();
+  useTherapistGuard();
+  const { role, profile, sessions, bookings, clients, loading, error, refresh } = usePracticeData();
   const router = useRouter();
+  const now = useNow();
+  const actions = useSessionActions(refresh);
 
-  const [sessions, setSessions] = useState<SessionData[]>([]);
-  const [clients, setClients] = useState<ClientBasic[]>([]);
-  const [currentWeekOffset, setCurrentWeekOffset] = useState(0);
-  const [loading, setLoading] = useState(true);
+  const [selected, setSelected] = useState(() => startOfDay(new Date()));
+  const [month, setMonth] = useState(() => {
+    const d = new Date();
+    return new Date(d.getFullYear(), d.getMonth(), 1);
+  });
+  const [view, setView] = useState<'list' | 'calendar'>('list');
+  const [statusFilter, setStatusFilter] = useState<SessionState[]>([]);
+  const [showCancelled, setShowCancelled] = useState(false);
+  const [book, setBook] = useState<{ open: boolean; day?: Date }>({ open: false });
+  const [availOpen, setAvailOpen] = useState(false);
+  const [addOpen, setAddOpen] = useState(false);
 
-  // Booking modal
-  const [isBookModalOpen, setIsBookModalOpen] = useState(false);
-  const [selectedClientId, setSelectedClientId] = useState('');
-  const [dateTime, setDateTime] = useState('');
-  const [duration, setDuration] = useState(50);
-  const [saving, setSaving] = useState(false);
+  const numbers = useMemo(() => sessionNumbers(sessions), [sessions]);
+  const durationOf = (s: PracticeSession) => sessionDuration(s, bookings);
+  const stateOf = (s: PracticeSession) => sessionState(s, now, durationOf(s));
 
-  useEffect(() => {
-    if (!uid || role !== 'THERAPIST') { router.push('/auth'); return; }
-    fetchData();
-  }, [uid, role]);
+  const visible = sessions.filter(
+    (s) => (showCancelled || s.status !== 'CANCELLED') && (statusFilter.length === 0 || statusFilter.includes(stateOf(s)))
+  );
+  const onDay = (d: Date) => visible.filter((s) => isSameDay(new Date(s.scheduledAt), d)).sort(byStartAsc);
 
-  const fetchData = async () => {
-    if (!profile) return;
-    setLoading(true);
-    try {
-      const [sessionsRes, clientsRes] = await Promise.all([
-        fetch(`/api/sessions?therapistId=${profile.id}`),
-        fetch(`/api/clients?therapistId=${profile.id}`),
-      ]);
-      if (sessionsRes.ok) { const d = await sessionsRes.json(); setSessions(d.sessions || []); }
-      if (clientsRes.ok) { const d = await clientsRes.json(); setClients(d.clients || []); }
-    } catch (err) { console.error(err); }
-    setLoading(false);
+  const weekStart = startOfWeek(selected);
+  const days = Array.from({ length: 7 }, (_, i) => addDays(weekStart, i));
+  const daySessions = onDay(selected);
+  const hiddenOnDay = sessions.filter((s) => isSameDay(new Date(s.scheduledAt), selected)).length - daySessions.length;
+  const isToday = isSameDay(selected, now);
+  const isPast = selected < startOfDay(now);
+  const filterCount = statusFilter.length + (showCancelled ? 1 : 0);
+
+  const sessionDays = useMemo(
+    () => new Set(sessions.filter((s) => s.status !== 'CANCELLED').map((s) => toDateInput(new Date(s.scheduledAt)))),
+    [sessions]
+  );
+
+  const selectDay = (d: Date) => {
+    const day = startOfDay(d);
+    setSelected(day);
+    setMonth(new Date(day.getFullYear(), day.getMonth(), 1));
   };
+  const openBook = (day?: Date) => setBook({ open: true, day: day && day >= startOfDay(new Date()) ? day : undefined });
 
-  const handleCreateBooking = async () => {
-    if (!profile || !selectedClientId || !dateTime) return;
-    setSaving(true);
-    try {
-      const res = await fetch('/api/bookings', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ therapistId: profile.id, clientId: selectedClientId, dateTime, duration }),
-      });
-      if (res.ok) { setIsBookModalOpen(false); fetchData(); }
-    } catch (err) { console.error(err); }
-    setSaving(false);
-  };
-
-  const handleStartSession = (sessionId: string) => {
-    setActiveSessionId(sessionId);
-    router.push(`/session/${sessionId}`);
-  };
-
-  // Week calculation
-  const getWeekDates = (offset: number) => {
-    const now = new Date();
-    const dayOfWeek = now.getDay();
-    const diff = dayOfWeek === 0 ? -6 : 1 - dayOfWeek;
-    const monday = new Date(now);
-    monday.setDate(now.getDate() + diff + offset * 7);
-    monday.setHours(0, 0, 0, 0);
-    const days = [];
-    for (let i = 0; i < 7; i++) {
-      const d = new Date(monday);
-      d.setDate(monday.getDate() + i);
-      days.push(d);
+  const exportCalendar = () => {
+    const upcoming = sessions.filter((s) => s.status === 'SCHEDULED' && new Date(s.scheduledAt) > now).sort(byStartAsc);
+    if (upcoming.length === 0) {
+      toast('No upcoming sessions to export yet.', 'info');
+      return;
     }
-    return days;
+    downloadFile('staad-schedule.ics', sessionIcs(upcoming.map((s) => ({ s, minutes: durationOf(s) }))), 'text/calendar');
+    toast(`Exported ${upcoming.length} session${upcoming.length === 1 ? '' : 's'}. In Google Calendar, use Settings → Import & export to add them.`);
   };
 
-  const weekDays = getWeekDates(currentWeekOffset);
-  const today = new Date();
-  today.setHours(0, 0, 0, 0);
+  const weekLabel = `${days[0].toLocaleDateString(undefined, { month: 'long', day: 'numeric' })} – ${days[6].toLocaleDateString(undefined, {
+    month: 'long',
+    day: 'numeric',
+    year: 'numeric',
+  })}`;
 
-  const isToday = (d: Date) => d.getTime() === today.getTime();
-
-  // Get sessions for a specific day
-  const getSessionsForDay = (day: Date) => {
-    return sessions.filter((s) => {
-      const sDate = new Date(s.scheduledAt);
-      return sDate.getFullYear() === day.getFullYear() &&
-        sDate.getMonth() === day.getMonth() &&
-        sDate.getDate() === day.getDate();
-    });
-  };
-
-  const upcomingSessions = sessions
-    .filter((s) => new Date(s.scheduledAt) > new Date())
-    .sort((a, b) => new Date(a.scheduledAt).getTime() - new Date(b.scheduledAt).getTime())
-    .slice(0, 5);
+  const quickActions = [
+    { icon: CalendarPlus, title: 'Book a Session', sub: 'Schedule a new client session', onClick: () => openBook(selected) },
+    { icon: Clock, title: 'Manage Availability', sub: 'Set your working hours', onClick: () => setAvailOpen(true) },
+    { icon: CalendarCheck, title: 'Sync Calendar', sub: 'Export to Google Calendar (.ics)', onClick: exportCalendar },
+    { icon: ClipboardList, title: 'View All Sessions', sub: 'See past and upcoming sessions', onClick: () => router.push('/sessions') },
+  ];
 
   return (
     <DashboardLayout role={role} profile={profile}>
-    <div className="relative">
-      <div aria-hidden className="pointer-events-none absolute inset-0 overflow-hidden">
-        <div className="blob animate-blob" style={{ top: '-10%', right: '-5%', width: '30vw', height: '30vw', background: 'radial-gradient(circle at 70% 30%, rgba(200, 96, 42, 0.08), transparent 70%)' }} />
-        <div className="blob animate-blob" style={{ bottom: '-15%', left: '-8%', width: '35vw', height: '35vw', background: 'radial-gradient(circle at 30% 70%, rgba(156, 125, 89, 0.10), transparent 70%)', animationDelay: '-9s' }} />
-      </div>
-
-      <div className="relative z-10 space-y-6">
-        {/* Header */}
-        <div className="flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
-          <div>
-            <h1 className="font-heading text-[28px]" style={{ color: 'var(--ink)' }}>Schedule</h1>
-            <p className="text-sm font-medium mt-1" style={{ color: 'var(--ink-muted)' }}>Manage your weekly sessions</p>
-          </div>
-          <Button onClick={() => setIsBookModalOpen(true)} className="btn-press rounded-xl flex items-center gap-2 py-5 px-4 shadow-sm" style={{ background: 'var(--sage)', color: '#fff', border: 'none' }}>
-            <Plus className="h-4 w-4" /> Book Session
-          </Button>
-        </div>
-
-        {/* Week Calendar */}
-        <div className={`${GLASS_CARD} p-5`}>
-          <div className="flex items-center justify-between mb-4">
-            <button onClick={() => setCurrentWeekOffset((o) => o - 1)} className="btn-press flex h-8 w-8 items-center justify-center rounded-lg" style={{ color: 'var(--ink-muted)' }}>
-              <ChevronLeft className="h-4 w-4" />
+      <div className="space-y-6">
+        <PageHeader
+          title="Schedule"
+          subtitle="Plan. Connect. Make a difference."
+          actions={
+            <button className="ds-btn ds-btn-lg ds-btn-clay" onClick={() => openBook(selected)}>
+              <Plus /> Book Session
             </button>
-            <span className="font-heading text-base" style={{ color: 'var(--ink)' }}>
-              {weekDays[0].toLocaleDateString(undefined, { month: 'long', day: 'numeric' })} — {weekDays[6].toLocaleDateString(undefined, { month: 'long', day: 'numeric', year: 'numeric' })}
-            </span>
-            <button onClick={() => setCurrentWeekOffset((o) => o + 1)} className="btn-press flex h-8 w-8 items-center justify-center rounded-lg" style={{ color: 'var(--ink-muted)' }}>
-              <ChevronRight className="h-4 w-4" />
-            </button>
-          </div>
-          <div className="-mx-2 overflow-x-auto px-2">
-          <div className="grid grid-cols-7 gap-2 min-w-[560px]">
-            {weekDays.map((day) => {
-              const daySessions = getSessionsForDay(day);
-              return (
-                <div
-                  key={day.toISOString()}
-                  className="rounded-xl p-2 min-h-[100px]"
-                  style={{
-                    background: isToday(day) ? 'var(--sage-light)' : 'var(--glass-bg)',
-                    border: isToday(day) ? '1px solid var(--sage)' : '1px solid transparent',
-                  }}
-                >
-                  <p className="text-center text-xs font-semibold mb-1" style={{ color: isToday(day) ? 'var(--sage)' : 'var(--ink-muted)' }}>
-                    {day.toLocaleDateString(undefined, { weekday: 'short' })}
+          }
+        />
+
+        {error && <ErrorBanner message={error} onRetry={refresh} />}
+
+        <div className="grid grid-cols-1 gap-6 xl:grid-cols-[minmax(0,1fr)_340px]">
+          <div className="min-w-0 space-y-6">
+            {/* Week strip */}
+            <Card className="p-4 sm:p-5">
+              <div className="flex items-center gap-2">
+                <button className="ds-icon-btn" onClick={() => selectDay(addDays(selected, -7))} aria-label="Previous week">
+                  <ChevronLeft className="h-5 w-5" />
+                </button>
+                <h2 className="ds-title flex-1 text-center text-[18px] sm:text-[22px]">{weekLabel}</h2>
+                <button className="ds-icon-btn" onClick={() => selectDay(addDays(selected, 7))} aria-label="Next week">
+                  <ChevronRight className="h-5 w-5" />
+                </button>
+                <button className="ds-btn ds-btn-outline ml-1" onClick={() => selectDay(new Date())}>
+                  Today
+                </button>
+              </div>
+              <div className="mt-4 grid grid-cols-7 gap-1.5 sm:gap-2">
+                {days.map((d) => {
+                  const n = onDay(d).length;
+                  const sel = isSameDay(d, selected);
+                  const today = isSameDay(d, now);
+                  return (
+                    <button
+                      key={d.toISOString()}
+                      onClick={() => selectDay(d)}
+                      aria-pressed={sel}
+                      aria-label={`${longDay(d)}, ${n} session${n === 1 ? '' : 's'}`}
+                      className="flex flex-col items-center rounded-2xl px-1 py-3 transition-colors"
+                      style={
+                        sel
+                          ? { background: 'var(--ds-forest)', color: '#fff' }
+                          : {
+                              background: 'var(--ds-surface-2)',
+                              color: 'var(--ds-ink)',
+                              boxShadow: today ? 'inset 0 0 0 1.5px var(--ds-clay)' : undefined,
+                            }
+                      }
+                    >
+                      <span className="text-[12.5px] opacity-80">{d.toLocaleDateString(undefined, { weekday: 'short' })}</span>
+                      <span className="text-[22px] leading-tight sm:text-[26px]" style={{ fontFamily: "'DM Serif Display', serif" }}>
+                        {d.getDate()}
+                      </span>
+                      <span className="hidden text-[11.5px] opacity-80 sm:block">
+                        {n} session{n === 1 ? '' : 's'}
+                      </span>
+                      <span className="text-[11px] opacity-80 sm:hidden">{n}</span>
+                    </button>
+                  );
+                })}
+              </div>
+            </Card>
+
+            {/* Day / week detail */}
+            <Card className="p-4 sm:p-6">
+              <div className="flex flex-col gap-3 lg:flex-row lg:items-start lg:justify-between">
+                <div>
+                  <h2 className="ds-title text-[24px] leading-tight sm:text-[28px]">
+                    {selected.toLocaleDateString(undefined, { weekday: 'long', month: 'long', day: 'numeric', year: 'numeric' })}
+                  </h2>
+                  <p className="ds-muted text-[14px]">
+                    {view === 'calendar' ? 'Your week at a glance' : isToday ? 'Your sessions for today' : isPast ? 'Sessions on this day' : 'Your sessions for this day'}
                   </p>
-                  <p className="text-center text-sm font-bold mb-2" style={{ color: isToday(day) ? 'var(--sage)' : 'var(--ink)' }}>
-                    {day.getDate()}
-                  </p>
-                  <div className="space-y-1">
-                    {daySessions.map((s) => (
-                      <button
-                        key={s.id}
-                        onClick={() => handleStartSession(s.id)}
-                        className="w-full rounded-lg px-1.5 py-1 text-left text-[10px] font-semibold leading-tight hover-lift"
-                        style={{
-                          background: s.status === 'ACTIVE' ? 'var(--sage)' : 'var(--c-accent-bg)',
-                          color: s.status === 'ACTIVE' ? '#fff' : 'var(--c-accent)',
-                        }}
-                      >
-                        {s.client?.firstName}
-                        <br />
-                        {new Date(s.scheduledAt).toLocaleTimeString(undefined, { hour: '2-digit', minute: '2-digit' })}
-                      </button>
-                    ))}
-                  </div>
                 </div>
-              );
-            })}
-          </div>
-          </div>
-        </div>
-
-        {/* Upcoming Sessions */}
-        <div className={`${GLASS_CARD} p-5`}>
-          <h2 className="font-heading text-lg mb-4" style={{ color: 'var(--ink)' }}>Upcoming Sessions</h2>
-          {loading ? (
-            <div className="flex justify-center py-8">
-              <div className="h-8 w-8 animate-spin rounded-full border-2 border-[var(--sage)] border-t-transparent"></div>
-            </div>
-          ) : upcomingSessions.length === 0 ? (
-            <p className="text-sm font-medium text-center py-8" style={{ color: 'var(--ink-muted)' }}>No upcoming sessions. Book one to get started.</p>
-          ) : (
-            <div className="space-y-3">
-              {upcomingSessions.map((s, i) => (
-                <div key={s.id} className={`flex items-center justify-between rounded-xl p-3 stagger-${Math.min(i + 1, 4)}`} style={{ background: 'var(--sage-light)' }}>
-                  <div className="flex items-center gap-3">
-                    <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl text-xs font-bold text-white" style={{ background: 'linear-gradient(135deg, var(--sage), var(--sage-mid))' }}>
-                      {((s.client?.firstName || '')[0] ?? '') + ((s.client?.lastName || '')[0] ?? '') || '?'}
-                    </div>
-                    <div>
-                      <p className="text-sm font-semibold" style={{ color: 'var(--ink)' }}>{s.client?.firstName} {s.client?.lastName}</p>
-                      <p className="text-xs font-medium" style={{ color: 'var(--ink-muted)' }}>
-                        {new Date(s.scheduledAt).toLocaleDateString(undefined, { weekday: 'short', month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' })}
-                      </p>
-                      {s.confirmedByPatient === false && (
-                        <span className="inline-flex items-center gap-1 mt-0.5 rounded-full px-2 py-0.5 text-[10px] font-semibold" style={{ background: 'var(--c-accent-bg)', color: 'var(--c-accent)' }}>
-                          Awaiting confirmation
-                        </span>
-                      )}
-                    </div>
-                  </div>
-                  <button
-                    onClick={() => handleStartSession(s.id)}
-                    className="btn-press flex items-center gap-1.5 rounded-lg px-3 py-2 text-xs font-semibold text-white"
-                    style={{ background: 'var(--sage)', border: 'none' }}
-                  >
-                    <Play className="h-3 w-3" /> Enter <ArrowRight className="h-2.5 w-2.5" />
+                <div className="flex flex-wrap gap-2">
+                  <button className={cx('ds-btn', view === 'list' ? 'ds-btn-primary' : 'ds-btn-outline')} aria-pressed={view === 'list'} onClick={() => setView('list')}>
+                    <List /> List View
                   </button>
+                  <button
+                    className={cx('ds-btn', view === 'calendar' ? 'ds-btn-primary' : 'ds-btn-outline')}
+                    aria-pressed={view === 'calendar'}
+                    onClick={() => setView('calendar')}
+                  >
+                    <CalendarDays /> Calendar View
+                  </button>
+                  <Dropdown
+                    width={240}
+                    trigger={({ open, toggle }) => (
+                      <button className="ds-btn ds-btn-outline" aria-expanded={open} onClick={toggle}>
+                        <ListFilter /> Filter{filterCount ? ` (${filterCount})` : ''}
+                      </button>
+                    )}
+                  >
+                    {() => (
+                      <div className="p-1.5">
+                        <p className="ds-muted px-1 pb-2 text-[12px] font-semibold uppercase tracking-wide">Show only</p>
+                        {FILTERABLE.map((st) => (
+                          <label key={st} className="ds-menu-item cursor-pointer">
+                            <input
+                              type="checkbox"
+                              checked={statusFilter.includes(st)}
+                              onChange={() => setStatusFilter((prev) => (prev.includes(st) ? prev.filter((x) => x !== st) : [...prev, st]))}
+                              style={{ accentColor: 'var(--ds-clay)' }}
+                            />
+                            {STATE_META[st].label}
+                          </label>
+                        ))}
+                        <div className="my-1 h-px" style={{ background: 'var(--ds-border)' }} />
+                        <label className="ds-menu-item cursor-pointer">
+                          <input type="checkbox" checked={showCancelled} onChange={() => setShowCancelled((v) => !v)} style={{ accentColor: 'var(--ds-clay)' }} />
+                          Show cancelled sessions
+                        </label>
+                        {filterCount > 0 && (
+                          <button
+                            className="ds-btn ds-btn-sm ds-btn-ghost mt-1 w-full"
+                            onClick={() => {
+                              setStatusFilter([]);
+                              setShowCancelled(false);
+                            }}
+                          >
+                            Reset filters
+                          </button>
+                        )}
+                      </div>
+                    )}
+                  </Dropdown>
                 </div>
-              ))}
-            </div>
-          )}
+              </div>
+
+              <div className="mt-5">
+                {loading ? (
+                  <LoadingBlock label="Loading your schedule…" />
+                ) : view === 'calendar' ? (
+                  <div className="overflow-x-auto">
+                    <div className="grid min-w-[700px] grid-cols-7 gap-2">
+                      {days.map((d) => {
+                        const list = onDay(d);
+                        const sel = isSameDay(d, selected);
+                        const past = d < startOfDay(now);
+                        return (
+                          <div
+                            key={d.toISOString()}
+                            className="flex min-h-[240px] flex-col rounded-2xl p-2"
+                            style={{ background: sel ? 'var(--ds-forest-soft)' : 'var(--ds-surface-2)' }}
+                          >
+                            <button className="mb-2 rounded-lg py-1 text-center hover:bg-[var(--ds-surface)]" onClick={() => selectDay(d)}>
+                              <span className="ds-muted block text-[11.5px]">{d.toLocaleDateString(undefined, { weekday: 'short' })}</span>
+                              <span className="text-[16px] font-semibold">{d.getDate()}</span>
+                            </button>
+                            <div className="flex-1 space-y-1.5">
+                              {list.map((s) => {
+                                const st = stateOf(s);
+                                const tone = TONES[STATE_META[st].tone];
+                                return (
+                                  <button
+                                    key={s.id}
+                                    onClick={() => {
+                                      selectDay(d);
+                                      setView('list');
+                                    }}
+                                    className="w-full rounded-lg px-2 py-1.5 text-left text-[11.5px] leading-tight"
+                                    style={{ background: tone.bg, color: tone.fg }}
+                                    title={`${fullName(s.client)} · ${STATE_META[st].label}`}
+                                  >
+                                    <span className="block font-semibold">{fmtTime(s.scheduledAt)}</span>
+                                    <span className="block truncate">{s.client?.firstName}</span>
+                                  </button>
+                                );
+                              })}
+                            </div>
+                            {!past && (
+                              <button className="ds-btn ds-btn-sm ds-btn-ghost mt-2 w-full" onClick={() => openBook(d)} aria-label={`Book a session on ${longDay(d)}`}>
+                                <Plus /> Book
+                              </button>
+                            )}
+                          </div>
+                        );
+                      })}
+                    </div>
+                  </div>
+                ) : daySessions.length === 0 ? (
+                  <div className="rounded-2xl px-4 py-10 text-center" style={{ border: '1px solid var(--ds-border)' }}>
+                    <div
+                      className="mx-auto flex h-24 w-24 items-center justify-center rounded-3xl"
+                      style={{ background: 'var(--ds-clay-soft)', color: 'var(--ds-clay-ink)' }}
+                    >
+                      <CalendarDays className="h-12 w-12" strokeWidth={1.5} />
+                    </div>
+                    <p className="ds-title mt-5 text-[24px]">No sessions scheduled for {isToday ? 'today' : 'this day'}</p>
+                    <p className="ds-muted mx-auto mt-1.5 max-w-md text-[14.5px]">
+                      {isPast ? (
+                        'Nothing was booked on this day.'
+                      ) : (
+                        <>
+                          Looks like you have a free day.
+                          <br />
+                          Take this time to plan ahead or explore therapy resources.
+                        </>
+                      )}
+                    </p>
+                    {hiddenOnDay > 0 && (
+                      <p className="mt-2 text-[13px]" style={{ color: 'var(--ds-amber)' }}>
+                        {hiddenOnDay} session{hiddenOnDay === 1 ? ' is' : 's are'} hidden by your filters.{' '}
+                        <button
+                          className="underline"
+                          onClick={() => {
+                            setStatusFilter([]);
+                            setShowCancelled(true);
+                          }}
+                        >
+                          Show all
+                        </button>
+                      </p>
+                    )}
+                    <div className="mt-5 flex flex-wrap justify-center gap-3">
+                      {!isPast && (
+                        <button className="ds-btn ds-btn-lg ds-btn-primary" onClick={() => openBook(selected)}>
+                          <Plus /> Book a Session
+                        </button>
+                      )}
+                      <button className="ds-btn ds-btn-lg ds-btn-outline" onClick={() => router.push('/clients')}>
+                        View All Clients
+                      </button>
+                    </div>
+                    <div className="mx-auto mt-8 flex max-w-2xl flex-wrap items-center gap-4 rounded-2xl p-4 text-left" style={{ background: 'var(--ds-surface-2)' }}>
+                      <span className="flex h-11 w-11 shrink-0 items-center justify-center rounded-full" style={{ background: 'var(--ds-clay-soft)', color: 'var(--ds-clay-ink)' }}>
+                        <Lightbulb className="h-5 w-5" />
+                      </span>
+                      <div className="min-w-[200px] flex-1">
+                        <p className="text-[14px] font-semibold">Make the most of your day</p>
+                        <p className="ds-muted text-[13px]">Use this time to complete pending notes, explore modules or prepare for upcoming sessions.</p>
+                      </div>
+                      <button className="ds-btn ds-btn-outline" onClick={() => router.push('/sessions?view=notes-pending')}>
+                        Go to Tasks <ArrowRight />
+                      </button>
+                    </div>
+                  </div>
+                ) : (
+                  <>
+                    <ul className="space-y-3">
+                      {daySessions.map((s) => {
+                        const st = stateOf(s);
+                        const dur = durationOf(s);
+                        return (
+                          <li key={s.id} className="flex flex-wrap items-center gap-x-4 gap-y-3 rounded-2xl p-4" style={{ border: '1px solid var(--ds-border)' }}>
+                            <div className="w-[78px] shrink-0">
+                              <p className="text-[14.5px] font-semibold">{fmtTime(s.scheduledAt)}</p>
+                              <p className="ds-muted text-[12px]">{dur} min</p>
+                            </div>
+                            <div className="flex min-w-[180px] flex-1 items-center gap-3">
+                              <Avatar first={s.client?.firstName} last={s.client?.lastName} size={44} />
+                              <div className="min-w-0">
+                                <p className="truncate text-[15px] font-semibold">{fullName(s.client)}</p>
+                                <div className="mt-1 flex flex-wrap items-center gap-2">
+                                  {s.client?.diagnosis?.[0] && <Tag label={s.client.diagnosis[0]} />}
+                                  <span className="ds-muted text-[12.5px]">
+                                    {SESSION_KIND}
+                                    {numbers.get(s.id) ? ` · ${fmtSessionNo(numbers.get(s.id))}` : ''}
+                                  </span>
+                                </div>
+                              </div>
+                            </div>
+                            <StatusPill state={st} />
+                            <div className="flex items-center gap-2">
+                              {(st === 'upcoming' || st === 'live') && (
+                                <button className="ds-btn ds-btn-sm ds-btn-primary" onClick={() => actions.enter(s)}>
+                                  <Play /> {st === 'live' ? 'Join' : 'Start'}
+                                </button>
+                              )}
+                              {(st === 'completed' || st === 'notes-pending') && (
+                                <button className="ds-btn ds-btn-sm ds-btn-outline" onClick={() => actions.openNotes(s)}>
+                                  {st === 'notes-pending' ? 'Add Notes' : 'View Notes'}
+                                </button>
+                              )}
+                              {(st === 'missed' || st === 'cancelled') && (
+                                <button className="ds-btn ds-btn-sm ds-btn-clay-outline" onClick={() => actions.openReschedule(s)}>
+                                  Reschedule
+                                </button>
+                              )}
+                              <Menu items={actions.menuFor(s, st, dur)} label={`More actions for ${fullName(s.client)}'s session`} />
+                            </div>
+                          </li>
+                        );
+                      })}
+                    </ul>
+                    {!isPast && (
+                      <div className="mt-4 flex justify-center">
+                        <button className="ds-btn ds-btn-ghost" onClick={() => openBook(selected)}>
+                          <Plus /> Book another session on this day
+                        </button>
+                      </div>
+                    )}
+                  </>
+                )}
+              </div>
+            </Card>
+          </div>
+
+          {/* Side column */}
+          <div className="space-y-6">
+            <MiniMonth month={month} onMonth={setMonth} selected={selected} onSelect={selectDay} marks={sessionDays} now={now} />
+            <Card className="p-5">
+              <h2 className="ds-title flex items-center gap-2 text-[22px]">
+                <Zap className="h-5 w-5" style={{ color: 'var(--ds-clay)' }} /> Quick Actions
+              </h2>
+              <div className="mt-4 space-y-2">
+                {quickActions.map((a) => (
+                  <button
+                    key={a.title}
+                    onClick={a.onClick}
+                    className="flex w-full items-center gap-3 rounded-2xl p-3 text-left transition-colors hover:bg-[var(--ds-clay-soft)]"
+                    style={{ background: 'var(--ds-surface-2)' }}
+                  >
+                    <span className="flex h-11 w-11 shrink-0 items-center justify-center rounded-full" style={{ background: 'var(--ds-clay-soft)', color: 'var(--ds-clay-ink)' }}>
+                      <a.icon className="h-5 w-5" />
+                    </span>
+                    <span className="min-w-0 flex-1">
+                      <span className="block text-[14px] font-semibold">{a.title}</span>
+                      <span className="ds-muted block text-[12.5px]">{a.sub}</span>
+                    </span>
+                    <ChevronRight className="h-4 w-4 shrink-0" style={{ color: 'var(--ds-muted)' }} />
+                  </button>
+                ))}
+              </div>
+            </Card>
+          </div>
         </div>
       </div>
 
-      {/* Book Session Modal */}
-      <Dialog open={isBookModalOpen} onOpenChange={setIsBookModalOpen}>
-        <DialogContent className="rounded-2xl max-w-md" style={{ background: 'var(--glass-strong)', backdropFilter: 'blur(24px)', border: '1px solid var(--glass-border)' }}>
-          <DialogHeader>
-            <DialogTitle className="text-2xl font-heading" style={{ color: 'var(--ink)' }}>Book Session Appointment</DialogTitle>
-            <DialogDescription className="font-medium" style={{ color: 'var(--ink-muted)' }}>Select a client and appointment schedule</DialogDescription>
-          </DialogHeader>
-          <div className="space-y-4 py-4">
-            <div className="space-y-1">
-              <label className="text-sm font-semibold" style={{ color: 'var(--ink-muted)' }}>Select Client</label>
-              <Select onValueChange={(val) => setSelectedClientId(val || '')} value={selectedClientId}>
-                <SelectTrigger className="w-full rounded-xl" style={{ background: 'var(--glass-bg)', border: '1px solid var(--glass-border)' }}>
-                  <SelectValue placeholder="Select client" />
-                </SelectTrigger>
-                <SelectContent className="rounded-xl" style={{ background: 'var(--glass-strong)', backdropFilter: 'blur(24px)', border: '1px solid var(--glass-border)' }}>
-                  {clients.map((c) => (
-                    <SelectItem key={c.id} value={c.id} style={{ color: 'var(--ink)' }}>{c.firstName} {c.lastName}</SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            </div>
-            <div className="space-y-1">
-              <label className="text-sm font-semibold" style={{ color: 'var(--ink-muted)' }}>Date & Time</label>
-              <input type="datetime-local" value={dateTime} onChange={(e) => setDateTime(e.target.value)}
-                className="w-full rounded-xl p-3 text-sm focus-visible:outline-none"
-                style={{ background: 'var(--glass-bg)', border: '1px solid var(--glass-border)', color: 'var(--ink)' }}
-              />
-            </div>
-            <div className="space-y-1">
-              <label className="text-sm font-semibold" style={{ color: 'var(--ink-muted)' }}>Duration (minutes)</label>
-              <Select onValueChange={(val) => setDuration(Number(val))} value={String(duration)}>
-                <SelectTrigger className="w-full rounded-xl" style={{ background: 'var(--glass-bg)', border: '1px solid var(--glass-border)' }}>
-                  <SelectValue placeholder="Select duration" />
-                </SelectTrigger>
-                <SelectContent className="rounded-xl" style={{ background: 'var(--glass-strong)', backdropFilter: 'blur(24px)', border: '1px solid var(--glass-border)' }}>
-                  <SelectItem value="30" style={{ color: 'var(--ink)' }}>30 minutes</SelectItem>
-                  <SelectItem value="50" style={{ color: 'var(--ink)' }}>50 minutes</SelectItem>
-                  <SelectItem value="80" style={{ color: 'var(--ink)' }}>80 minutes</SelectItem>
-                </SelectContent>
-              </Select>
-            </div>
-          </div>
-          <DialogFooter>
-            <Button variant="ghost" onClick={() => setIsBookModalOpen(false)} className="btn-press rounded-xl font-medium" style={{ color: 'var(--ink-muted)' }}>Cancel</Button>
-            <Button onClick={handleCreateBooking} disabled={saving} className="btn-press rounded-xl font-semibold px-5" style={{ background: 'var(--sage)', color: '#fff', border: 'none' }}>Book</Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
-    </div>
+      <BookSessionDialog
+        open={book.open}
+        onOpenChange={(open) => setBook((b) => ({ ...b, open }))}
+        clients={clients}
+        defaultDay={book.day}
+        onBooked={(s) => {
+          selectDay(new Date(s.scheduledAt));
+          setView('list');
+          refresh();
+        }}
+        onAddClient={() => {
+          setBook({ open: false });
+          setAddOpen(true);
+        }}
+      />
+      <AvailabilityDialog open={availOpen} onOpenChange={setAvailOpen} />
+      <AddClientDialog open={addOpen} onOpenChange={setAddOpen} onCreated={refresh} />
+      {actions.dialogs}
     </DashboardLayout>
   );
 }

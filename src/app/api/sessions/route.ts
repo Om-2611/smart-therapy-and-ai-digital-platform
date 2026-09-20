@@ -10,10 +10,14 @@ export async function GET(request: Request) {
     const clientId = searchParams.get('clientId');
 
     if (therapistId) {
+      // Note count + report presence let the UI flag completed sessions whose
+      // documentation is still outstanding ("Notes pending").
       const sessions = await prisma.session.findMany({
         where: { therapistId },
         include: {
           client: true,
+          report: { select: { id: true } },
+          _count: { select: { notes: true } },
         },
         orderBy: { scheduledAt: 'desc' },
       });
