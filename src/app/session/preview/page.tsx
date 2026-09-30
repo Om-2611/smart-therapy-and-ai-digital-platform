@@ -23,6 +23,8 @@ import SessionBottomBar from '@/components/session/SessionBottomBar';
 import AIAssistantPanel from '@/components/session/AIAssistantPanel';
 import AINotesPanel from '@/components/session/AINotesPanel';
 import TherapyModulesPanel from '@/components/session/TherapyModulesPanel';
+import ParticipantsPanel from '@/components/session/ParticipantsPanel';
+import SettingsPanel from '@/components/session/SettingsPanel';
 import { ShareWhiteboardModal } from '@/components/session/WhiteboardStage';
 import StaadWhiteboard from '@/components/session/StaadWhiteboard';
 import ModuleStage from '@/components/session/ModuleStage';
@@ -185,8 +187,7 @@ export default function SessionLayoutPreview() {
               onToggleReactions={() => setReactionBarOpen((o) => !o)}
               isLocked={isLocked}
               onToggleLock={() => setIsLocked((l) => !l)}
-              screenSharing={screenSharing}
-              onToggleScreenShare={() => setScreenSharing((s) => !s)}
+              onScreenShareChange={setScreenSharing}
             />
           </div>
         </div>
@@ -226,6 +227,12 @@ export default function SessionLayoutPreview() {
               onLaunch={(id) => setPreviewModule(id)}
               onClose={() => setActivePanel(null)}
             />
+          )}
+          {activePanel === 'participants' && (
+            <ParticipantsPanel onClose={() => setActivePanel(null)} />
+          )}
+          {activePanel === 'settings' && (
+            <SettingsPanel onClose={() => setActivePanel(null)} />
           )}
         </div>
 

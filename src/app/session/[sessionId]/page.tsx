@@ -8,7 +8,7 @@ import { doc, onSnapshot, updateDoc, getDoc } from 'firebase/firestore';
 import { db } from '@/lib/firebase';
 import {
   Mic, MicOff, Camera, CameraOff, PhoneOff, Settings, Smile,
-  Maximize2, Minimize2,
+  Maximize2, Minimize2, MonitorUp,
 } from 'lucide-react';
 import AIConsentBanner from '@/components/session/AIConsentBanner';
 import { AIErrorBoundary } from '@/components/session/AIErrorBoundary';
@@ -29,6 +29,8 @@ import SessionBottomBar from '@/components/session/SessionBottomBar';
 import AIAssistantPanel from '@/components/session/AIAssistantPanel';
 import AINotesPanel from '@/components/session/AINotesPanel';
 import TherapyModulesPanel from '@/components/session/TherapyModulesPanel';
+import ParticipantsPanel from '@/components/session/ParticipantsPanel';
+import SettingsPanel from '@/components/session/SettingsPanel';
 import { ShareWhiteboardModal } from '@/components/session/WhiteboardStage';
 import StaadWhiteboard from '@/components/session/StaadWhiteboard';
 import ModuleStage from '@/components/session/ModuleStage';
@@ -743,6 +745,17 @@ export default function SessionRoomPage({ params }: { params: { sessionId: strin
                       <span style={{ width: 7, height: 7, borderRadius: '50%', background: RC.green, display: 'inline-block' }} />
                       {onlineCount} online
                     </span>
+                    {/* Mirrors the real LiveKit screen-share state reported by
+                        the bottom bar, so the browser's own "Stop sharing"
+                        bar clears this too. */}
+                    {screenSharing && (
+                      <>
+                        <span style={{ width: 1, height: 12, background: 'rgba(0,0,0,0.12)', display: 'inline-block' }} />
+                        <span style={{ display: 'flex', alignItems: 'center', gap: 5, fontSize: 12, fontWeight: 600, color: RC.greenDark }}>
+                          <MonitorUp size={12} /> You&apos;re presenting
+                        </span>
+                      </>
+                    )}
                   </div>
 
                   {/* Floating pill control bar — patient only. The therapist's
@@ -757,7 +770,11 @@ export default function SessionRoomPage({ params }: { params: { sessionId: strin
                 </div>
               )}
 
-              <ReactionOverlay sessionId={sessionId} />
+              <ReactionOverlay
+                sessionId={sessionId}
+                open={reactionBarOpen}
+                onClose={() => setReactionBarOpen(false)}
+              />
 
               {/* Toast notification */}
               {toast && (
@@ -783,8 +800,7 @@ export default function SessionRoomPage({ params }: { params: { sessionId: strin
                 onToggleReactions={() => setReactionBarOpen((o) => !o)}
                 isLocked={isLocked}
                 onToggleLock={handleLockToggle}
-                screenSharing={screenSharing}
-                onToggleScreenShare={() => setScreenSharing((s) => !s)}
+                onScreenShareChange={setScreenSharing}
               />
             )}
           </div>
@@ -850,6 +866,15 @@ export default function SessionRoomPage({ params }: { params: { sessionId: strin
                 onClose={() => setActivePanel(null)}
               />
             ) : null
+          )}
+
+          {/* Both read straight from the LiveKit room this page already hosts. */}
+          {sidebarPanel === 'participants' && (
+            <ParticipantsPanel onClose={() => setActivePanel(null)} />
+          )}
+
+          {sidebarPanel === 'settings' && (
+            <SettingsPanel onClose={() => setActivePanel(null)} />
           )}
         </div>
 

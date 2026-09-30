@@ -11,14 +11,24 @@ interface FloatingEmoji {
 
 interface ReactionOverlayProps {
   sessionId: string
+  /** Whether the emoji picker bar is showing. Driven by the React button in the
+   *  bottom bar / pill controls — the overlay used to keep this in private
+   *  state that nothing could ever set, so the bar never appeared. */
+  open?: boolean
+  /** Called after a reaction is sent, so the opener can close the bar. */
+  onClose?: () => void
 }
 
 const EMOJIS = ['👏', '⭐', '💪', '😊', '🎉']
 
-export default function ReactionOverlay({ sessionId }: ReactionOverlayProps) {
-  const [barOpen, setBarOpen] = useState(false)
+export default function ReactionOverlay({ sessionId, open = false, onClose }: ReactionOverlayProps) {
+  const barOpen = open
   const [floaters, setFloaters] = useState<FloatingEmoji[]>([])
   const idRef = useRef(0)
+  // Ignore the reaction already sitting in the doc when we mount, otherwise
+  // every join replays whatever was sent in the last two seconds.
+  const seenReactionRef = useRef<string | null>(null)
+  const mountedAtRef = useRef(Date.now())
 
   useEffect(() => {
     if (!sessionId) return
@@ -26,8 +36,15 @@ export default function ReactionOverlay({ sessionId }: ReactionOverlayProps) {
       if (!snap.exists()) return
       const data = snap.data()
       if (data.lastReaction?.emoji && data.lastReaction?.timestamp) {
-        const elapsed = Date.now() - new Date(data.lastReaction.timestamp).getTime()
-        if (elapsed < 2000) {
+        const stamp = String(data.lastReaction.timestamp)
+        const sentAt = new Date(stamp).getTime()
+        // Any write to the session doc (module launch, lock toggle, whiteboard
+        // state) re-fires this snapshot, so key off the reaction's own
+        // timestamp rather than replaying it on every unrelated update.
+        const alreadyShown = seenReactionRef.current === stamp
+        seenReactionRef.current = stamp
+        const elapsed = Date.now() - sentAt
+        if (!alreadyShown && sentAt >= mountedAtRef.current && elapsed < 5000) {
           const id = ++idRef.current
           const floater: FloatingEmoji = {
             id,
@@ -46,7 +63,7 @@ export default function ReactionOverlay({ sessionId }: ReactionOverlayProps) {
 
   const sendReaction = useCallback(
     async (emoji: string) => {
-      setBarOpen(false)
+      onClose?.()
       const id = ++idRef.current
       const floater: FloatingEmoji = { id, emoji, x: Math.random() * 60 + 20 }
       setFloaters((prev) => [...prev, floater])
@@ -61,7 +78,7 @@ export default function ReactionOverlay({ sessionId }: ReactionOverlayProps) {
         })
       } catch {}
     },
-    [sessionId]
+    [sessionId, onClose]
   )
 
   return (

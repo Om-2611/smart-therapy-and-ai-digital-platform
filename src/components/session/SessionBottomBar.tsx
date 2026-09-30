@@ -1,8 +1,9 @@
 'use client'
+import { useEffect, useState } from 'react'
 import { useLocalParticipant } from '@livekit/components-react'
 import {
   Mic, MicOff, Camera, CameraOff, PhoneOff, ChevronUp,
-  MonitorUp, NotebookPen, PenTool, Blocks, Users, Settings,
+  MonitorUp, MonitorX, NotebookPen, PenTool, Blocks, Users, Settings,
   Smile, Lock, LockOpen, Sparkles,
 } from 'lucide-react'
 import { RC } from './roomTheme'
@@ -12,11 +13,11 @@ import type { SidebarPanel } from './sessionPanels'
 //   [End Call] [Mic ▾] [Camera ▾]   ···   [Screen Share] [AI Assistant] [AI Notes]
 //   [Whiteboard] [Therapy Modules] [Participants 2] [Reactions] [Control] [Settings]
 //
-// Mic/camera use the same LiveKit toggles as before; the dropdown chevrons are
-// visual affordances only (device switching is not wired up). Screen share is a
-// UI toggle placeholder — no screen-share implementation exists in the codebase
-// to reuse. Reactions and Control (therapist lock) are carried over from the
-// previous toolbar so no existing feature is lost.
+// Mic/camera/screen-share all drive the same LiveKit local participant. The
+// mic/camera dropdown chevrons point at the Settings panel, which is where
+// device switching lives. Participants and Settings open sidebar panels the
+// same way AI Assistant/Notes/Whiteboard/Modules do. Reactions and Control
+// (therapist lock) are carried over from the previous toolbar.
 export default function SessionBottomBar({
   activePanel,
   onSelectPanel,
@@ -26,8 +27,7 @@ export default function SessionBottomBar({
   onToggleReactions,
   isLocked,
   onToggleLock,
-  screenSharing,
-  onToggleScreenShare,
+  onScreenShareChange,
 }: {
   activePanel: SidebarPanel
   onSelectPanel: (panel: Exclude<SidebarPanel, null>) => void
@@ -37,10 +37,46 @@ export default function SessionBottomBar({
   onToggleReactions: () => void
   isLocked: boolean
   onToggleLock: () => void
-  screenSharing: boolean
-  onToggleScreenShare: () => void
+  /** Told whenever the real LiveKit screen-share state changes. */
+  onScreenShareChange?: (sharing: boolean) => void
 }) {
-  const { localParticipant, isMicrophoneEnabled, isCameraEnabled } = useLocalParticipant()
+  const {
+    localParticipant,
+    isMicrophoneEnabled,
+    isCameraEnabled,
+    isScreenShareEnabled,
+  } = useLocalParticipant()
+
+  // Screen share is owned by LiveKit, not by a local boolean — the browser's
+  // own "Stop sharing" bar ends the track without going through this button,
+  // so the button has to read back from the participant to stay truthful.
+  const [shareBusy, setShareBusy] = useState(false)
+  const [shareError, setShareError] = useState<string | null>(null)
+
+  useEffect(() => {
+    onScreenShareChange?.(isScreenShareEnabled)
+  }, [isScreenShareEnabled, onScreenShareChange])
+
+  const toggleScreenShare = async () => {
+    if (!localParticipant || shareBusy) return
+    setShareBusy(true)
+    setShareError(null)
+    try {
+      // audio: true shares tab audio where the browser offers it; LiveKit
+      // silently drops it when the picked surface has no audio.
+      await localParticipant.setScreenShareEnabled(!isScreenShareEnabled, { audio: true })
+    } catch (err) {
+      // Dismissing the OS/browser picker rejects with NotAllowedError — that is
+      // a cancel, not a failure, so it should not surface as an error.
+      const name = err instanceof DOMException ? err.name : ''
+      if (name !== 'NotAllowedError' && name !== 'AbortError') {
+        setShareError(err instanceof Error ? err.message : 'Screen share failed')
+        setTimeout(() => setShareError(null), 4000)
+      }
+    } finally {
+      setShareBusy(false)
+    }
+  }
 
   const circle = (opts?: { danger?: boolean; off?: boolean }): React.CSSProperties => ({
     width: 44,
@@ -77,11 +113,32 @@ export default function SessionBottomBar({
     whiteSpace: 'nowrap',
   })
 
+  // The chevron now does what it always looked like it did: opens the Settings
+  // panel, where the camera/mic/speaker pickers live.
   const chevron = (
-    <ChevronUp
-      size={10}
-      style={{ position: 'absolute', bottom: 2, right: 4, color: RC.inkMuted, pointerEvents: 'none' }}
-    />
+    <button
+      type="button"
+      title="Device settings"
+      onClick={() => onSelectPanel('settings')}
+      style={{
+        position: 'absolute',
+        bottom: 0,
+        right: 0,
+        width: 16,
+        height: 16,
+        padding: 0,
+        borderRadius: '50%',
+        border: `1px solid ${RC.border}`,
+        background: RC.panel,
+        color: RC.inkMuted,
+        cursor: 'pointer',
+        display: 'flex',
+        alignItems: 'center',
+        justifyContent: 'center',
+      }}
+    >
+      <ChevronUp size={10} />
+    </button>
   )
 
   return (
@@ -131,11 +188,24 @@ export default function SessionBottomBar({
       {/* ---- CENTRE/RIGHT: panel toggles + utilities ---- */}
       <div style={{ display: 'flex', alignItems: 'center', gap: 8, flex: 1, justifyContent: 'center' }}>
         <button
-          onClick={onToggleScreenShare}
-          title="Screen share (placeholder)"
-          style={item(screenSharing)}
+          onClick={toggleScreenShare}
+          disabled={shareBusy}
+          title={
+            shareError
+              ? shareError
+              : isScreenShareEnabled
+                ? 'Stop sharing your screen'
+                : 'Share your screen'
+          }
+          style={{
+            ...item(isScreenShareEnabled),
+            opacity: shareBusy ? 0.6 : 1,
+            cursor: shareBusy ? 'progress' : 'pointer',
+            ...(shareError ? { borderColor: RC.red, color: RC.red } : null),
+          }}
         >
-          <MonitorUp size={17} /> Share
+          {isScreenShareEnabled ? <MonitorX size={17} /> : <MonitorUp size={17} />}
+          {isScreenShareEnabled ? 'Stop' : 'Share'}
         </button>
 
         <button onClick={() => onSelectPanel('assistant')} style={item(activePanel === 'assistant')}>
@@ -154,7 +224,11 @@ export default function SessionBottomBar({
           <Blocks size={17} /> Modules
         </button>
 
-        <button title="Participants" style={item(false)}>
+        <button
+          onClick={() => onSelectPanel('participants')}
+          title="Participants"
+          style={item(activePanel === 'participants')}
+        >
           <Users size={17} /> Participants
           <span
             style={{
@@ -165,7 +239,7 @@ export default function SessionBottomBar({
               height: 17,
               padding: '0 4px',
               borderRadius: 9,
-              background: RC.green,
+              background: activePanel === 'participants' ? RC.greenDark : RC.green,
               color: '#fff',
               fontSize: 12.5,
               fontWeight: 700,
@@ -186,7 +260,11 @@ export default function SessionBottomBar({
           {isLocked ? <Lock size={17} /> : <LockOpen size={17} />} Control
         </button>
 
-        <button title="Settings" style={item(false)}>
+        <button
+          onClick={() => onSelectPanel('settings')}
+          title="Settings"
+          style={item(activePanel === 'settings')}
+        >
           <Settings size={17} /> Settings
         </button>
       </div>
