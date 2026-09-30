@@ -9,6 +9,7 @@ import {
 } from 'lucide-react'
 import { db } from '@/lib/firebase'
 import { logModuleEvent } from '@/lib/sessionEvents'
+import MicDictateButton from '@/components/modules/MicDictateButton'
 
 interface ValuesCardSortProps {
   sessionId: string
@@ -409,7 +410,7 @@ export default function ValuesCardSort({ sessionId, role, isLocked }: ValuesCard
             </div>
           )}
           {isT && customOpen && (
-            <div style={{ display: 'flex', gap: 6 }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
               {/* eslint-disable-next-line jsx-a11y/no-autofocus */}
               <input
                 autoFocus
@@ -419,6 +420,16 @@ export default function ValuesCardSort({ sessionId, role, isLocked }: ValuesCard
                 onKeyDown={e => e.key === 'Enter' && submitCustom()}
                 placeholder="Name a value"
                 style={inputStyle}
+              />
+              {/* Speak the value instead of typing it. */}
+              <MicDictateButton
+                sessionId={sessionId}
+                value={customValue}
+                onText={setCustomValue}
+                disabled={!canInteract}
+                size={32}
+                captionAlign="right"
+                title="Dictate this value"
               />
               <button onClick={submitCustom} style={chipBtn}>Add</button>
             </div>

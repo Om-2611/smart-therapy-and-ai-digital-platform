@@ -15,6 +15,13 @@ import BoxPopping from '@/components/modules/anxiety/BoxPopping'
 import NBackChallenge from '@/components/modules/adhd/NBackChallenge'
 import BubbleSplash from '@/components/modules/sld/BubbleSplash'
 import EmotionalCharades from '@/components/modules/anxiety/EmotionalCharades'
+import GroundingGame from '@/components/modules/anxiety/GroundingGame'
+import DefusionRiver from '@/components/modules/general/DefusionRiver'
+import ThoughtChallenger from '@/components/modules/general/ThoughtChallenger'
+import MicroQuestBoard from '@/components/modules/general/MicroQuestBoard'
+import ValuesCardSort from '@/components/modules/general/ValuesCardSort'
+import WorryVault from '@/components/modules/general/WorryVault'
+import FactsVsFeelings from '@/components/modules/general/FactsVsFeelings'
 
 const MODULES = [
   { id: 'wam', name: 'Whack-a-Mole Math', Comp: WhackAMoleMath },
@@ -24,12 +31,24 @@ const MODULES = [
   { id: 'nback', name: 'N-Back Challenge', Comp: NBackChallenge },
   { id: 'bsplash', name: 'Bubble Splash (SLD)', Comp: BubbleSplash },
   { id: 'charades', name: 'Emotional Charades', Comp: EmotionalCharades },
+  /* The dictation ("speak instead of type") modules. These run on the WIDE
+     canvas in the real room, not the 420px sidebar, so they default to it. */
+  { id: 'ground', name: '5-4-3-2-1 Grounding', Comp: GroundingGame, wide: true },
+  { id: 'defusion', name: 'Defusion River', Comp: DefusionRiver, wide: true },
+  { id: 'thought', name: 'Thought Challenger', Comp: ThoughtChallenger, wide: true },
+  { id: 'quest', name: 'Micro Quest Board', Comp: MicroQuestBoard, wide: true },
+  { id: 'values', name: 'Values Card Sort', Comp: ValuesCardSort, wide: true },
+  { id: 'worry', name: 'Worry Vault', Comp: WorryVault, wide: true },
+  { id: 'facts', name: 'Facts vs Feelings', Comp: FactsVsFeelings, wide: true },
 ] as const
 
 export default function ModuleBench() {
   if (process.env.NODE_ENV === 'production') notFound()
 
   const [active, setActive] = useState<string>('wam')
+  // The sidebar modules and the canvas modules live at very different widths;
+  // showing either at the wrong one hides real layout problems.
+  const [wide, setWide] = useState(false)
   const [role, setRole] = useState<'therapist' | 'client'>('therapist')
   const [isLocked, setIsLocked] = useState(false)
   const [ready, setReady] = useState(false)
@@ -77,7 +96,11 @@ export default function ModuleBench() {
     <div style={{ padding: 20, fontFamily: 'system-ui, sans-serif', background: '#eef1f4', minHeight: '100vh' }}>
       <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap', marginBottom: 10 }}>
         {MODULES.map((m) => (
-          <button key={m.id} onClick={() => setActive(m.id)} style={btn(active === m.id)}>
+          <button
+            key={m.id}
+            onClick={() => { setActive(m.id); setWide('wide' in m && !!m.wide) }}
+            style={btn(active === m.id)}
+          >
             {m.name}
           </button>
         ))}
@@ -89,6 +112,9 @@ export default function ModuleBench() {
         <button onClick={() => setIsLocked((l) => !l)} style={btn(isLocked)}>
           isLocked: <strong>{String(isLocked)}</strong>
         </button>
+        <button onClick={() => setWide((w) => !w)} style={btn(wide)}>
+          width: <strong>{wide ? 'canvas' : 'sidebar 420'}</strong>
+        </button>
         <span style={{ fontSize: 11, color: '#6b7280' }}>
           session: <code>dev-modules</code>
         </span>
@@ -97,9 +123,10 @@ export default function ModuleBench() {
       {/* Approximates the real 420px dark-glass sidebar panel. */}
       <div
         style={{
-          width: 420,
-          height: 620,
-          background: 'rgba(28,28,28,0.92)',
+          width: wide ? 'min(1180px, 100%)' : 420,
+          height: wide ? 760 : 620,
+          // The wide canvas in the real room is a WHITE stage, not dark glass.
+          background: wide ? '#ffffff' : 'rgba(28,28,28,0.92)',
           border: '1px solid rgba(255,255,255,0.14)',
           borderRadius: 20,
           padding: 12,
@@ -107,7 +134,7 @@ export default function ModuleBench() {
           // overflowY auto, NOT a flex column. Modules that rely on `flex: 1` for
           // height get none here, which is what production actually does.
           overflowY: 'auto',
-          color: '#fff',
+          color: wide ? '#1f3b2c' : '#fff',
         }}
       >
         {ready

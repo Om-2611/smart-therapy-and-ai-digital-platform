@@ -5,6 +5,7 @@ import { doc, onSnapshot, updateDoc } from 'firebase/firestore'
 import { Brain, FileText, Heart, MessageCircle, SquarePen } from 'lucide-react'
 import { db } from '@/lib/firebase'
 import { logModuleEvent } from '@/lib/sessionEvents'
+import MicDictateButton from '@/components/modules/MicDictateButton'
 
 interface FactsVsFeelingsProps {
   sessionId: string
@@ -304,13 +305,24 @@ export default function FactsVsFeelings({ sessionId, role, isLocked }: FactsVsFe
                 maxLength={MAX_CHARS}
                 style={{
                   flex: 1, width: '100%', boxSizing: 'border-box', resize: 'none', outline: 'none',
-                  padding: '11px 12px 24px', borderRadius: 14,
+                  padding: '11px 46px 24px 12px', borderRadius: 14,
                   border: `1px solid ${LINE}`, background: '#ffffff',
                   fontSize: 16.5, lineHeight: 1.4, color: INK_BODY,
                   fontFamily: '"DM Sans", sans-serif',
                   transition: 'border-color .15s, box-shadow .15s',
                 }}
               />
+              {/* Speak the thought rather than typing it into the narrow column. */}
+              <div style={{ position: 'absolute', right: 8, top: 7 }}>
+                <MicDictateButton
+                  sessionId={sessionId}
+                  value={cardInput}
+                  onText={next => setCardInput(next.slice(0, MAX_CHARS))}
+                  disabled={!canInteract}
+                  size={32}
+                  title="Dictate this thought"
+                />
+              </div>
               <span style={{
                 position: 'absolute', right: 11, bottom: 8, pointerEvents: 'none',
                 fontSize: 14, fontWeight: 600, color: INK_FAINT,

@@ -10,6 +10,7 @@ import {
 } from 'lucide-react'
 import { db } from '@/lib/firebase'
 import { logModuleEvent } from '@/lib/sessionEvents'
+import MicDictateButton from '@/components/modules/MicDictateButton'
 
 interface MicroQuestBoardProps {
   sessionId: string
@@ -360,7 +361,7 @@ export default function MicroQuestBoard({ sessionId, role, isLocked }: MicroQues
               </button>
 
               {composerOpen && (
-                <div style={{ display: 'flex', gap: 8 }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
                   {/* eslint-disable-next-line jsx-a11y/no-autofocus */}
                   <input
                     autoFocus
@@ -370,6 +371,15 @@ export default function MicroQuestBoard({ sessionId, role, isLocked }: MicroQues
                     onKeyDown={e => e.key === 'Enter' && submitQuest()}
                     placeholder={`New ${effort.toLowerCase()} quest / micro-task`}
                     style={inputStyle}
+                  />
+                  {/* Speak the quest instead of typing it. */}
+                  <MicDictateButton
+                    sessionId={sessionId}
+                    value={questText}
+                    onText={setQuestText}
+                    disabled={!canInteract}
+                    size={32}
+                    title="Dictate this quest"
                   />
                   <button onClick={submitQuest} style={chipBtn}>Add</button>
                 </div>
@@ -594,15 +604,29 @@ export default function MicroQuestBoard({ sessionId, role, isLocked }: MicroQues
                 )}
 
                 {isT && reviewMode && q.completed && (
-                  <input
+                  <div
                     onClick={e => e.stopPropagation()}
-                    className="mq-input"
-                    placeholder="Which felt hardest and why?"
-                    value={q.therapistNote}
-                    onChange={e => setNote(q.id, e.target.value)}
-                    onBlur={() => persist(quests)}
-                    style={{ ...inputStyle, fontSize: 15.5, padding: '8px 10px' }}
-                  />
+                    style={{ display: 'flex', alignItems: 'center', gap: 6 }}
+                  >
+                    <input
+                      className="mq-input"
+                      placeholder="Which felt hardest and why?"
+                      value={q.therapistNote}
+                      onChange={e => setNote(q.id, e.target.value)}
+                      onBlur={() => persist(quests)}
+                      style={{ ...inputStyle, fontSize: 15.5, padding: '8px 10px' }}
+                    />
+                    {/* The review note is dictated mid-conversation, so it gets
+                        its own mic rather than sharing the composer's. */}
+                    <MicDictateButton
+                      sessionId={sessionId}
+                      value={q.therapistNote}
+                      onText={next => setNote(q.id, next)}
+                      onStop={() => persist(quests)}
+                      size={30}
+                      title="Dictate this note"
+                    />
+                  </div>
                 )}
               </div>
             )

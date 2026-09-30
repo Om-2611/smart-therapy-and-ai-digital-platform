@@ -5,6 +5,7 @@ import { doc, onSnapshot, updateDoc } from 'firebase/firestore'
 import { Check, Clock, Sparkles } from 'lucide-react'
 import { db } from '@/lib/firebase'
 import { logModuleEvent } from '@/lib/sessionEvents'
+import MicDictateButton from '@/components/modules/MicDictateButton'
 
 interface GroundingGameProps {
   sessionId: string
@@ -745,6 +746,17 @@ export default function GroundingGame({ sessionId, role, isLocked }: GroundingGa
                             fontWeight: 600,
                             padding: 0,
                           }}
+                        />
+                        {/* One mic per slot: the therapist fills these in while
+                            the client is naming things out loud. */}
+                        <MicDictateButton
+                          sessionId={sessionId}
+                          value={item}
+                          onText={next => handleItemChange(idx, next)}
+                          disabled={!canInteract || transitioning}
+                          size={26}
+                          showCaption={false}
+                          title={`Dictate ${sense.label.toLowerCase()} item`}
                         />
                       </div>
                       <span

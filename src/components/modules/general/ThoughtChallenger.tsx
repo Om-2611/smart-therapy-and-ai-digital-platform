@@ -6,6 +6,7 @@ import { doc, onSnapshot, updateDoc } from 'firebase/firestore'
 import { Plus, Search, Shield, Scale, ArrowDown, Lightbulb, Pencil, Check, ArrowRight } from 'lucide-react'
 import { db } from '@/lib/firebase'
 import { logModuleEvent } from '@/lib/sessionEvents'
+import MicDictateButton from '@/components/modules/MicDictateButton'
 
 interface ThoughtChallengerProps {
   sessionId: string
@@ -308,7 +309,7 @@ export default function ThoughtChallenger({ sessionId, role, isLocked }: Thought
           )}
 
           {isT && thoughtOpen && (
-            <div style={{ display: 'flex', gap: 8 }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
               {/* eslint-disable-next-line jsx-a11y/no-autofocus */}
               <input
                 autoFocus
@@ -318,6 +319,15 @@ export default function ThoughtChallenger({ sessionId, role, isLocked }: Thought
                 placeholder="Enter the automatic thought"
                 onKeyDown={e => e.key === 'Enter' && submitThought()}
                 style={inputStyle}
+              />
+              {/* Capture the thought in the client's own words as they say it. */}
+              <MicDictateButton
+                sessionId={sessionId}
+                value={thoughtInput}
+                onText={setThoughtInput}
+                disabled={!canInteract}
+                size={32}
+                title="Dictate the thought"
               />
               <button onClick={submitThought} style={chipBtn(VIOLET)}>Set</button>
             </div>
@@ -399,7 +409,17 @@ export default function ThoughtChallenger({ sessionId, role, isLocked }: Thought
                       fontFamily: '"DM Sans", sans-serif',
                     }}
                   />
-                  <div style={{ display: 'flex', gap: 8, marginTop: 10 }}>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginTop: 10 }}>
+                    {/* Reword the reframe out loud rather than retyping it. */}
+                    <MicDictateButton
+                      sessionId={sessionId}
+                      value={reframeDraft}
+                      onText={setReframeDraft}
+                      disabled={!canInteract}
+                      size={32}
+                      captionAlign="left"
+                      title="Dictate the reframe"
+                    />
                     <button onClick={saveReframeEdit} disabled={!reframeDraft.trim()}
                       style={{ ...chipBtn(GREEN), opacity: reframeDraft.trim() ? 1 : 0.45 }}>
                       Save reframe
@@ -627,7 +647,7 @@ export default function ThoughtChallenger({ sessionId, role, isLocked }: Thought
         </div>
 
         {isT && evidenceOpen && (
-          <div style={{ display: 'flex', gap: 8, marginBottom: 10 }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 10 }}>
             {/* eslint-disable-next-line jsx-a11y/no-autofocus */}
             <input
               autoFocus
@@ -637,6 +657,15 @@ export default function ThoughtChallenger({ sessionId, role, isLocked }: Thought
               placeholder="Add evidence card"
               onKeyDown={e => e.key === 'Enter' && addCard()}
               style={inputStyle}
+            />
+            {/* Evidence usually arrives mid-sentence — dictate it straight in. */}
+            <MicDictateButton
+              sessionId={sessionId}
+              value={cardInput}
+              onText={setCardInput}
+              disabled={!canInteract}
+              size={32}
+              title="Dictate this evidence"
             />
             <button onClick={addCard} style={chipBtn(BLUE)}>Add</button>
           </div>

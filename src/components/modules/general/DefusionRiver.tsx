@@ -8,6 +8,7 @@ import {
 } from 'lucide-react'
 import { db } from '@/lib/firebase'
 import { logModuleEvent } from '@/lib/sessionEvents'
+import MicDictateButton from '@/components/modules/MicDictateButton'
 
 /* ---------------------------------------------------------------------------
    Art assets. The Background folder name is clean but the file name carries a
@@ -379,11 +380,21 @@ export default function DefusionRiver({ sessionId, role, isLocked }: DefusionRiv
                       style={{
                         width: '100%', boxSizing: 'border-box', minHeight: 76,
                         background: '#ffffff', border: `1px solid ${BORDER}`, borderRadius: 14,
-                        padding: '11px 12px 24px', fontSize: 17, lineHeight: 1.35, color: INK,
+                        padding: '11px 50px 24px 12px', fontSize: 17, lineHeight: 1.35, color: INK,
                         resize: 'none', outline: 'none', fontFamily: '"DM Sans", sans-serif',
                         transition: 'border-color .15s, box-shadow .15s',
                       }}
                     />
+                    {/* Say the thought aloud and it lands on the leaf. */}
+                    <div style={{ position: 'absolute', right: 9, top: 8 }}>
+                      <MicDictateButton
+                        sessionId={sessionId}
+                        value={input}
+                        onText={next => setInput(next.slice(0, MAX_CHARS))}
+                        size={34}
+                        title="Dictate this thought"
+                      />
+                    </div>
                     <span style={{
                       position: 'absolute', right: 11, bottom: 9, fontSize: 14, fontWeight: 600,
                       color: input.length >= MAX_CHARS ? '#B4632A' : MUTED, pointerEvents: 'none',

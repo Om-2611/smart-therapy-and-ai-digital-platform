@@ -5,6 +5,7 @@ import { doc, onSnapshot, updateDoc } from 'firebase/firestore'
 import { MessageCircle, Lock, Unlock } from 'lucide-react'
 import { db } from '@/lib/firebase'
 import { logModuleEvent } from '@/lib/sessionEvents'
+import MicDictateButton from '@/components/modules/MicDictateButton'
 
 /* ---------------------------------------------------------------------------
    Art assets. Both folder names contain spaces, so every segment is encoded
@@ -254,12 +255,22 @@ export default function WorryVault({ sessionId, role, isLocked }: WorryVaultProp
                   style={{
                     width: '100%', boxSizing: 'border-box', minHeight: 64,
                     background: '#ffffff', border: `1px solid ${BORDER}`, borderRadius: 20,
-                    padding: '20px 22px 20px 56px', fontSize: 18.5, lineHeight: 1.35, color: INK,
+                    padding: '20px 68px 20px 56px', fontSize: 18.5, lineHeight: 1.35, color: INK,
                     resize: 'none', outline: 'none', fontFamily: '"DM Sans", sans-serif',
                     boxShadow: '0 2px 12px rgba(31,59,44,0.06)',
                     transition: 'border-color .15s, box-shadow .15s',
                   }}
                 />
+                {/* Dictate the worry instead of typing it. */}
+                <div style={{ position: 'absolute', right: 14, top: 13 }}>
+                  <MicDictateButton
+                    sessionId={sessionId}
+                    value={text}
+                    onText={next => setText(next.slice(0, MAX_CHARS))}
+                    disabled={!canInteract}
+                    title="Dictate this worry"
+                  />
+                </div>
               </div>
 
               <button
