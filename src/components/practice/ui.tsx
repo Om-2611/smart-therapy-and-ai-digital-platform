@@ -506,7 +506,9 @@ export function DsDialog({
 }) {
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className={cx('ds-dialog gap-0 p-0', wide ? 'sm:max-w-2xl' : 'sm:max-w-md')}>
+      {/* `staad-ui` matters here: Radix portals this to <body>, outside the app
+          shell, so without it none of the STAAD design tokens resolve. */}
+      <DialogContent className={cx('staad-ui ds-dialog gap-0 p-0', wide ? 'sm:max-w-2xl' : 'sm:max-w-md')}>
         <div className="px-6 pb-4 pt-6 pr-12">
           <DialogTitle className="ds-title text-[25px] leading-tight">{title}</DialogTitle>
           {description && (
@@ -555,7 +557,7 @@ export function Drawer({
     <div className="fixed inset-0 z-50 flex justify-end" role="dialog" aria-modal="true">
       <div className="absolute inset-0 bg-black/25 backdrop-blur-[2px]" onClick={onClose} />
       <div
-        className={cx('animate-fade-in relative flex h-full w-full flex-col', wide ? 'max-w-xl' : 'max-w-md')}
+        className={cx('staad-ui animate-fade-in relative flex h-full w-full flex-col', wide ? 'max-w-xl' : 'max-w-md')}
         style={{ background: 'var(--ds-surface)', borderLeft: '1px solid var(--ds-border)' }}
       >
         <div className="flex items-start justify-between gap-3 border-b px-6 py-5" style={{ borderColor: 'var(--ds-border)' }}>

@@ -40,6 +40,21 @@ enum SubRequestStatus {
   REJECTED
 }
 
+enum WhatsAppMessageStatus {
+  PENDING
+  SENDING
+  SENT
+  DELIVERED
+  READ
+  FAILED
+  SKIPPED
+}
+
+enum WhatsAppMessageType {
+  CLIENT_INVITE
+  SESSION_SCHEDULED
+}
+
 model User {
   id        String   @id // Firebase Auth UID
   email     String   @unique
@@ -63,27 +78,27 @@ model ProfileAdmin {
 }
 
 model ProfileTherapist {
-  id            String   @id @default(uuid())
-  userId        String   @unique
-  user          User     @relation(fields: [userId], references: [id], onDelete: Cascade)
-  firstName     String
-  lastName      String
-  specialty     String[] // SLD, ADHD, Anxiety, Depression, ID, Dyslexia, Autism etc.
-  qualification String?
-  experience    String?
-  bio           String?
+  id                String   @id @default(uuid())
+  userId            String   @unique
+  user              User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  firstName         String
+  lastName          String
+  specialty         String[] // SLD, ADHD, Anxiety, Depression, ID, Dyslexia, Autism etc.
+  qualification     String?
+  experience        String?
+  bio               String?
   // Per-therapist module/tool access. When allModulesAllowed is true the
   // therapist may launch any module; otherwise only those listed in moduleAccess.
   allModulesAllowed Boolean  @default(true)
   moduleAccess      String[] @default([])
-  createdAt     DateTime @default(now())
-  updatedAt     DateTime @updatedAt
+  createdAt         DateTime @default(now())
+  updatedAt         DateTime @updatedAt
 
-  sessions     Session[]
-  notes        TherapistNote[]
-  bookings     Booking[]
-  invites      Invite[]
-  usageEvents  UsageEvent[]
+  sessions             Session[]
+  notes                TherapistNote[]
+  bookings             Booking[]
+  invites              Invite[]
+  usageEvents          UsageEvent[]
   subscriptions        Subscription[]
   subscriptionRequests SubscriptionRequest[]
 
@@ -93,19 +108,22 @@ model ProfileTherapist {
 }
 
 model ProfileClient {
-  id          String    @id @default(uuid())
-  userId      String    @unique
-  user        User      @relation(fields: [userId], references: [id], onDelete: Cascade)
-  firstName   String
-  lastName    String
-  dateOfBirth DateTime
-  gender      String?
-  diagnosis   String[]
-  parentEmail String?
-  createdAt   DateTime  @default(now())
-  updatedAt   DateTime  @updatedAt
-  bookings    Booking[]
-  sessions    Session[]
+  id               String            @id @default(uuid())
+  userId           String            @unique
+  user             User              @relation(fields: [userId], references: [id], onDelete: Cascade)
+  firstName        String
+  lastName         String
+  dateOfBirth      DateTime
+  gender           String?
+  diagnosis        String[]
+  parentEmail      String?
+  phoneNumber      String? // E.164; used as the patient's WhatsApp recipient
+  createdAt        DateTime          @default(now())
+  updatedAt        DateTime          @updatedAt
+  bookings         Booking[]
+  sessions         Session[]
+  claimedInvites   Invite[]          @relation("ClaimedInvite")
+  whatsAppMessages WhatsAppMessage[]
 
   progressMetrics ProgressMetric[]
   progressReports ProgressReport[]
@@ -141,21 +159,22 @@ model Booking {
 }
 
 model Session {
-  id          String           @id @default(uuid())
-  therapistId String
-  therapist   ProfileTherapist @relation(fields: [therapistId], references: [id])
-  clientId    String
-  client      ProfileClient    @relation(fields: [clientId], references: [id])
-  status              SessionStatus    @default(SCHEDULED)
-  scheduledAt         DateTime
-  startedAt           DateTime?
-  endedAt             DateTime?
-  confirmedByPatient  Boolean          @default(false)
-  createdAt   DateTime         @default(now())
-  updatedAt   DateTime         @updatedAt
+  id                 String           @id @default(uuid())
+  therapistId        String
+  therapist          ProfileTherapist @relation(fields: [therapistId], references: [id])
+  clientId           String
+  client             ProfileClient    @relation(fields: [clientId], references: [id])
+  status             SessionStatus    @default(SCHEDULED)
+  scheduledAt        DateTime
+  startedAt          DateTime?
+  endedAt            DateTime?
+  confirmedByPatient Boolean          @default(false)
+  createdAt          DateTime         @default(now())
+  updatedAt          DateTime         @updatedAt
 
-  notes  TherapistNote[]
-  report SessionReport?
+  notes            TherapistNote[]
+  report           SessionReport?
+  whatsAppMessages WhatsAppMessage[]
 }
 
 // End-of-session AI clinical report. One per session. Generated from the full
@@ -163,40 +182,79 @@ model Session {
 // editable by the therapist. `visibleToClient` is false for now (therapist-only)
 // but lets us expose reports to clients later without a schema change.
 model SessionReport {
-  id          String   @id @default(uuid())
-  sessionId   String   @unique
-  session     Session  @relation(fields: [sessionId], references: [id], onDelete: Cascade)
-  therapistId String
-  clientId    String
-  content     String   // report body (Markdown, English) — editable by therapist
-  language    String   @default("en")
-  model       String?  // which LLM produced the draft
+  id                String    @id @default(uuid())
+  sessionId         String    @unique
+  session           Session   @relation(fields: [sessionId], references: [id], onDelete: Cascade)
+  therapistId       String
+  clientId          String
+  content           String // report body (Markdown, English) — editable by therapist
+  language          String    @default("en")
+  model             String? // which LLM produced the draft
   aiGenerated       Boolean   @default(true)
   editedByTherapist Boolean   @default(false)
   editedAt          DateTime?
   visibleToClient   Boolean   @default(false)
-  generatedAt DateTime @default(now())
-  updatedAt   DateTime @updatedAt
+  generatedAt       DateTime  @default(now())
+  updatedAt         DateTime  @updatedAt
 
   @@index([therapistId])
   @@index([clientId])
 }
 
 model Invite {
-  id              String           @id @default(uuid())
-  token           String           @unique
-  therapistId     String
-  therapist       ProfileTherapist @relation(fields: [therapistId], references: [id], onDelete: Cascade)
-  firstName       String
-  lastName        String
-  diagnosis       String[]
-  scheduledAt     DateTime         @default(now())
-  status          InviteStatus     @default(PENDING)
-  claimedClientId String?
-  createdAt       DateTime         @default(now())
-  expiresAt       DateTime?
+  id               String            @id @default(uuid())
+  token            String            @unique
+  therapistId      String
+  therapist        ProfileTherapist  @relation(fields: [therapistId], references: [id], onDelete: Cascade)
+  firstName        String
+  lastName         String
+  diagnosis        String[]
+  phoneNumber      String? // E.164; retained after claim for delivery audit
+  scheduledAt      DateTime          @default(now())
+  status           InviteStatus      @default(PENDING)
+  claimedClientId  String?
+  createdAt        DateTime          @default(now())
+  expiresAt        DateTime?
+  claimedClient    ProfileClient?    @relation("ClaimedInvite", fields: [claimedClientId], references: [id])
+  whatsAppMessages WhatsAppMessage[]
 
   @@index([therapistId])
+  @@index([claimedClientId])
+}
+
+model WhatsAppMessage {
+  id                String                @id
+  inviteId          String?
+  sessionId         String?
+  clientId          String?
+  phoneNumber       String
+  generatedLink     String
+  messageType       WhatsAppMessageType   @default(CLIENT_INVITE)
+  status            WhatsAppMessageStatus @default(PENDING)
+  providerMessageId String?               @unique
+  errorCode         String?
+  errorMessage      String?
+  attempts          Int                   @default(0)
+  lastAttemptAt     DateTime?
+  nextAttemptAt     DateTime?
+  sentAt            DateTime?
+  deliveredAt       DateTime?
+  readAt            DateTime?
+  providerStatusAt  DateTime?
+  createdAt         DateTime              @default(now())
+  updatedAt         DateTime
+  invite            Invite?               @relation(fields: [inviteId], references: [id], onDelete: Cascade)
+  session           Session?              @relation(fields: [sessionId], references: [id], onDelete: Cascade)
+  client            ProfileClient?        @relation(fields: [clientId], references: [id])
+
+  // Nullable columns don't collide under Postgres uniqueness (NULL != NULL),
+  // so CLIENT_INVITE rows (inviteId set, sessionId null) and
+  // SESSION_SCHEDULED rows (sessionId set, inviteId null) each get their own
+  // effective dedup constraint from these two indexes.
+  @@unique([inviteId, messageType])
+  @@unique([sessionId, messageType])
+  @@index([clientId])
+  @@index([status, nextAttemptAt])
 }
 
 // Lightweight resource-usage log for the admin dashboard.
@@ -328,9 +386,9 @@ model ProgressReport {
 // the client's overall progress tracking and can optionally attach to a
 // specific ProgressReport.
 model ProgressNote {
-  id          String          @id @default(uuid())
+  id          String           @id @default(uuid())
   reportId    String?
-  report      ProgressReport? @relation(fields: [reportId], references: [id], onDelete: Cascade)
+  report      ProgressReport?  @relation(fields: [reportId], references: [id], onDelete: Cascade)
   clientId    String
   client      ProfileClient    @relation(fields: [clientId], references: [id], onDelete: Cascade)
   therapistId String
@@ -355,4 +413,3 @@ model TherapistNote {
   createdAt   DateTime         @default(now())
   updatedAt   DateTime         @updatedAt
 }
-

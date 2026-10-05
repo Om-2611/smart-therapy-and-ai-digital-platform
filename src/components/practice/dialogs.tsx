@@ -4,6 +4,7 @@ import React, { useEffect, useMemo, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { Check, Copy, Loader2, Mail, MessageCircle, Send } from 'lucide-react';
 import { useAuthStore } from '@/store/useAuthStore';
+import { auth } from '@/lib/firebase';
 import { DsDialog, Drawer, Field, Spinner, toast } from './ui';
 import {
   DAY_NAMES,
@@ -306,21 +307,48 @@ export function AddClientDialog({
   const [firstName, setFirstName] = useState('');
   const [lastName, setLastName] = useState('');
   const [diagnosis, setDiagnosis] = useState('');
+  const [phone, setPhone] = useState('');
   const [link, setLink] = useState('');
   const [copied, setCopied] = useState(false);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState('');
+  const [waSending, setWaSending] = useState(false);
+  const [waStatus, setWaStatus] = useState('');
 
   useEffect(() => {
     if (open) {
       setFirstName('');
       setLastName('');
       setDiagnosis('');
+      setPhone('');
       setLink('');
       setCopied(false);
       setError('');
+      setWaStatus('');
     }
   }, [open]);
+
+  // Fires on its own once the invite exists — the therapist never clicks "send".
+  const sendWhatsApp = async (inviteLink: string) => {
+    if (!profile?.id || !phone.trim() || !auth.currentUser) return;
+    setWaSending(true);
+    setWaStatus('');
+    try {
+      const token = await auth.currentUser.getIdToken();
+      const res = await fetch('/api/whatsapp/invite', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
+        body: JSON.stringify({ therapistId: profile.id, patientName: firstName.trim(), inviteLink }),
+      });
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) throw new Error(data.error || 'WhatsApp send failed');
+      setWaStatus('Invite sent via WhatsApp.');
+    } catch (e) {
+      setWaStatus(e instanceof Error ? e.message : 'WhatsApp send failed');
+    } finally {
+      setWaSending(false);
+    }
+  };
 
   const submit = async () => {
     if (!profile?.id) return;
@@ -330,17 +358,23 @@ export function AddClientDialog({
     try {
       const res = await fetch('/api/invites', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: `Bearer ${await auth.currentUser?.getIdToken()}`,
+        },
         body: JSON.stringify({
           therapistId: profile.id,
           firstName: firstName.trim(),
           lastName: lastName.trim(),
           diagnosis: diagnosis.split(',').map((d) => d.trim()).filter(Boolean),
+          phoneNumber: phone,
         }),
       });
       const data = await res.json().catch(() => ({}));
       if (!res.ok) throw new Error(data.error || 'Could not create the invite.');
-      setLink(`${window.location.origin}/auth?invite=${data.token}`);
+      const inviteLink = `${window.location.origin}/auth?invite=${data.token}`;
+      setLink(inviteLink);
+      if (phone.trim()) void sendWhatsApp(inviteLink);
       onCreated?.();
     } catch (e) {
       setError(e instanceof Error ? e.message : 'Could not create the invite.');
@@ -400,17 +434,19 @@ export function AddClientDialog({
               {copied ? 'Copied' : 'Copy'}
             </button>
           </div>
-          <div className="grid grid-cols-2 gap-2">
-            <a className="ds-btn ds-btn-outline" href={`https://wa.me/?text=${encodeURIComponent(message)}`} target="_blank" rel="noopener noreferrer">
-              <MessageCircle /> WhatsApp
-            </a>
+          {phone.trim() ? (
+            <div className="flex items-center gap-2 rounded-xl p-3 text-[13px]" style={{ background: 'var(--ds-surface-2)', border: '1px solid var(--ds-border)', color: 'var(--ds-ink)' }}>
+              {waSending ? <Loader2 className="animate-spin" /> : <MessageCircle />}
+              {waSending ? 'Sending via WhatsApp…' : waStatus || 'Invite sent via WhatsApp.'}
+            </div>
+          ) : (
             <a
-              className="ds-btn ds-btn-outline"
+              className="ds-btn ds-btn-outline w-full"
               href={`mailto:?subject=${encodeURIComponent('Your STAAD therapy session invite')}&body=${encodeURIComponent(message)}`}
             >
               <Mail /> Email
             </a>
-          </div>
+          )}
         </div>
       ) : (
         <div className="space-y-4">
@@ -424,6 +460,16 @@ export function AddClientDialog({
           </div>
           <Field label="Conditions" htmlFor="client-dx" hint="Separate with commas, e.g. Anxiety, ADHD">
             <input id="client-dx" className="ds-input" value={diagnosis} onChange={(e) => setDiagnosis(e.target.value)} placeholder="Anxiety, ADHD" />
+          </Field>
+          <Field label="WhatsApp number" htmlFor="client-phone" hint="Include the country code. The invite is sent here automatically.">
+            <input
+              id="client-phone"
+              className="ds-input"
+              value={phone}
+              onChange={(e) => setPhone(e.target.value)}
+              placeholder="+91 98765 43210"
+              inputMode="tel"
+            />
           </Field>
           {error && <ErrorText>{error}</ErrorText>}
         </div>

@@ -82,6 +82,7 @@ export default function StaadVideo({
   return (
     <RoomCtx.Provider value={{ disconnect, room }}>
       <LiveKitRoom
+        key={token}
         room={room}
         serverUrl={process.env.NEXT_PUBLIC_LIVEKIT_URL}
         token={token}

@@ -34,6 +34,11 @@ interface Caption {
   at: number
 }
 
+interface CaptionPayload {
+  text: string
+  attributes: Record<string, string>
+}
+
 export default function CaptionOverlay({ enabled }: { enabled: boolean }) {
   const { room } = useSessionRoom()
   const [captions, setCaptions] = useState<Caption[]>([])
@@ -42,6 +47,39 @@ export default function CaptionOverlay({ enabled }: { enabled: boolean }) {
   // torn down every time this flag flips.
   const enabledRef = useRef(enabled)
   enabledRef.current = enabled
+
+  const addCaption = (payload: CaptionPayload) => {
+    const text = payload.text.trim()
+    if (!enabledRef.current || !text) return
+
+    const attrs = payload.attributes
+    if (attrs['staad.kind'] !== 'translation') return
+
+    const caption: Caption = {
+      segmentId: attrs['lk.segment_id'] || `${Date.now()}`,
+      speaker: attrs['staad.speaker_identity'] || 'Speaker',
+      text,
+      original: attrs['staad.original_text'] || '',
+      sourceLang: attrs['staad.source_language'] || '',
+      targetLang: attrs['staad.target_language'] || '',
+      at: Date.now(),
+    }
+
+    setCaptions((prev) => {
+      // Re-publishing the same segment replaces rather than stacks.
+      const withoutDupe = prev.filter((c) => c.segmentId !== caption.segmentId)
+      return [...withoutDupe, caption].slice(-MAX_VISIBLE)
+    })
+  }
+
+  useEffect(() => {
+    const onLocalCaption = (event: Event) => {
+      const detail = (event as CustomEvent<CaptionPayload>).detail
+      if (detail) addCaption(detail)
+    }
+    window.addEventListener('staad:caption', onLocalCaption)
+    return () => window.removeEventListener('staad:caption', onLocalCaption)
+  }, [])
 
   useEffect(() => {
     if (!room) return
@@ -54,25 +92,7 @@ export default function CaptionOverlay({ enabled }: { enabled: boolean }) {
         if (cancelled || !enabledRef.current || !text) return
 
         const attrs = reader.info.attributes ?? {}
-        // Only the translated line is rendered; the original rides along as an
-        // attribute so both are available without a second lookup.
-        if (attrs['staad.kind'] !== 'translation') return
-
-        const caption: Caption = {
-          segmentId: attrs['lk.segment_id'] || `${Date.now()}`,
-          speaker: attrs['staad.speaker_identity'] || 'Speaker',
-          text,
-          original: attrs['staad.original_text'] || '',
-          sourceLang: attrs['staad.source_language'] || '',
-          targetLang: attrs['staad.target_language'] || '',
-          at: Date.now(),
-        }
-
-        setCaptions((prev) => {
-          // Re-publishing the same segment replaces rather than stacks.
-          const withoutDupe = prev.filter((c) => c.segmentId !== caption.segmentId)
-          return [...withoutDupe, caption].slice(-MAX_VISIBLE)
-        })
+        addCaption({ text, attributes: attrs })
       } catch {
         // A malformed stream must not take the session room down.
       }

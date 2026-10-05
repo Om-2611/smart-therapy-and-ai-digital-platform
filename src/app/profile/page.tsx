@@ -2,47 +2,39 @@
 
 import React, { useEffect, useMemo, useState } from 'react';
 import { useRouter } from 'next/navigation';
-import { AlertTriangle, ChevronDown, Leaf, Loader2, Monitor, Moon, Quote, Save, Settings, SlidersHorizontal, Sun, Trash2, User, Users } from 'lucide-react';
-import { sendPasswordResetEmail, deleteUser } from 'firebase/auth';
-import DashboardLayout from '@/components/layout/DashboardLayout';
-import { useTheme } from '@/components/ThemeProvider';
-import { useAuthStore } from '@/store/useAuthStore';
+import { deleteUser, sendPasswordResetEmail } from 'firebase/auth';
 import { auth } from '@/lib/firebase';
-import { Card, Field, IconBubble, PageHeader, Pill, cx, toast } from '@/components/practice/ui';
-import { initials } from '@/lib/practice';
+import { useAuthStore } from '@/store/useAuthStore';
+import { usePracticeData } from '@/hooks/usePracticeData';
+import { StaadShell } from '@/components/staad/Shell';
+import { TopBar } from '@/components/staad/TopBar';
+import { Btn, InlineError, Section, SkeletonCard, cx } from '@/components/staad/parts';
+import { IconCheckSm, IconDownload, IconRowA, IconRowB, IconRowC } from '@/components/staad/icons';
+import { DsDialog, toast } from '@/components/practice/ui';
+import {
+  DAY_NAMES,
+  DEFAULT_AVAILABILITY,
+  DEFAULT_DURATION,
+  downloadFile,
+  fmtDate,
+  fullName,
+  hasDocs,
+  initials,
+  loadAvailability,
+  saveAvailability,
+  sessionDuration,
+  toCsv,
+  type Availability,
+} from '@/lib/practice';
 
 const SPECIALITIES = ['SLD', 'ADHD', 'Anxiety', 'Depression', 'ID', 'Autism', 'Dyslexia', 'Trauma', 'General'];
 const QUALIFICATIONS = ['BA/BSc', 'MA/MSc', 'M.Phil', 'Ph.D', 'MD', 'DM'];
-const EXPERIENCES = ['0-2 years', '3-5 years', '5-10 years', '10+ years', '15+ years'];
-const GENDERS = ['Male', 'Female', 'Non-binary', 'Prefer not to say'];
-const BIO_MAX = 200;
-
-// Practice preferences have no schema column yet, so they live in this browser.
-interface Prefs {
-  mode: 'online' | 'in-person';
-  email: boolean;
-  inApp: boolean;
-}
-const DEFAULT_PREFS: Prefs = { mode: 'online', email: true, inApp: false };
-
-const dobInput = (d?: string | null) => (d ? new Date(d).toISOString().split('T')[0] : '');
-
-function CardHeading({ icon, title, subtitle }: { icon: React.ReactNode; title: string; subtitle: string }) {
-  return (
-    <div className="mb-5 flex items-center gap-4">
-      <IconBubble size={52}>{icon}</IconBubble>
-      <div>
-        <h2 className="ds-title text-[22px] leading-tight">{title}</h2>
-        <p className="ds-muted text-[13px]">{subtitle}</p>
-      </div>
-    </div>
-  );
-}
 
 export default function ProfilePage() {
-  const { uid, role, profile, email, clearAuth, setRoleAndProfile } = useAuthStore();
-  const { theme, toggle: toggleTheme } = useTheme();
   const router = useRouter();
+  const { uid, role, email, profile, setRoleAndProfile, clearAuth } = useAuthStore();
+  const { sessions, bookings, clients, loading } = usePracticeData();
+
   const isTherapist = role === 'THERAPIST';
 
   const [firstName, setFirstName] = useState('');
@@ -51,20 +43,15 @@ export default function ProfilePage() {
   const [experience, setExperience] = useState('');
   const [specialties, setSpecialties] = useState<string[]>([]);
   const [bio, setBio] = useState('');
-  const [dateOfBirth, setDateOfBirth] = useState('');
-  const [gender, setGender] = useState('');
-  const [prefs, setPrefs] = useState<Prefs>(DEFAULT_PREFS);
+  const [availability, setAvailability] = useState<Availability>(DEFAULT_AVAILABILITY);
+
   const [saving, setSaving] = useState(false);
-
-  const [pwSending, setPwSending] = useState(false);
   const [pwMessage, setPwMessage] = useState('');
-
-  const [showDanger, setShowDanger] = useState(false);
+  const [pwSending, setPwSending] = useState(false);
+  const [dangerOpen, setDangerOpen] = useState(false);
   const [deleteConfirm, setDeleteConfirm] = useState('');
   const [deleting, setDeleting] = useState(false);
   const [deleteError, setDeleteError] = useState('');
-
-  const prefsKey = `staad-prefs-${uid ?? 'anon'}`;
 
   useEffect(() => {
     if (!uid) router.push('/auth');
@@ -72,69 +59,62 @@ export default function ProfilePage() {
 
   useEffect(() => {
     if (!profile) return;
-    setFirstName(profile.firstName || '');
-    setLastName(profile.lastName || '');
-    setQualification(profile.qualification || '');
-    setExperience(profile.experience || '');
-    setSpecialties(profile.specialty || []);
-    setBio(profile.bio || '');
-    setDateOfBirth(dobInput(profile.dateOfBirth));
-    setGender(profile.gender || '');
+    setFirstName(profile.firstName ?? '');
+    setLastName(profile.lastName ?? '');
+    setQualification(profile.qualification ?? '');
+    setExperience(profile.experience ?? '');
+    setSpecialties(profile.specialty ?? []);
+    setBio(profile.bio ?? '');
+    setAvailability(loadAvailability(profile.id));
   }, [profile]);
 
-  useEffect(() => {
-    try {
-      const raw = localStorage.getItem(prefsKey);
-      setPrefs(raw ? { ...DEFAULT_PREFS, ...JSON.parse(raw) } : DEFAULT_PREFS);
-    } catch {}
-  }, [prefsKey]);
+  const snapshot = (v: unknown) => JSON.stringify(v);
+  const initial = useMemo(
+    () =>
+      snapshot({
+        firstName: profile?.firstName ?? '',
+        lastName: profile?.lastName ?? '',
+        qualification: profile?.qualification ?? '',
+        experience: profile?.experience ?? '',
+        specialties: profile?.specialty ?? [],
+        bio: profile?.bio ?? '',
+      }),
+    [profile]
+  );
+  const dirty =
+    !!profile && initial !== snapshot({ firstName, lastName, qualification, experience, specialties, bio });
 
-  const updatePrefs = (patch: Partial<Prefs>) => {
-    const next = { ...prefs, ...patch };
-    setPrefs(next);
-    try {
-      localStorage.setItem(prefsKey, JSON.stringify(next));
-    } catch {}
+  const toggleSpecialty = (s: string) =>
+    setSpecialties((prev) => (prev.includes(s) ? prev.filter((x) => x !== s) : [...prev, s]));
+
+  const toggleDay = (d: number) =>
+    setAvailability((a) => {
+      const next = {
+        ...a,
+        days: a.days.includes(d) ? a.days.filter((x) => x !== d) : [...a.days, d].sort(),
+      };
+      saveAvailability(profile?.id, next);
+      return next;
+    });
+
+  const setHours = (key: 'start' | 'end', value: string) =>
+    setAvailability((a) => {
+      const next = { ...a, [key]: value };
+      saveAvailability(profile?.id, next);
+      return next;
+    });
+
+  const discard = () => {
+    if (!profile) return;
+    setFirstName(profile.firstName ?? '');
+    setLastName(profile.lastName ?? '');
+    setQualification(profile.qualification ?? '');
+    setExperience(profile.experience ?? '');
+    setSpecialties(profile.specialty ?? []);
+    setBio(profile.bio ?? '');
   };
 
-  const snapshot = (v: {
-    firstName: string;
-    lastName: string;
-    qualification: string;
-    experience: string;
-    specialties: string[];
-    bio: string;
-    dateOfBirth: string;
-    gender: string;
-  }) =>
-    JSON.stringify(
-      isTherapist
-        ? [v.firstName, v.lastName, v.qualification, v.experience, v.specialties, v.bio]
-        : [v.firstName, v.lastName, v.dateOfBirth, v.gender]
-    );
-  const initialSnapshot = useMemo(
-    () =>
-      profile
-        ? snapshot({
-            firstName: profile.firstName || '',
-            lastName: profile.lastName || '',
-            qualification: profile.qualification || '',
-            experience: profile.experience || '',
-            specialties: profile.specialty || [],
-            bio: profile.bio || '',
-            dateOfBirth: dobInput(profile.dateOfBirth),
-            gender: profile.gender || '',
-          })
-        : '',
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-    [profile, isTherapist]
-  );
-  const dirty = !!profile && initialSnapshot !== snapshot({ firstName, lastName, qualification, experience, specialties, bio, dateOfBirth, gender });
-
-  const toggleSpecialty = (spec: string) =>
-    setSpecialties((prev) => (prev.includes(spec) ? prev.filter((s) => s !== spec) : [...prev, spec]));
-
-  const handleSave = async () => {
+  const save = async () => {
     if (!uid || !role) return;
     if (!firstName.trim()) {
       toast('First name is required.', 'error');
@@ -142,9 +122,13 @@ export default function ProfilePage() {
     }
     setSaving(true);
     try {
-      const body: Record<string, unknown> = { uid, role, firstName: firstName.trim(), lastName: lastName.trim() };
+      const body: Record<string, unknown> = {
+        uid,
+        role,
+        firstName: firstName.trim(),
+        lastName: lastName.trim(),
+      };
       if (isTherapist) Object.assign(body, { qualification, experience, specialty: specialties, bio });
-      else Object.assign(body, { dateOfBirth: dateOfBirth || undefined, gender });
       const res = await fetch('/api/users/profile', {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
@@ -152,7 +136,6 @@ export default function ProfilePage() {
       });
       const data = await res.json().catch(() => ({}));
       if (!res.ok) throw new Error(data.error || 'Could not save your profile.');
-      // Keep the sidebar / header in sync without a reload.
       setRoleAndProfile(role, { ...profile, ...data.profile });
       toast('Profile saved');
     } catch (e) {
@@ -162,7 +145,7 @@ export default function ProfilePage() {
     }
   };
 
-  const handleChangePassword = async () => {
+  const changePassword = async () => {
     if (!email) return;
     setPwMessage('');
     setPwSending(true);
@@ -176,15 +159,25 @@ export default function ProfilePage() {
     setPwSending(false);
   };
 
-  const handleDeleteAccount = async () => {
+  const exportData = () => {
+    const header = ['Client', 'Date', 'Status', 'Notes filed'];
+    const rows = sessions.map((s) => [
+      fullName(s.client) || 'Client',
+      fmtDate(s.scheduledAt),
+      s.status,
+      hasDocs(s) ? 'Yes' : 'No',
+    ]);
+    downloadFile('staad-my-data.csv', toCsv([header, ...rows]), 'text/csv');
+    toast('Your session data has been downloaded.');
+  };
+
+  const deleteAccount = async () => {
     if (deleteConfirm !== 'DELETE' || !uid) return;
     setDeleteError('');
     setDeleting(true);
     try {
-      // Remove the Firebase Auth user first; this can require a recent login.
-      const current = auth.currentUser;
-      if (current) await deleteUser(current);
-      // Then purge all relational data for this user.
+      const currentUser = auth.currentUser;
+      if (currentUser) await deleteUser(currentUser);
       await fetch('/api/users/profile', {
         method: 'DELETE',
         headers: { 'Content-Type': 'application/json' },
@@ -198,314 +191,301 @@ export default function ProfilePage() {
           ? 'For security, please log out and log back in, then try again.'
           : 'Could not delete account. Please try again.'
       );
+    } finally {
       setDeleting(false);
     }
   };
 
-  const roleLabel = role === 'ADMIN' ? 'Admin' : isTherapist ? 'Therapist' : 'Client';
-  const tagline = isTherapist
-    ? specialties.length
-      ? `Specialising in ${specialties.slice(0, 3).join(', ')}`
-      : 'Dedicated to inclusive, evidence-based care.'
-    : 'Your calm space for growth.';
+  // practice stats — all derived from real sessions
+  const completed = sessions.filter((s) => s.status === 'COMPLETED');
+  const filedOnTime = completed.filter(hasDocs).length;
+  const notesPct = completed.length ? Math.round((filedOnTime / completed.length) * 100) : 0;
+  const avgMinutes = completed.length
+    ? Math.round(completed.reduce((a, s) => a + sessionDuration(s, bookings), 0) / completed.length)
+    : DEFAULT_DURATION;
 
   return (
-    <DashboardLayout role={role} profile={profile}>
-      <div className="space-y-6">
-        <PageHeader
-          title="Profile"
-          subtitle="Manage your account settings and therapeutic identity."
-          actions={
-            <>
-              {dirty && <span className="ds-muted text-[13px]">Unsaved changes</span>}
-              <button className="ds-btn ds-btn-lg ds-btn-clay" onClick={handleSave} disabled={saving || !profile}>
-                {saving ? <Loader2 className="animate-spin" /> : <Save />} Save
-              </button>
-            </>
-          }
-        />
+    <StaadShell>
+      <TopBar sessions={sessions} />
 
-        {/* Identity */}
-        <Card className="flex flex-col gap-6 p-6 md:flex-row md:items-center">
-          <div className="flex min-w-0 flex-1 items-center gap-5">
-            <div
-              className="flex h-[88px] w-[88px] shrink-0 items-center justify-center rounded-full text-[30px]"
-              style={{ background: 'var(--ds-clay-soft)', color: 'var(--ds-clay-ink)', fontFamily: "'DM Serif Display', serif" }}
-            >
-              {initials(firstName, lastName)}
-            </div>
-            <div className="min-w-0">
-              <div className="flex flex-wrap items-center gap-2">
-                <p className="ds-title text-[28px] leading-tight">{`${firstName} ${lastName}`.trim() || 'Your name'}</p>
-                <Pill tone="green">{roleLabel}</Pill>
-              </div>
-              <p className="ds-muted mt-1.5 flex items-center gap-2 text-[14px]">
-                <Leaf className="h-4 w-4 shrink-0" style={{ color: 'var(--ds-green)' }} /> {tagline}
-              </p>
-            </div>
-          </div>
-          <div className="hidden h-16 w-px md:block" style={{ background: 'var(--ds-border)' }} />
-          <div className="flex flex-1 items-start gap-3">
-            <Quote className="h-8 w-8 shrink-0" style={{ color: 'var(--ds-faint)' }} />
-            <div>
-              <p className="ds-title text-[19px] italic">Small steps, meaningful change.</p>
-              <p className="ds-muted text-[14px]">Better support. Brighter tomorrows.</p>
-            </div>
-          </div>
-        </Card>
+      <div className="phead">
+        <div>
+          <div className="eyebrow">Your account</div>
+          <h1 className="phead__title">Profile</h1>
+          <p className="phead__lead">How you appear to clients, and how STAAD reaches you.</p>
+        </div>
+        <div className="phead__acts">
+          <Btn onClick={discard} disabled={!dirty}>
+            Discard
+          </Btn>
+          <Btn icon={<IconCheckSm />} variant="primary" onClick={save} disabled={saving || !dirty}>
+            {saving ? 'Saving…' : 'Save Changes'}
+          </Btn>
+        </div>
+      </div>
 
-        <div className="grid grid-cols-1 gap-6 lg:grid-cols-[minmax(0,1.45fr)_minmax(0,1fr)]">
-          {/* Personal information */}
-          <Card className="p-6">
-            <CardHeading
-              icon={<User className="h-6 w-6" />}
-              title="Personal Information"
-              subtitle={isTherapist ? 'Tell us about your professional background and therapeutic approach.' : 'Your personal details.'}
-            />
-            <div className="space-y-5">
-              <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
-                <Field label="First Name" htmlFor="pf-first">
-                  <input id="pf-first" className="ds-input" value={firstName} onChange={(e) => setFirstName(e.target.value)} />
-                </Field>
-                <Field label="Last Name" htmlFor="pf-last">
-                  <input id="pf-last" className="ds-input" value={lastName} onChange={(e) => setLastName(e.target.value)} />
-                </Field>
+      <div className="cols">
+        <div className="left">
+          <Section title="Identity" sub="Clients see your name, title and focus areas when they book">
+            <article className="card card--flat">
+              <div className="rowflex" style={{ gap: 22 }}>
+                <span className="av av--xxl av--user">{initials(firstName, lastName) || '—'}</span>
+                <div>
+                  <span style={{ display: 'block', fontWeight: 800 }}>
+                    {`${firstName} ${lastName}`.trim() || 'Your name'}
+                  </span>
+                  <span className="lsub">
+                    {[role ? role.charAt(0) + role.slice(1).toLowerCase() : null, experience]
+                      .filter(Boolean)
+                      .join(' · ') || 'Therapist'}
+                  </span>
+                </div>
               </div>
 
-              {isTherapist ? (
-                <>
-                  <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
-                    <Field label="Qualification" htmlFor="pf-qual">
-                      <select id="pf-qual" className="ds-input" value={qualification} onChange={(e) => setQualification(e.target.value)}>
-                        <option value="">Select qualification</option>
+              <div className="fgrid" style={{ marginTop: 22 }}>
+                <div className="field">
+                  <label htmlFor="p-first">First name</label>
+                  <input id="p-first" type="text" value={firstName} onChange={(e) => setFirstName(e.target.value)} />
+                </div>
+                <div className="field">
+                  <label htmlFor="p-last">Last name</label>
+                  <input id="p-last" type="text" value={lastName} onChange={(e) => setLastName(e.target.value)} />
+                </div>
+                <div className="field">
+                  <label htmlFor="p-email">Email</label>
+                  <input id="p-email" type="email" value={email ?? ''} readOnly aria-readonly />
+                </div>
+                {isTherapist && (
+                  <>
+                    <div className="field">
+                      <label htmlFor="p-qual">Professional title</label>
+                      <select id="p-qual" value={qualification} onChange={(e) => setQualification(e.target.value)}>
+                        <option value="">Not set</option>
                         {QUALIFICATIONS.map((q) => (
                           <option key={q} value={q}>
                             {q}
                           </option>
                         ))}
                       </select>
-                    </Field>
-                    <Field label="Experience" htmlFor="pf-exp">
-                      <select id="pf-exp" className="ds-input" value={experience} onChange={(e) => setExperience(e.target.value)}>
-                        <option value="">Select experience</option>
-                        {EXPERIENCES.map((x) => (
-                          <option key={x} value={x}>
-                            {x}
-                          </option>
-                        ))}
-                      </select>
-                    </Field>
-                  </div>
-                  <div>
-                    <p className="ds-label">Specialties</p>
-                    <div className="flex flex-wrap gap-2">
-                      {SPECIALITIES.map((spec) => {
-                        const on = specialties.includes(spec);
-                        return (
-                          <button
-                            key={spec}
-                            type="button"
-                            aria-pressed={on}
-                            onClick={() => toggleSpecialty(spec)}
-                            className="rounded-full px-3.5 py-1.5 text-[13px] font-medium transition-colors"
-                            style={on ? { background: 'var(--ds-clay)', color: '#fff' } : { background: 'var(--ds-surface-2)', color: 'var(--ds-ink)', border: '1px solid var(--ds-border)' }}
-                          >
-                            {spec}
-                          </button>
-                        );
-                      })}
                     </div>
-                  </div>
-                  <div>
-                    <label className="ds-label" htmlFor="pf-bio">
-                      Bio <span className="ds-muted font-normal">({BIO_MAX - bio.length} chars remaining)</span>
-                    </label>
-                    <textarea
-                      id="pf-bio"
-                      className="ds-input resize-y"
-                      rows={4}
-                      value={bio}
-                      maxLength={BIO_MAX}
-                      onChange={(e) => setBio(e.target.value.slice(0, BIO_MAX))}
-                      placeholder="Tell us about your therapeutic approach…"
-                    />
-                    <p className="ds-faint mt-1 text-right text-[12px]">
-                      {bio.length}/{BIO_MAX}
-                    </p>
-                  </div>
-                </>
-              ) : (
+                    <div className="field">
+                      <label htmlFor="p-exp">Experience</label>
+                      <input
+                        id="p-exp"
+                        type="text"
+                        value={experience}
+                        placeholder="e.g. 6 years in practice"
+                        onChange={(e) => setExperience(e.target.value)}
+                      />
+                    </div>
+                  </>
+                )}
+              </div>
+
+              {isTherapist && (
                 <>
-                  <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
-                    <Field label="Date of Birth" htmlFor="pf-dob">
-                      <input id="pf-dob" type="date" className="ds-input" value={dateOfBirth} onChange={(e) => setDateOfBirth(e.target.value)} />
-                    </Field>
-                    <Field label="Gender" htmlFor="pf-gender">
-                      <select id="pf-gender" className="ds-input" value={gender} onChange={(e) => setGender(e.target.value)}>
-                        <option value="">Select gender</option>
-                        {GENDERS.map((g) => (
-                          <option key={g} value={g}>
-                            {g}
-                          </option>
-                        ))}
-                      </select>
-                    </Field>
+                  <div className="field" style={{ marginTop: 16 }}>
+                    <label htmlFor="p-bio">How you introduce yourself</label>
+                    <textarea
+                      id="p-bio"
+                      value={bio}
+                      placeholder="Two or three lines clients read before their first session."
+                      onChange={(e) => setBio(e.target.value)}
+                    />
                   </div>
-                  <div>
-                    <p className="ds-label">Conditions</p>
-                    <div className="flex flex-wrap gap-2">
-                      {(profile?.diagnosis ?? []).length === 0 ? (
-                        <span className="ds-muted text-[13px]">No conditions recorded</span>
-                      ) : (
-                        (profile?.diagnosis as string[]).map((d) => (
-                          <Pill key={d} tone="clay">
-                            {d}
-                          </Pill>
-                        ))
-                      )}
+
+                  <div style={{ marginTop: 16 }}>
+                    <div className="eyebrow" style={{ marginBottom: 8 }}>
+                      Focus areas
                     </div>
-                    <p className="ds-faint mt-1.5 text-[12px]">Set by your therapist.</p>
+                    <div className="chips">
+                      {SPECIALITIES.map((s) => (
+                        <button
+                          key={s}
+                          type="button"
+                          className={cx('chip', specialties.includes(s) && 'on')}
+                          aria-pressed={specialties.includes(s)}
+                          onClick={() => toggleSpecialty(s)}
+                        >
+                          {s}
+                        </button>
+                      ))}
+                    </div>
                   </div>
                 </>
               )}
-            </div>
-          </Card>
+            </article>
+          </Section>
 
-          <div className="space-y-6">
-            {/* Account */}
-            <Card className="p-6">
-              <CardHeading icon={<Settings className="h-6 w-6" />} title="Account" subtitle="Manage your login details and preferences." />
-              <div className="space-y-5">
-                <Field label="Email" htmlFor="pf-email">
-                  <input id="pf-email" className="ds-input" value={email || ''} readOnly />
-                </Field>
-                <div className="flex items-center justify-between gap-3">
-                  <div>
-                    <p className="text-[14px] font-semibold">Theme</p>
-                    <p className="ds-muted text-[12.5px]">Switch between light and dark mode</p>
+          {isTherapist && (
+            <Section title="Working hours" sub="The window clients can book into">
+              <article className="card card--flat">
+                <div className="fgrid">
+                  <div className="field">
+                    <label htmlFor="p-from">Weekdays from</label>
+                    <input
+                      id="p-from"
+                      type="time"
+                      value={availability.start}
+                      onChange={(e) => setHours('start', e.target.value)}
+                    />
                   </div>
-                  <button
-                    className="ds-icon-btn"
-                    style={{ width: 48, height: 44, background: 'var(--ds-surface-2)', border: '1px solid var(--ds-border)' }}
-                    onClick={toggleTheme}
-                    aria-label={theme === 'light' ? 'Switch to dark mode' : 'Switch to light mode'}
-                  >
-                    {theme === 'light' ? <Sun className="h-5 w-5" /> : <Moon className="h-5 w-5" />}
-                  </button>
-                </div>
-                <div className="flex items-center justify-between gap-3">
-                  <div className="min-w-0">
-                    <p className="text-[14px] font-semibold">Password</p>
-                    <p className="ds-muted text-[12.5px]">Change your account password</p>
-                    {pwMessage && (
-                      <p className="mt-1 text-[12px] font-medium" style={{ color: 'var(--ds-green)' }}>
-                        {pwMessage}
-                      </p>
-                    )}
+                  <div className="field">
+                    <label htmlFor="p-until">Weekdays until</label>
+                    <input
+                      id="p-until"
+                      type="time"
+                      value={availability.end}
+                      onChange={(e) => setHours('end', e.target.value)}
+                    />
                   </div>
-                  <button className="ds-btn ds-btn-clay-outline" onClick={handleChangePassword} disabled={pwSending || !email}>
-                    {pwSending && <Loader2 className="animate-spin" />} Change password
-                  </button>
                 </div>
-              </div>
-            </Card>
 
-            {isTherapist && (
-              <Card className="p-6">
-                <CardHeading
-                  icon={<SlidersHorizontal className="h-6 w-6" />}
-                  title="Practice Preferences"
-                  subtitle="Set your default preferences for a smoother experience."
-                />
-                <div className="space-y-5">
-                  <div>
-                    <p className="ds-label">Preferred session mode</p>
-                    <div className="grid grid-cols-2 gap-3">
-                      {(
-                        [
-                          { key: 'online', label: 'Online (Video)', icon: Monitor },
-                          { key: 'in-person', label: 'In-person', icon: Users },
-                        ] as const
-                      ).map((o) => {
-                        const on = prefs.mode === o.key;
-                        return (
-                          <button
-                            key={o.key}
-                            type="button"
-                            aria-pressed={on}
-                            onClick={() => updatePrefs({ mode: o.key })}
-                            className={cx('flex items-center gap-2 rounded-xl px-3 py-2.5 text-[13.5px] font-medium transition-colors')}
-                            style={
-                              on
-                                ? { background: 'var(--ds-green-soft)', border: '1px solid var(--ds-green)', color: 'var(--ds-ink)' }
-                                : { background: 'var(--ds-surface)', border: '1px solid var(--ds-border-strong)', color: 'var(--ds-ink)' }
-                            }
-                          >
-                            <o.icon className="h-4 w-4" /> {o.label}
-                          </button>
-                        );
-                      })}
-                    </div>
-                  </div>
-                  <div>
-                    <p className="ds-label">Preferred communication</p>
-                    <div className="flex flex-wrap gap-5 text-[14px]">
-                      <label className="flex cursor-pointer items-center gap-2">
-                        <input type="checkbox" checked={prefs.email} onChange={(e) => updatePrefs({ email: e.target.checked })} style={{ accentColor: 'var(--ds-forest)', width: 17, height: 17 }} />
-                        Email
-                      </label>
-                      <label className="flex cursor-pointer items-center gap-2">
-                        <input type="checkbox" checked={prefs.inApp} onChange={(e) => updatePrefs({ inApp: e.target.checked })} style={{ accentColor: 'var(--ds-forest)', width: 17, height: 17 }} />
-                        In-app notifications
-                      </label>
-                    </div>
-                  </div>
-                  <p className="ds-faint text-[12px]">Preferences save automatically in this browser.</p>
+                <div className="rowflex" style={{ marginTop: 16, flexWrap: 'wrap' }}>
+                  {DAY_NAMES.map((name, i) => (
+                    <button
+                      key={name}
+                      type="button"
+                      className={cx('chip', availability.days.includes(i) && 'on')}
+                      aria-pressed={availability.days.includes(i)}
+                      onClick={() => toggleDay(i)}
+                    >
+                      {name}
+                    </button>
+                  ))}
+                  <span className="note">Tap a day to open or close it</span>
                 </div>
-              </Card>
-            )}
-          </div>
-        </div>
-
-        {/* Danger zone */}
-        <div className="rounded-[18px]" style={{ background: 'var(--ds-red-soft)', border: '1px solid color-mix(in srgb, var(--ds-red) 35%, transparent)' }}>
-          <button className="flex w-full items-center gap-4 p-5 text-left" onClick={() => setShowDanger((v) => !v)} aria-expanded={showDanger}>
-            <IconBubble tone="red" size={52}>
-              <AlertTriangle className="h-6 w-6" />
-            </IconBubble>
-            <div className="flex-1">
-              <p className="ds-title text-[20px]">Danger Zone</p>
-              <p className="ds-muted text-[13.5px]">These actions are permanent and cannot be undone.</p>
-            </div>
-            <ChevronDown className={cx('h-5 w-5 transition-transform', showDanger && 'rotate-180')} style={{ color: 'var(--ds-muted)' }} />
-          </button>
-          {showDanger && (
-            <div className="space-y-3 px-5 pb-5">
-              <p className="text-[14px]">
-                <strong>Delete account</strong> — permanently removes your profile, sessions, notes and invites. Type <strong>DELETE</strong> to confirm.
-              </p>
-              <div className="flex flex-col gap-3 sm:flex-row">
-                <input
-                  className="ds-input"
-                  value={deleteConfirm}
-                  onChange={(e) => setDeleteConfirm(e.target.value)}
-                  placeholder='Type "DELETE" to confirm'
-                  aria-label="Type DELETE to confirm account deletion"
-                />
-                <button className="ds-btn ds-btn-danger" onClick={handleDeleteAccount} disabled={deleteConfirm !== 'DELETE' || deleting}>
-                  {deleting ? <Loader2 className="animate-spin" /> : <Trash2 />}
-                  {deleting ? 'Deleting…' : 'Delete account'}
-                </button>
-              </div>
-              {deleteError && (
-                <p className="text-[13px] font-medium" style={{ color: 'var(--ds-red)' }} role="alert">
-                  {deleteError}
-                </p>
-              )}
-            </div>
+              </article>
+            </Section>
           )}
+
+          <Section title="Security" sub="Password and account access">
+            <article className="card card--flat">
+              <div className="switchrow">
+                <span>
+                  <span className="switchrow__t">Password</span>
+                  <span className="switchrow__s">
+                    {pwMessage || 'We email you a secure link instead of storing a password here.'}
+                  </span>
+                </span>
+                <Btn sm onClick={changePassword} disabled={pwSending || !email}>
+                  {pwSending ? 'Sending…' : 'Send reset link'}
+                </Btn>
+              </div>
+            </article>
+          </Section>
         </div>
+
+        <aside className="panel">
+          <span className="panel__glow" />
+          <div>
+            <h2 className="panel__t">Your Practice</h2>
+            <p className="panel__s">Since joining STAAD</p>
+          </div>
+
+          {loading ? (
+            <SkeletonCard height={120} />
+          ) : (
+            <>
+              <article className="pcard">
+                <span className="prow__s" style={{ display: 'block' }}>
+                  Sessions run
+                </span>
+                <span style={{ display: 'block', fontFamily: 'var(--font-display)', fontSize: 34, color: '#fff' }}>
+                  {completed.length}
+                </span>
+                <span className="prow__s" style={{ display: 'block' }}>
+                  Across {clients.length} client{clients.length === 1 ? '' : 's'}
+                </span>
+              </article>
+
+              <div className="panel__rows">
+                <div className="prow">
+                  <span style={{ display: 'flex', width: 38, height: 38, flex: 'none', alignItems: 'center' }}>
+                    <IconRowA />
+                  </span>
+                  <span style={{ minWidth: 0, flex: 1 }}>
+                    <span className="prow__t">Notes filed</span>
+                    <span className="prow__s">
+                      {completed.length ? `${notesPct}% of completed sessions` : 'No completed sessions yet'}
+                    </span>
+                  </span>
+                </div>
+                <div className="prow">
+                  <span style={{ display: 'flex', width: 38, height: 38, flex: 'none', alignItems: 'center' }}>
+                    <IconRowB />
+                  </span>
+                  <span style={{ minWidth: 0, flex: 1 }}>
+                    <span className="prow__t">Average session</span>
+                    <span className="prow__s">{avgMinutes} minutes</span>
+                  </span>
+                </div>
+                <div className="prow">
+                  <span style={{ display: 'flex', width: 38, height: 38, flex: 'none', alignItems: 'center' }}>
+                    <IconRowC />
+                  </span>
+                  <span style={{ minWidth: 0, flex: 1 }}>
+                    <span className="prow__t">Focus areas</span>
+                    <span className="prow__s">{specialties.length ? specialties.join(', ') : 'None set yet'}</span>
+                  </span>
+                </div>
+              </div>
+            </>
+          )}
+
+          <article className="pcard" style={{ marginTop: 14 }}>
+            <span className="pcard__name">Danger zone</span>
+            <p className="prow__s">Export everything, or close the account for good.</p>
+            <div className="rowflex" style={{ marginTop: 12 }}>
+              <button type="button" className="chip" onClick={exportData}>
+                Export data
+              </button>
+              <button type="button" className="chip" onClick={() => setDangerOpen(true)}>
+                Delete account
+              </button>
+            </div>
+          </article>
+        </aside>
       </div>
-    </DashboardLayout>
+
+      <DsDialog
+        open={dangerOpen}
+        onOpenChange={(o) => {
+          setDangerOpen(o);
+          if (!o) {
+            setDeleteConfirm('');
+            setDeleteError('');
+          }
+        }}
+        title="Delete your account"
+        description="This removes your profile, sessions, notes and invites. It cannot be undone."
+        footer={
+          <>
+            <button className="ds-btn ds-btn-ghost" onClick={() => setDangerOpen(false)}>
+              Cancel
+            </button>
+            <button
+              className="ds-btn ds-btn-clay"
+              onClick={deleteAccount}
+              disabled={deleteConfirm !== 'DELETE' || deleting}
+            >
+              {deleting ? 'Deleting…' : 'Delete permanently'}
+            </button>
+          </>
+        }
+      >
+        <div className="field">
+          <label htmlFor="p-confirm">Type DELETE to confirm</label>
+          <input
+            id="p-confirm"
+            type="text"
+            value={deleteConfirm}
+            onChange={(e) => setDeleteConfirm(e.target.value)}
+            placeholder="DELETE"
+          />
+        </div>
+        {deleteError && <InlineError message={deleteError} />}
+      </DsDialog>
+    </StaadShell>
   );
 }

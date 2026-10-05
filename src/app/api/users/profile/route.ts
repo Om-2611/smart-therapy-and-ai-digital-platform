@@ -36,6 +36,10 @@ export async function POST(request: Request) {
         return { user: u, profile, session: null };
       }
 
+      const invite = inviteToken
+        ? await tx.invite.findUnique({ where: { token: inviteToken } })
+        : null;
+
       const profile = await tx.profileClient.create({
         data: {
           userId: uid,
@@ -43,6 +47,7 @@ export async function POST(request: Request) {
           lastName: lastName || '',
           dateOfBirth: dateOfBirth ? new Date(dateOfBirth) : new Date(),
           diagnosis: diagnosis || [],
+          phoneNumber: invite?.status === 'PENDING' ? invite.phoneNumber : null,
         },
       });
 
@@ -50,7 +55,6 @@ export async function POST(request: Request) {
       // session and mark the invite CLAIMED.
       let session = null;
       if (inviteToken) {
-        const invite = await tx.invite.findUnique({ where: { token: inviteToken } });
         if (invite && invite.status === 'PENDING') {
           session = await tx.session.create({
             data: {

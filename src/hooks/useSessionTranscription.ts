@@ -6,6 +6,8 @@ import { db } from '@/lib/firebase'
 import { useSessionRoom } from '@/components/StaadVideo'
 import type { TranscriptChunk } from '@/lib/rag/types'
 
+const TRANSCRIPTION_TOPIC = 'lk.transcription'
+
 interface UseSessionTranscriptionOptions {
   sessionId: string
   enabled: boolean
@@ -28,20 +30,27 @@ interface Pipe {
   processor: ScriptProcessorNode
 }
 
-// We connect to our OWN server-side proxy (same origin), which holds the Sarvam
-// key and adds it as a header upstream. Browsers can't set WS headers, and
-// Sarvam rejects query-param auth — hence the proxy. See server.js.
-function buildProxyUrl(sessionId: string, speaker: string): string {
-  const proto = window.location.protocol === 'https:' ? 'wss:' : 'ws:'
-  const params = new URLSearchParams({
-    model: 'saaras:v3',
-    mode: 'translate',
-    high_vad_sensitivity: 'true',
-    vad_signals: 'true',
-    sid: sessionId,
-    speaker,
-  })
-  return `${proto}//${window.location.host}/api/sarvam-stream?${params.toString()}`
+const STT_RELAY_URL = process.env.NEXT_PUBLIC_STT_RELAY_URL
+
+// With NEXT_PUBLIC_STT_RELAY_URL set we connect to the external relay (Fly.io)
+// using a signed token. Without it we fall back to the same-origin proxy in
+// server.js (local dev / self-hosted Node).
+function buildProxyUrl(sessionId: string, speaker: string, token: string): string {
+  const url = STT_RELAY_URL
+    ? new URL('/sarvam-stream', STT_RELAY_URL)
+    : new URL('/api/sarvam-stream', window.location.origin)
+  // Ensure wss:// or ws://
+  url.protocol = url.protocol.replace('http', 'ws')
+  
+  url.searchParams.set('model', 'saaras:v3')
+  url.searchParams.set('mode', 'translate')
+  url.searchParams.set('high_vad_sensitivity', 'true')
+  url.searchParams.set('vad_signals', 'true')
+  url.searchParams.set('sid', sessionId)
+  url.searchParams.set('speaker', speaker)
+  if (token) url.searchParams.set('token', token)
+  
+  return url.toString()
 }
 
 // Sarvam streaming audio chunks are base64-encoded PCM (s16le) wrapped in JSON.
@@ -56,6 +65,22 @@ function pcmToBase64(int16: Int16Array): string {
     )
   }
   return btoa(binary)
+}
+
+function captionAttributes(
+  speaker: TranscriptChunk['speaker'],
+  original: string,
+): Record<string, string> {
+  return {
+    'lk.segment_id': `${Date.now()}-${Math.random().toString(36).slice(2)}`,
+    'lk.transcription_final': 'true',
+    'staad.kind': 'translation',
+    'staad.speaker_identity': speaker,
+    'staad.source_language': speaker,
+    'staad.target_language': 'en',
+    'staad.original_text': original,
+    'staad.source': 'sarvam-browser',
+  }
 }
 
 export function useSessionTranscription({
@@ -103,6 +128,33 @@ export function useSessionTranscription({
     [sessionId]
   )
 
+  const publishCaption = useCallback(
+    async (text: string, speaker: TranscriptChunk['speaker']) => {
+      const clean = text.trim()
+      if (!clean || !room) return
+
+      const attributes = captionAttributes(speaker, clean)
+
+      // Text streams are not looped back to the sender in every LiveKit client
+      // path, so update this browser directly and also publish for the peer.
+      window.dispatchEvent(
+        new CustomEvent('staad:caption', {
+          detail: { text: clean, attributes },
+        })
+      )
+
+      try {
+        await room.localParticipant.sendText(clean, {
+          topic: TRANSCRIPTION_TOPIC,
+          attributes,
+        })
+      } catch (e) {
+        console.warn('[Transcription] Caption publish failed:', e)
+      }
+    },
+    [room]
+  )
+
   const stopPipe = useCallback((key: string) => {
     const pipe = pipesRef.current.get(key)
     if (!pipe) return
@@ -115,11 +167,27 @@ export function useSessionTranscription({
 
   // Open a Sarvam socket + audio graph for one participant track.
   const startPipe = useCallback(
-    (key: string, track: MediaStreamTrack, speaker: TranscriptChunk['speaker']) => {
+    async (key: string, track: MediaStreamTrack, speaker: TranscriptChunk['speaker']) => {
       if (pipesRef.current.has(key)) return
 
+      let token = ''
+      if (STT_RELAY_URL) try {
+        const { auth } = await import('@/lib/firebase')
+        const idToken = await auth.currentUser?.getIdToken()
+        const res = await fetch(`/api/stt-token?sessionId=${sessionId}`, {
+          headers: { Authorization: `Bearer ${idToken}` }
+        })
+        const data = await res.json()
+        if (!res.ok) throw new Error(data.error || 'Failed to get STT token')
+        token = data.token
+      } catch (err) {
+        console.error('[Transcription] Failed to get token:', err)
+        setState((s) => ({ ...s, error: 'Transcription auth error' }))
+        return
+      }
+
       // Connect to our proxy (translate mode → English out, multilingual in).
-      const ws = new WebSocket(buildProxyUrl(sessionId, speaker))
+      const ws = new WebSocket(buildProxyUrl(sessionId, speaker, token))
 
       const ctx = new AudioContext({ sampleRate: 16000 })
       const source = ctx.createMediaStreamSource(new MediaStream([track]))
@@ -156,7 +224,11 @@ export function useSessionTranscription({
           const msg = JSON.parse(event.data)
           if (msg.type !== 'data') return
           const text: string = msg.data?.transcript || msg.data?.translation || ''
-          if (text.trim()) writeChunk(text, speaker)
+          if (text.trim()) {
+            console.log(`[Transcription] Caption received (${speaker})`)
+            writeChunk(text, speaker)
+            publishCaption(text, speaker)
+          }
         } catch (e) {
           console.warn('[Transcription] Parse error:', e)
         }
@@ -172,7 +244,7 @@ export function useSessionTranscription({
 
       pipesRef.current.set(key, { ws, ctx, source, processor })
     },
-    [writeChunk, sessionId]
+    [writeChunk, publishCaption, sessionId]
   )
 
   const addRemoteMic = useCallback(

@@ -1,5 +1,7 @@
 import { NextResponse } from 'next/server';
+import { randomUUID } from 'crypto';
 import { prisma } from '@/lib/db';
+import { sendSessionScheduledMessage } from '@/lib/whatsapp-bot';
 
 export const dynamic = 'force-dynamic';
 
@@ -71,6 +73,65 @@ export async function POST(request: Request) {
         therapist: true,
       },
     });
+
+    // Best-effort WhatsApp notification — a failure here must not fail session
+    // creation, so it's logged rather than thrown.
+    if (session.client.phoneNumber) {
+      const sessionLink = `${new URL(request.url).origin}/session/${session.id}`;
+      const now = new Date();
+      try {
+        const delivery = await prisma.whatsAppMessage.upsert({
+          where: { sessionId_messageType: { sessionId: session.id, messageType: 'SESSION_SCHEDULED' } },
+          create: {
+            id: randomUUID(),
+            sessionId: session.id,
+            clientId: session.clientId,
+            phoneNumber: session.client.phoneNumber,
+            generatedLink: sessionLink,
+            messageType: 'SESSION_SCHEDULED',
+            status: 'SENDING',
+            attempts: 1,
+            lastAttemptAt: now,
+            updatedAt: now,
+          },
+          update: {
+            phoneNumber: session.client.phoneNumber,
+            generatedLink: sessionLink,
+            status: 'SENDING',
+            attempts: { increment: 1 },
+            lastAttemptAt: now,
+            errorCode: null,
+            errorMessage: null,
+            updatedAt: now,
+          },
+        });
+
+        const message = await sendSessionScheduledMessage({
+          to: session.client.phoneNumber,
+          patientName: session.client.firstName,
+          sessionLink,
+          scheduledAt: session.scheduledAt,
+          therapistName: `${session.therapist.firstName} ${session.therapist.lastName}`.trim(),
+        });
+
+        await prisma.whatsAppMessage.update({
+          where: { id: delivery.id },
+          data: {
+            status: 'SENT',
+            providerMessageId: message.sid,
+            sentAt: new Date(),
+            providerStatusAt: new Date(),
+            updatedAt: new Date(),
+          },
+        });
+      } catch (error: any) {
+        console.error('Session-scheduled WhatsApp notification failed:', error);
+        await prisma.whatsAppMessage.updateMany({
+          where: { sessionId: session.id, messageType: 'SESSION_SCHEDULED' },
+          data: { status: 'FAILED', errorMessage: error?.message || 'WhatsApp send failed', updatedAt: new Date() },
+        });
+      }
+    }
 
     return NextResponse.json({ session });
   } catch (error: any) {

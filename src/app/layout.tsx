@@ -2,6 +2,8 @@ import React from 'react';
 import AuthProvider from '@/components/AuthProvider';
 import ThemeProvider from '@/components/ThemeProvider';
 import './globals.css';
+import './staad-design.css';
+import './staad-extras.css';
 
 export const metadata = {
   title: 'STAAD — Collaborative Therapy Platform',

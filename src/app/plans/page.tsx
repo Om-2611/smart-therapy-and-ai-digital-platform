@@ -1,12 +1,13 @@
 'use client';
 
 import React, { useCallback, useEffect, useState } from 'react';
-import Link from 'next/link';
-import { ArrowRight, Check, Clock, Crown, Headset, Loader2, Mail, Sparkles, Sprout, User, Users } from 'lucide-react';
-import DashboardLayout from '@/components/layout/DashboardLayout';
 import { useAuthStore } from '@/store/useAuthStore';
-import { useTherapistGuard } from '@/hooks/usePracticeData';
-import { Card, DsDialog, ErrorBanner, IconBubble, LoadingBlock, PageHeader, Pill, cx, toast } from '@/components/practice/ui';
+import { usePracticeData, useTherapistGuard } from '@/hooks/usePracticeData';
+import { StaadShell } from '@/components/staad/Shell';
+import { TopBar } from '@/components/staad/TopBar';
+import { Badge, Btn, Chips, InlineError, Notch, Section, SkeletonCard, cx } from '@/components/staad/parts';
+import { IconArrowRightXs, IconTick } from '@/components/staad/icons';
+import { DsDialog, toast } from '@/components/practice/ui';
 import { ALL_MODULE_IDS, MODULE_CATEGORIES, resolveAllowedModuleIds } from '@/lib/modules';
 import { fmtDate } from '@/lib/practice';
 
@@ -37,16 +38,8 @@ interface Pending {
   modules: string[];
 }
 
-const MONTH_OPTIONS = [1, 3, 6, 12];
-const PLAN_ICONS = [User, Crown, Users];
-
-const STEPS = [
-  { title: 'Select a plan', body: 'Choose the plan that fits your needs.' },
-  { title: 'Send request', body: 'Submit a request for the selected plan.' },
-  { title: 'Admin approval', body: 'Our team reviews and approves your request.' },
-];
-
-const quotaLabel = (q: number | null) => (q == null ? 'All therapy tools' : `${q} therapy tools`);
+const MONTH_OPTIONS = [1, 3, 6, 12] as const;
+type Term = (typeof MONTH_OPTIONS)[number];
 
 const planFeatures = (p: Plan) => [
   p.toolQuota == null ? 'Every therapy tool, including new ones' : `Any ${p.toolQuota} therapy tools you choose`,
@@ -56,25 +49,23 @@ const planFeatures = (p: Plan) => [
   p.durationMonths > 1 ? `${p.durationMonths}-month default term` : 'Flexible terms from 1 to 12 months',
 ];
 
-const CheckDot = () => (
-  <span className="mt-px flex h-5 w-5 shrink-0 items-center justify-center rounded-full" style={{ background: 'var(--ds-green-soft)', color: 'var(--ds-green)' }}>
-    <Check className="h-3 w-3" strokeWidth={3} />
-  </span>
-);
+const inr = (n: number) => `₹${n.toLocaleString('en-IN')}`;
 
 export default function PlansPage() {
   useTherapistGuard();
   const { role, profile } = useAuthStore();
+  const { sessions } = usePracticeData();
 
   const [plans, setPlans] = useState<Plan[]>([]);
   const [current, setCurrent] = useState<Current | null>(null);
   const [pending, setPending] = useState<Pending | null>(null);
   const [loading, setLoading] = useState(true);
   const [loadError, setLoadError] = useState('');
+  const [term, setTerm] = useState<Term>(1);
 
-  // Request modal
+  // request dialog
   const [reqPlan, setReqPlan] = useState<Plan | null>(null);
-  const [months, setMonths] = useState(1);
+  const [months, setMonths] = useState<number>(1);
   const [selected, setSelected] = useState<Set<string>>(new Set());
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState('');
@@ -83,7 +74,10 @@ export default function PlansPage() {
     if (!profile?.id) return;
     setLoading(true);
     try {
-      const [pRes, sRes] = await Promise.all([fetch('/api/plans'), fetch(`/api/subscriptions?therapistId=${profile.id}`)]);
+      const [pRes, sRes] = await Promise.all([
+        fetch('/api/plans'),
+        fetch(`/api/subscriptions?therapistId=${profile.id}`),
+      ]);
       if (pRes.ok) setPlans((await pRes.json()).plans || []);
       if (sRes.ok) {
         const d = await sRes.json();
@@ -103,7 +97,7 @@ export default function PlansPage() {
 
   const openRequest = (p: Plan) => {
     setReqPlan(p);
-    setMonths(p.durationMonths || 1);
+    setMonths(term || p.durationMonths || 1);
     setSelected(new Set(current?.moduleAccess?.slice(0, p.toolQuota ?? undefined) ?? []));
     setError('');
   };
@@ -130,7 +124,12 @@ export default function PlansPage() {
       const res = await fetch('/api/subscriptions/request', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ therapistId: profile.id, planId: reqPlan.id, months, modules: Array.from(selected) }),
+        body: JSON.stringify({
+          therapistId: profile.id,
+          planId: reqPlan.id,
+          months,
+          modules: Array.from(selected),
+        }),
       });
       const data = await res.json().catch(() => ({}));
       if (!res.ok) {
@@ -147,279 +146,243 @@ export default function PlansPage() {
   };
 
   const toolsAvailable = resolveAllowedModuleIds(profile).length;
-  const toolPct = Math.round((toolsAvailable / ALL_MODULE_IDS.length) * 100);
-
-  const included = current
-    ? [quotaLabel(current.toolQuota), `${current.months}-month term`, `Started ${fmtDate(current.startedAt)}`, 'Session notes & AI reports']
-    : ['Scheduling & live session rooms', 'Session notes & AI reports', 'Client invites & progress tracking', 'Email support'];
 
   return (
-    <DashboardLayout role={role} profile={profile}>
-      <div className="space-y-6">
-        <PageHeader title="Plans & Subscription" subtitle="View your current plan and request a subscription. An admin reviews every request." />
+    <StaadShell>
+      <TopBar sessions={sessions} />
 
-        {loadError && <ErrorBanner message={loadError} onRetry={load} />}
+      <div className="phead">
+        <div>
+          <div className="eyebrow">Billing</div>
+          <h1 className="phead__title">Plans</h1>
+          <p className="phead__lead">What your practice is on, and what changes if you grow.</p>
+        </div>
+        <div className="phead__acts">
+          <Chips<Term>
+            value={term}
+            onChange={setTerm}
+            options={MONTH_OPTIONS.map((m) => ({ key: m, label: m === 1 ? 'Monthly' : `${m} months` }))}
+          />
+        </div>
+      </div>
 
+      {loadError && <InlineError message={loadError} onRetry={load} />}
+
+      {pending && (
+        <div className="inline-err" style={{ background: 'var(--ok-soft)', color: 'var(--ok)' }} role="status">
+          <span style={{ flex: 1 }}>
+            Your request for <b>{pending.planName}</b> ({pending.months} month{pending.months === 1 ? '' : 's'}) is with
+            an admin for approval.
+          </span>
+        </div>
+      )}
+
+      <div className="grid3">
         {loading ? (
-          <LoadingBlock label="Loading plans…" />
-        ) : (
           <>
-            {/* Current plan */}
-            <Card className="grid grid-cols-1 gap-6 p-6 lg:grid-cols-[minmax(0,1.5fr)_minmax(0,1fr)_minmax(0,1fr)]">
-              <div className="flex items-start gap-4">
-                <div
-                  className="flex h-[76px] w-[76px] shrink-0 items-center justify-center rounded-2xl"
-                  style={{ background: 'var(--ds-clay-soft)', color: 'var(--ds-clay-ink)' }}
-                >
-                  <Sprout className="h-9 w-9" />
+            <SkeletonCard height={420} />
+            <SkeletonCard height={420} />
+            <SkeletonCard height={420} />
+          </>
+        ) : plans.length === 0 ? (
+          <article className="card plan card--flat">
+            <span className="plan__name">No plans available</span>
+            <p className="mod__p">No subscription plans have been published yet. Check back soon.</p>
+          </article>
+        ) : (
+          plans.map((p) => {
+            const isCurrent = current?.planName === p.name;
+            const total = p.priceMonthly * term;
+            return (
+              <article key={p.id} className={cx('card plan', isCurrent ? 'card--lime' : 'card--flat')}>
+                {isCurrent && (
+                  <Notch width={52}>
+                    <button
+                      type="button"
+                      className="nbtn arrow"
+                      aria-label="Open plan details"
+                      onClick={() => openRequest(p)}
+                    >
+                      <IconArrowRightXs />
+                    </button>
+                  </Notch>
+                )}
+
+                <div>
+                  {isCurrent && <span className="badge badge--solid">Current plan</span>}
+                  <span className="plan__name" style={{ display: 'block' }}>
+                    {p.name}
+                  </span>
+                  <p className="mod__p">{p.description || 'Everything your practice needs to run its day.'}</p>
                 </div>
-                <div className="min-w-0">
-                  <p className="ds-muted text-[12px] font-semibold uppercase tracking-[0.12em]">Current plan</p>
-                  <div className="mt-1 flex flex-wrap items-center gap-2">
-                    <p className="ds-title text-[32px] leading-none">{current ? current.planName : 'Free tier'}</p>
-                    <Pill tone="green">{current?.renewed ? `Renewed ×${current.renewalCount}` : 'Current'}</Pill>
+
+                <div>
+                  <span className="plan__price">{p.priceMonthly === 0 ? 'Free' : inr(p.priceMonthly)}</span>
+                  <div className="plan__per">
+                    {p.priceMonthly === 0
+                      ? 'no charge'
+                      : term === 1
+                        ? 'per month, billed monthly'
+                        : `per month · ${inr(total)} for ${term} months`}
                   </div>
-                  <p className="ds-muted mt-2 text-[13.5px]">
-                    {current
-                      ? `Renews or ends on ${fmtDate(current.currentPeriodEnd)}.`
-                      : "You haven't taken a plan yet. Choose one below and send a request to unlock more tools."}
-                  </p>
                 </div>
-              </div>
-              <div className="lg:border-l lg:pl-6" style={{ borderColor: 'var(--ds-border)' }}>
-                <p className="text-[14px] font-semibold">What&apos;s included</p>
-                <ul className="mt-2.5 space-y-2">
-                  {included.map((item) => (
-                    <li key={item} className="flex items-start gap-2 text-[13.5px]">
-                      <CheckDot /> {item}
+
+                <ul className="plan__list">
+                  {planFeatures(p).map((f) => (
+                    <li key={f}>
+                      <span className="plan__tick">
+                        <IconTick />
+                      </span>
+                      {f}
                     </li>
                   ))}
                 </ul>
-              </div>
-              <div className="lg:border-l lg:pl-6" style={{ borderColor: 'var(--ds-border)' }}>
-                <div className="flex items-center justify-between">
-                  <p className="ds-muted text-[12px] font-semibold uppercase tracking-[0.12em]">Tool access</p>
-                  <p className="text-[15px] font-semibold">
-                    {toolsAvailable} / {ALL_MODULE_IDS.length}
-                  </p>
-                </div>
-                <div
-                  className="mt-3 h-2.5 overflow-hidden rounded-full"
-                  style={{ background: 'var(--ds-border)' }}
-                  role="progressbar"
-                  aria-valuenow={toolsAvailable}
-                  aria-valuemin={0}
-                  aria-valuemax={ALL_MODULE_IDS.length}
-                  aria-label="Therapy tools available"
-                >
-                  <div className="h-full rounded-full" style={{ width: `${Math.max(toolPct, 3)}%`, background: 'var(--ds-green)' }} />
-                </div>
-                <p className="ds-muted mt-2 text-[12.5px]">
-                  You can use {toolsAvailable} of {ALL_MODULE_IDS.length} therapy tools.
-                </p>
-                <Link href="/modules" className="mt-3 inline-flex items-center gap-1 text-[13px] font-semibold" style={{ color: 'var(--ds-clay-ink)' }}>
-                  Browse modules <ArrowRight className="h-3.5 w-3.5" />
-                </Link>
-              </div>
-            </Card>
 
-            {pending && (
-              <div className="flex items-center gap-3 rounded-2xl px-4 py-3 text-[13.5px]" style={{ background: 'var(--ds-amber-soft)' }} role="status">
-                <Clock className="h-5 w-5 shrink-0" style={{ color: 'var(--ds-amber)' }} />
-                <p>
-                  Your request for the <strong>{pending.planName}</strong> plan ({pending.months} mo
-                  {pending.modules.length ? `, ${pending.modules.length} tools` : ''}) is awaiting admin approval.
-                </p>
-              </div>
-            )}
-
-            {/* Available plans */}
-            <div>
-              <h2 className="ds-title text-[28px]">Available plans</h2>
-              <p className="ds-muted text-[14px]">Choose a plan that fits your practice and send a request. An admin will review and approve it.</p>
-              <div className="mt-6 grid grid-cols-1 gap-5 lg:grid-cols-3">
-                {plans.map((p, i) => {
-                  const popular = plans.length >= 3 && i === 1;
-                  const Icon = PLAN_ICONS[i % PLAN_ICONS.length];
-                  const isCurrent = current?.planName === p.name;
-                  return (
-                    <div
-                      key={p.id}
-                      className="ds-card relative flex flex-col p-6"
-                      style={popular ? { borderColor: 'var(--ds-green)', boxShadow: '0 0 0 1px var(--ds-green), var(--ds-shadow)' } : undefined}
-                    >
-                      {popular && (
-                        <span className="ds-chip absolute -top-3 right-6" style={{ background: 'var(--ds-green-soft)', color: 'var(--ds-green)' }}>
-                          <Sparkles className="h-3.5 w-3.5" /> Most Popular
-                        </span>
-                      )}
-                      <div className="flex items-center gap-4">
-                        <IconBubble tone={popular ? 'green' : 'clay'} size={60}>
-                          <Icon className="h-7 w-7" />
-                        </IconBubble>
-                        <div>
-                          <p className="ds-title text-[24px] leading-tight">{p.name}</p>
-                          {isCurrent && <Pill tone="green">Your plan</Pill>}
-                        </div>
-                      </div>
-                      <p className="mt-5">
-                        <span className="ds-title text-[36px]">{p.priceMonthly > 0 ? `₹${p.priceMonthly.toLocaleString('en-IN')}` : 'Free'}</span>
-                        {p.priceMonthly > 0 && <span className="ds-muted text-[15px]"> / month</span>}
-                      </p>
-                      {p.description && <p className="ds-muted mt-1 text-[13.5px]">{p.description}</p>}
-                      <div className="my-4 h-px" style={{ background: 'var(--ds-border)' }} />
-                      <ul className="space-y-2">
-                        {planFeatures(p).map((f) => (
-                          <li key={f} className="flex items-start gap-2 text-[13.5px]">
-                            <CheckDot /> {f}
-                          </li>
-                        ))}
-                      </ul>
-                      <div className="flex-1" />
-                      <button
-                        className={cx('ds-btn ds-btn-lg mt-6 w-full', popular ? 'ds-btn-clay' : 'ds-btn-clay-outline')}
-                        disabled={!!pending}
-                        onClick={() => openRequest(p)}
-                      >
-                        {pending ? 'Request pending' : isCurrent ? 'Renew plan' : 'Request Plan'}
-                      </button>
-                    </div>
-                  );
-                })}
-                {plans.length === 0 && (
-                  <Card className="col-span-full p-6 text-[14px]">
-                    <span className="ds-muted">No plans are available yet. Please check back later or contact support.</span>
-                  </Card>
-                )}
-              </div>
-            </div>
-
-            <div className="grid grid-cols-1 gap-5 lg:grid-cols-[minmax(0,1.6fr)_minmax(0,1fr)]">
-              <Card className="p-6">
-                <h2 className="ds-title text-[22px]">How subscriptions work</h2>
-                <p className="ds-muted text-[13.5px]">Getting access is simple and secure.</p>
-                <ol className="mt-5 flex flex-col gap-4 md:flex-row md:items-center">
-                  {STEPS.map((s, i) => (
-                    <React.Fragment key={s.title}>
-                      <li className="flex flex-1 items-center gap-3">
-                        <span
-                          className="flex h-11 w-11 shrink-0 items-center justify-center rounded-full text-[18px]"
-                          style={{
-                            fontFamily: "'DM Serif Display', serif",
-                            background: i === 0 ? 'var(--ds-green-soft)' : 'var(--ds-clay-soft)',
-                            color: i === 0 ? 'var(--ds-green)' : 'var(--ds-clay-ink)',
-                          }}
-                        >
-                          {i + 1}
-                        </span>
-                        <div>
-                          <p className="text-[14px] font-semibold">{s.title}</p>
-                          <p className="ds-muted text-[12.5px]">{s.body}</p>
-                        </div>
-                      </li>
-                      {i < STEPS.length - 1 && <ArrowRight className="hidden h-5 w-5 shrink-0 md:block" style={{ color: 'var(--ds-faint)' }} aria-hidden />}
-                    </React.Fragment>
-                  ))}
-                </ol>
-              </Card>
-              <Card className="flex items-start gap-4 p-6">
-                <IconBubble tone="green" size={56}>
-                  <Headset className="h-6 w-6" />
-                </IconBubble>
-                <div>
-                  <h2 className="ds-title text-[20px]">Need help choosing?</h2>
-                  <p className="ds-muted mt-1 text-[13.5px]">Our team is here to help you find the right plan for your practice.</p>
-                  <Link href="/help?category=Billing" className="ds-btn ds-btn-clay-outline mt-3">
-                    <Mail /> Contact Support
-                  </Link>
+                <div className="plan__foot">
+                  <Btn
+                    variant={isCurrent ? 'onlime' : 'primary'}
+                    onClick={() => openRequest(p)}
+                    disabled={!!pending}
+                    style={{ width: '100%', justifyContent: 'center' }}
+                  >
+                    {isCurrent ? 'Manage Plan' : pending ? 'Request pending' : `Request ${p.name}`}
+                  </Btn>
                 </div>
-              </Card>
-            </div>
-          </>
+              </article>
+            );
+          })
         )}
       </div>
 
+      <div className="cols">
+        <div className="left">
+          <Section
+            title="Your subscription"
+            sub={current ? 'The term you are on right now' : 'You are on the free tier'}
+          >
+            <article className="card card--flat" style={{ minHeight: 160 }}>
+              {loading ? (
+                <SkeletonCard height={120} />
+              ) : current ? (
+                <div className="fgrid">
+                  <Detail label="Plan" value={current.planName} />
+                  <Detail label="Status" value={current.status} />
+                  <Detail label="Started" value={fmtDate(current.startedAt)} />
+                  <Detail label="Renews / ends" value={fmtDate(current.currentPeriodEnd)} />
+                  <Detail label="Term" value={`${current.months} month${current.months === 1 ? '' : 's'}`} />
+                  <Detail
+                    label="Renewals"
+                    value={current.renewalCount > 0 ? `${current.renewalCount}×` : 'First term'}
+                  />
+                </div>
+              ) : (
+                <p className="mod__p">
+                  No active subscription. Request a plan above and an admin will review it.
+                </p>
+              )}
+            </article>
+          </Section>
+        </div>
+
+        <aside className="panel">
+          <div>
+            <h2 className="panel__t">Tool access</h2>
+            <p className="panel__s">What your plan unlocks in the session room</p>
+          </div>
+          <div className="panel__rows">
+            <div className="prow">
+              <span style={{ minWidth: 0, flex: 1 }}>
+                <span className="prow__t">
+                  {toolsAvailable} of {ALL_MODULE_IDS.length} tools
+                </span>
+                <span className="prow__s">
+                  {current?.toolQuota == null ? 'All therapy tools included' : `Quota: ${current.toolQuota}`}
+                </span>
+              </span>
+              <span className="badge badge--onpanel">
+                {Math.round((toolsAvailable / ALL_MODULE_IDS.length) * 100)}%
+              </span>
+            </div>
+          </div>
+          <span className="panel__glow" />
+        </aside>
+      </div>
+
+      {/* plan request */}
       <DsDialog
         open={!!reqPlan}
         onOpenChange={(o) => !o && setReqPlan(null)}
-        wide
-        title={`Request ${reqPlan?.name ?? ''}`}
-        description={
-          reqPlan?.toolQuota == null
-            ? 'This plan unlocks every tool. Choose a term and send your request.'
-            : `Pick up to ${reqPlan?.toolQuota} tools, choose a term, then send your request for admin approval.`
-        }
+        title={reqPlan ? `Request ${reqPlan.name}` : ''}
+        description="An admin reviews every plan change before it takes effect."
         footer={
           <>
             <button className="ds-btn ds-btn-ghost" onClick={() => setReqPlan(null)}>
               Cancel
             </button>
             <button className="ds-btn ds-btn-clay" onClick={submit} disabled={submitting}>
-              {submitting && <Loader2 className="animate-spin" />} Send request
+              {submitting ? 'Sending…' : 'Send request'}
             </button>
           </>
         }
       >
-        <div className="space-y-5">
-          <div>
-            <p className="ds-label">Term</p>
-            <div className="flex flex-wrap gap-2">
-              {MONTH_OPTIONS.map((m) => (
-                <button key={m} className={cx('ds-pill-tab', months === m && 'is-active')} aria-pressed={months === m} onClick={() => setMonths(m)}>
-                  {m} month{m === 1 ? '' : 's'}
-                </button>
-              ))}
-            </div>
-          </div>
-
-          {reqPlan?.toolQuota != null && (
+        {reqPlan && (
+          <div className="space-y-4">
             <div>
-              <div className="flex items-center justify-between">
-                <p className="ds-label">Tools</p>
-                <span className="text-[12.5px] font-semibold" style={{ color: selected.size >= reqPlan.toolQuota ? 'var(--ds-clay-ink)' : 'var(--ds-muted)' }}>
-                  {selected.size} / {reqPlan.toolQuota} selected
-                </span>
+              <div className="eyebrow" style={{ marginBottom: 8 }}>
+                Term
               </div>
-              <div className="mt-2 space-y-4">
-                {MODULE_CATEGORIES.map((cat) => (
-                  <div key={cat.id}>
-                    <p className="ds-muted mb-2 text-[12px] font-semibold uppercase tracking-wide">
-                      {cat.emoji} {cat.name}
-                    </p>
-                    <div className="grid grid-cols-1 gap-2 sm:grid-cols-2">
-                      {cat.modules.map((m) => {
-                        const checked = selected.has(m.id);
-                        const full = !checked && selected.size >= (reqPlan.toolQuota ?? Infinity);
-                        return (
-                          <label
-                            key={m.id}
-                            className="flex items-center gap-2 rounded-xl p-2.5 text-[13.5px]"
-                            style={{
-                              background: checked ? 'var(--ds-clay-soft)' : 'var(--ds-surface-2)',
-                              border: '1px solid var(--ds-border)',
-                              cursor: full ? 'not-allowed' : 'pointer',
-                              opacity: full ? 0.45 : 1,
-                            }}
-                          >
-                            <input type="checkbox" checked={checked} disabled={full} onChange={() => toggleTool(m.id)} style={{ accentColor: 'var(--ds-clay)' }} />
-                            {m.emoji} {m.name}
-                          </label>
-                        );
-                      })}
-                    </div>
-                  </div>
-                ))}
-              </div>
+              <Chips<number>
+                value={months}
+                onChange={setMonths}
+                options={MONTH_OPTIONS.map((m) => ({ key: m, label: m === 1 ? '1 month' : `${m} months` }))}
+              />
             </div>
-          )}
 
-          {error && (
-            <p className="text-[13px] font-medium" style={{ color: 'var(--ds-red)' }} role="alert">
-              {error}
-            </p>
-          )}
-        </div>
+            {reqPlan.toolQuota != null && (
+              <div>
+                <div className="eyebrow" style={{ marginBottom: 8 }}>
+                  Choose up to {reqPlan.toolQuota} tools ({selected.size} selected)
+                </div>
+                <div style={{ maxHeight: 260, overflowY: 'auto', display: 'flex', flexDirection: 'column', gap: 14 }}>
+                  {MODULE_CATEGORIES.map((cat) => (
+                    <div key={cat.id}>
+                      <div className="lsub" style={{ marginBottom: 6 }}>
+                        {cat.emoji} {cat.name}
+                      </div>
+                      <div className="chips">
+                        {cat.modules.map((m) => (
+                          <button
+                            key={m.id}
+                            type="button"
+                            className={cx('chip', selected.has(m.id) && 'on')}
+                            aria-pressed={selected.has(m.id)}
+                            onClick={() => toggleTool(m.id)}
+                          >
+                            {m.name}
+                          </button>
+                        ))}
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
+
+            {error && <InlineError message={error} />}
+          </div>
+        )}
       </DsDialog>
-    </DashboardLayout>
+    </StaadShell>
+  );
+}
+
+function Detail({ label, value }: { label: string; value: string }) {
+  return (
+    <div>
+      <div className="lsub">{label}</div>
+      <div className="lval" style={{ marginTop: 2 }}>
+        {value}
+      </div>
+    </div>
   );
 }

@@ -9,6 +9,17 @@
 // Next's App Router can't host a WebSocket route, hence this thin custom server.
 // HMR (dev) is preserved by delegating non-proxy upgrades to Next.
 
+// Keep generated output outside OneDrive through the local `.next` junction.
+// Node resolves modules from a junction's physical target, so explicitly expose
+// this project's dependencies to generated server bundles as well.
+const path = require('path')
+const Module = require('module')
+const projectNodeModules = path.join(__dirname, 'node_modules')
+process.env.NODE_PATH = [projectNodeModules, process.env.NODE_PATH]
+  .filter(Boolean)
+  .join(path.delimiter)
+Module.Module._initPaths()
+
 const { createServer } = require('http')
 const { parse } = require('url')
 const next = require('next')

@@ -3,9 +3,12 @@
   "version": "0.1.0",
   "private": true,
   "scripts": {
+    "db:generate": "prisma generate",
+    "predev": "npm run db:generate",
     "dev": "node server.js",
     "build": "next build",
     "start": "node server.js --prod",
+    "predev:next": "npm run db:generate",
     "dev:next": "next dev",
     "lint": "next lint",
     "test:pgvector": "tsx scripts/test-pgvector.ts",
@@ -20,7 +23,7 @@
     "test:e2e": "tsx scripts/test-e2e-rag.ts",
     "seed:admin": "node --env-file=.env scripts/seed-admin.cjs",
     "seed:plans": "node --env-file=.env scripts/seed-plans.cjs",
-    "prebuild": "node scripts/fetch-mediapipe-assets.mjs",
+    "prebuild": "npm run db:generate && node scripts/fetch-mediapipe-assets.mjs",
     "setup:mediapipe": "node scripts/fetch-mediapipe-assets.mjs",
     "test:rules": "firebase emulators:exec --only firestore --project staad-rules-test \"vitest run --config vitest.rules.config.ts\"",
     "emulators": "firebase emulators:start --only firestore --project staad-rules-test",
@@ -82,5 +85,13 @@
     "tsx": "^4.22.4",
     "typescript": "^5",
     "vitest": "^4.1.7"
+  },
+  "allowScripts": {
+    "@firebase/util@1.15.1": true,
+    "@prisma/client@6.19.3": true,
+    "@prisma/engines@6.19.3": true,
+    "esbuild@0.28.0": true,
+    "prisma@6.19.3": true,
+    "protobufjs@7.6.0": true
   }
 }
