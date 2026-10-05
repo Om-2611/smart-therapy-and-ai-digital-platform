@@ -26,6 +26,9 @@ import {
 } from '@/components/staad/icons';
 import { StartSessionDialog, AddClientDialog } from '@/components/practice/dialogs';
 import { useSessionActions } from '@/components/practice/useSessionActions';
+import { Drawer, EmptyState, toast } from '@/components/practice/ui';
+import SessionReportView from '@/components/report/SessionReportView';
+import { Loader2, Sparkles, RefreshCw, Pencil, Save } from 'lucide-react';
 import {
   SESSION_KIND,
   byStartAsc,
@@ -44,7 +47,7 @@ import {
 } from '@/lib/practice';
 
 type Tab = 'all' | 'completed' | 'upcoming' | 'notes-pending';
-const GRID = '1.9fr 1fr 1fr 1.1fr 96px';
+const GRID = '1.9fr 1fr 1fr 1.1fr 150px';
 
 export default function SessionsPage() {
   return (
@@ -65,6 +68,75 @@ function SessionsInner() {
   const [search, setSearch] = useState('');
   const [startOpen, setStartOpen] = useState(false);
   const [addOpen, setAddOpen] = useState(false);
+
+  const [reportFor, setReportFor] = useState<PracticeSession | null>(null);
+  const [report, setReport] = useState<any>(null);
+  const [reportStats, setReportStats] = useState<any>(null);
+  const [reportLoading, setReportLoading] = useState(false);
+  const [generating, setGenerating] = useState(false);
+  const [editing, setEditing] = useState(false);
+  const [draft, setDraft] = useState('');
+  const [savingReport, setSavingReport] = useState(false);
+
+  useEffect(() => {
+    if (!reportFor) {
+      setReport(null);
+      setEditing(false);
+      return;
+    }
+    setReportLoading(true);
+    fetch(`/api/session-report?sessionId=${reportFor.id}`)
+      .then((r) => r.ok ? r.json() : { report: null, stats: null })
+      .then((d) => {
+        setReport(d.report);
+        setReportStats(d.stats);
+      })
+      .catch(() => setReport(null))
+      .finally(() => setReportLoading(false));
+  }, [reportFor]);
+
+  const generateReport = async (sessionId: string) => {
+    setGenerating(true);
+    try {
+      const res = await fetch(`/api/session-report/generate?sessionId=${sessionId}`, { method: 'POST' });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || 'Failed to generate report');
+      setReport(data.report);
+      setReportStats(data.stats);
+      toast('Report generated successfully');
+    } catch (e) {
+      toast(e instanceof Error ? e.message : 'Could not generate report', 'error');
+    } finally {
+      setGenerating(false);
+    }
+  };
+
+  const saveReport = async () => {
+    if (!reportFor || !report) return;
+    setSavingReport(true);
+    try {
+      const res = await fetch('/api/session-report', {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ sessionId: reportFor.id, content: draft }),
+      });
+      if (!res.ok) throw new Error('Failed to save');
+      const data = await res.json();
+      setReport(data.report);
+      setEditing(false);
+      toast('Report updated');
+    } catch (e) {
+      toast('Could not save report changes', 'error');
+    } finally {
+      setSavingReport(false);
+    }
+  };
+
+  const openReport = (s: PracticeSession) => {
+    setReportFor(s);
+    setEditing(false);
+    setReport(null);
+  };
 
   // deep link from the Dashboard's "Pending Session Notes" card
   useEffect(() => {
@@ -261,7 +333,17 @@ function SessionsInner() {
                         )}
                       </div>
 
-                      <div className="lend">
+                      <div className="lend" style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                        {s.status === 'COMPLETED' && (
+                          <button
+                            type="button"
+                            className="ds-btn ds-btn-sm ds-btn-clay"
+                            onClick={() => openReport(s)}
+                            style={{ padding: '0.25rem 0.5rem', minHeight: 'unset', height: '32px' }}
+                          >
+                            <Sparkles style={{ width: '14px', height: '14px' }} /> Report
+                          </button>
+                        )}
                         <button
                           type="button"
                           className="nbtn arrow"
@@ -342,6 +424,90 @@ function SessionsInner() {
       />
       <AddClientDialog open={addOpen} onOpenChange={setAddOpen} onCreated={refresh} />
       {actions.dialogs}
+
+      <Drawer
+        open={!!reportFor}
+        onClose={() => setReportFor(null)}
+        title="Session report"
+        subtitle={reportFor ? `${fullName(reportFor.client)} · ${fmtListDate(reportFor.scheduledAt)}` : undefined}
+        wide
+      >
+        {reportLoading || generating ? (
+          <div className="flex flex-col items-center justify-center gap-3 py-16">
+            <Loader2 className="h-7 w-7 animate-spin" style={{ color: 'var(--ds-clay)' }} />
+            <p className="ds-muted text-[13.5px]">{generating ? 'Generating report…' : 'Loading…'}</p>
+          </div>
+        ) : !report ? (
+          <EmptyState compact title="No report yet" body="Generate an AI draft from the session transcript and notes.">
+            {reportFor && (
+              <button className="ds-btn ds-btn-clay" onClick={() => generateReport(reportFor.id)}>
+                <Sparkles className="h-4 w-4" /> Generate report
+              </button>
+            )}
+          </EmptyState>
+        ) : (
+          <div className="space-y-3">
+            <div className="flex flex-wrap items-center justify-between gap-2">
+              <span className="ds-muted text-[12px]">
+                {report.editedByTherapist ? 'Edited by therapist' : 'AI-generated draft'}
+                {report.model ? ` · ${report.model}` : ''}
+              </span>
+              {!editing && reportFor && (
+                <div className="flex gap-2">
+                  <button className="ds-btn ds-btn-sm ds-btn-outline" onClick={() => generateReport(reportFor.id)}>
+                    <RefreshCw className="h-4 w-4" /> Regenerate
+                  </button>
+                  <button
+                    className="ds-btn ds-btn-sm ds-btn-clay"
+                    onClick={() => {
+                      setDraft(report.content);
+                      setEditing(true);
+                    }}
+                  >
+                    <Pencil className="h-4 w-4" /> Edit
+                  </button>
+                </div>
+              )}
+            </div>
+            {editing ? (
+              <>
+                <textarea
+                  value={draft}
+                  autoFocus
+                  onChange={(e) => setDraft(e.target.value)}
+                  className="ds-input leading-relaxed"
+                  style={{ minHeight: '60vh', resize: 'vertical' }}
+                  aria-label="Report content"
+                />
+                <div className="flex justify-end gap-2">
+                  <button className="ds-btn ds-btn-sm ds-btn-ghost" onClick={() => setEditing(false)}>
+                    Cancel
+                  </button>
+                  <button className="ds-btn ds-btn-sm ds-btn-clay" onClick={saveReport} disabled={savingReport}>
+                    {savingReport ? <Loader2 className="h-4 w-4 animate-spin" /> : <Save className="h-4 w-4" />} Save
+                  </button>
+                </div>
+              </>
+            ) : (
+              <div className="rounded-2xl p-5" style={{ background: '#ffffff', border: '1px solid var(--ds-border)' }}>
+                <SessionReportView
+                  content={report.content}
+                  stats={reportStats}
+                  meta={{
+                    clientName: fullName(reportFor?.client) || undefined,
+                    dateLabel: new Date(report.generatedAt || reportFor?.scheduledAt || Date.now()).toLocaleDateString('en-GB', {
+                      day: 'numeric',
+                      month: 'long',
+                      year: 'numeric',
+                    }),
+                    statusLabel: report.editedByTherapist ? 'Edited by therapist' : 'AI-generated draft',
+                  }}
+                />
+              </div>
+            )}
+          </div>
+        )}
+      </Drawer>
     </StaadShell>
   );
 }
